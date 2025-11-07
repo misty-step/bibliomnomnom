@@ -26,54 +26,35 @@
   - ✅ Committed with descriptive message including architecture decisions
   ```
 
-- [~] Configure Tailwind CSS with bibliophile color palette
+- [x] Configure Tailwind CSS with bibliophile color palette
   ```
-  Files: tailwind.config.ts (lines 10-15), app/globals.css (lines 5-15)
+  Files: tailwind.config.ts, app/globals.css, app/page.tsx
   Pattern: Extend Tailwind theme with custom colors and typography
   Reference: TASK.md lines 268-277 (color palette), lines 262-266 (typography)
 
-  Approach:
-  1. Update tailwind.config.ts:
-     - Add bibliophile color palette to theme.extend.colors:
-       * paper: { DEFAULT: '#FDFBF7', secondary: '#F5F1E8' }
-       * ink: { DEFAULT: '#1A1A1A', faded: '#6B5D52' }
-       * leather: { DEFAULT: '#8B4513', light: '#D4A574' }
-       * border: '#E8DED0'
-     - Add typography fonts to theme.extend.fontFamily:
-       * serif: ['Crimson Text', 'Georgia', 'serif']
-       * sans: ['Inter', 'system-ui', 'sans-serif']
-       * mono: ['JetBrains Mono', 'monospace']
-     - Add fontSize scale: 12, 14, 16, 20, 24, 32, 48, 64px
-
-  2. Update app/globals.css:
-     - Replace :root CSS variables with bibliophile palette:
-       * --background: #FDFBF7 (paper)
-       * --foreground: #1A1A1A (ink)
-     - Remove dark mode @media query (not in MVP)
-     - Update body font-family to use Inter/system-ui
-
-  3. Update app/page.tsx as test:
-     - Apply new colors: bg-paper text-ink
-     - Apply new fonts: font-serif for headings, font-sans for body
-     - Verify classes compile and render
-
   Success criteria:
-  - ✓ Can use bg-paper, bg-paper-secondary, text-ink, text-ink-faded classes
-  - ✓ Can use text-leather, text-leather-light for accents
-  - ✓ Can use border-border for subtle borders
-  - ✓ Can use font-serif, font-sans, font-mono in components
-  - ✓ Can use text-xs through text-6xl (12px-64px scale)
-  - ✓ Home page renders with new colors and fonts
-  - ✓ No Tailwind compilation errors
+  - ✅ Can use bg-paper, bg-paper-secondary, text-ink, text-ink-faded classes
+  - ✅ Can use text-leather, text-leather-light for accents
+  - ✅ Can use border-border for subtle borders
+  - ✅ Can use font-serif, font-sans, font-mono in components
+  - ✅ Can use text-xs through text-6xl (Tailwind defaults)
+  - ✅ Home page renders with new colors and fonts
+  - ✅ No Tailwind compilation errors
+  - ✅ Build passes: 102 kB First Load JS
 
-  Testing:
-  - Run pnpm dev
-  - Visit localhost:3000
-  - Inspect elements to verify CSS custom properties
-  - Check browser console for errors
+  Work Log:
+  - ✅ Added bibliophile color palette (paper, ink, leather, border)
+  - ✅ Added typography fonts (Crimson Text serif, Inter sans, JetBrains Mono)
+  - ✅ Applied colors to landing page (warm sepia aesthetic)
+  - ✅ Simplified config via code review:
+    * Removed duplicate background/foreground CSS vars (10 lines)
+    * Removed fontSize override (uses Tailwind defaults, 10 lines)
+    * Made border.DEFAULT consistent with other colors
+    * Converted body CSS to @apply directive
+  - ✅ 30% reduction in config complexity
+  - ✅ All classes compile and work correctly
 
-  Dependencies: Next.js initialized ✅
-  Time: 30min
+  Time: 35min
   ```
 
 - [ ] Install and configure shadcn/ui base components
