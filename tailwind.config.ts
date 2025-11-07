@@ -9,8 +9,27 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
+        // Bibliophile color palette
+        paper: {
+          DEFAULT: "#FDFBF7", // Warm white (aged paper)
+          secondary: "#F5F1E8", // Lighter sepia
+        },
+        ink: {
+          DEFAULT: "#1A1A1A", // Near black (ink)
+          faded: "#6B5D52", // Warm gray (faded ink)
+        },
+        leather: {
+          DEFAULT: "#8B4513", // Saddle brown (leather)
+          light: "#D4A574", // Tan (aged pages)
+        },
+        border: {
+          DEFAULT: "#E8DED0", // Subtle border
+        },
+      },
+      fontFamily: {
+        serif: ["Crimson Text", "Georgia", "serif"],
+        sans: ["Inter", "system-ui", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
     },
   },
