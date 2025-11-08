@@ -158,7 +158,7 @@
   Time: 1hr
   ```
 
-- [ ] Build auth-protected route layout
+- [x] Build auth-protected route layout
   ```
   Files: app/(dashboard)/layout.tsx, app/(auth)/sign-in/[[...sign-in]]/page.tsx, app/(auth)/sign-up/[[...sign-up]]/page.tsx
   Architecture: Route groups for auth and dashboard (DESIGN.md lines 1046-1062)
