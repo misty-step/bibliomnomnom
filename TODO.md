@@ -366,7 +366,7 @@
   Time: 2hr
   ```
 
-- [ ] Implement status badge and privacy toggle components
+- [x] Implement status badge and privacy toggle components
   ```
   Files: components/book/StatusBadge.tsx, components/book/PrivacyToggle.tsx
   Architecture: Visual indicators (DESIGN.md lines 1092-1093)
