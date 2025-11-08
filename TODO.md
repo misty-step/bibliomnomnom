@@ -147,7 +147,7 @@
   - ✅ Deployed to Convex successfully
   ```
 
-- [ ] Create Clerk webhook handler for user sync
+- [x] Create Clerk webhook handler for user sync
   ```
   Files: app/api/webhooks/clerk/route.ts, convex/users.ts
   Architecture: Clerk → Convex user sync via webhook (DESIGN.md lines 81-84)
