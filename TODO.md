@@ -285,7 +285,7 @@
   Time: 2.5hr
   ```
 
-- [ ] Create note display components
+- [x] Create note display components
   ```
   Files: components/notes/NoteList.tsx, components/notes/NoteCard.tsx
   Architecture: Note display UI (DESIGN.md lines 1097-1100)
