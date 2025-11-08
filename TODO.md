@@ -298,7 +298,7 @@
 
 ## Module 5: File Upload (Custom Covers)
 
-- [ ] Implement Vercel Blob upload API route
+- [x] Implement Vercel Blob upload API route
   ```
   Files: app/api/blob/upload/route.ts, .env.local (BLOB_READ_WRITE_TOKEN)
   Architecture: Module 5 (DESIGN.md lines 675-776), presigned URL pattern
