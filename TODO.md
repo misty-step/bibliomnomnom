@@ -228,7 +228,7 @@
 
 ## Module 3: External Book Search
 
-- [ ] Implement Google Books API search action
+- [x] Implement Google Books API search action
   ```
   Files: convex/search.ts, .env.local (GOOGLE_BOOKS_API_KEY)
   Architecture: Module 3 (DESIGN.md lines 427-536), Convex actions for external calls
