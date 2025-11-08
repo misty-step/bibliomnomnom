@@ -274,7 +274,7 @@
   Time: 1.5hr
   ```
 
-- [ ] Build rich text note editor component
+- [x] Build rich text note editor component
   ```
   Files: components/notes/NoteEditor.tsx, components/notes/NoteTypeSelector.tsx
   Architecture: Note editor UI (DESIGN.md lines 1096-1100), rich text with Tiptap

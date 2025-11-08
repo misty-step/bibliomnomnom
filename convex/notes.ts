@@ -60,18 +60,21 @@ export const update = mutation({
     id: v.id("notes"),
     content: v.optional(v.string()),
     page: v.optional(v.string()),
+    type: v.optional(noteType),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    const note = await ctx.db.get(args.id);
+    const { id, ...updates } = args;
+    const note = await ctx.db.get(id);
 
     if (!note || note.userId !== userId) {
       throw new Error("Access denied");
     }
 
-    await ctx.db.patch(args.id, {
-      content: args.content ?? note.content,
-      page: args.page ?? note.page,
+    await ctx.db.patch(id, {
+      content: updates.content ?? note.content,
+      page: updates.page ?? note.page,
+      type: updates.type ?? note.type,
       updatedAt: Date.now(),
     });
   },
