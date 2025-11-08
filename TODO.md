@@ -169,7 +169,7 @@
   Time: 1hr
   ```
 
-- [ ] Create useAuth client hook
+- [x] Create useAuth client hook
   ```
   Files: lib/hooks/useAuth.ts
   Architecture: Module 1 public interface (DESIGN.md lines 70-74)
