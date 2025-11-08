@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+import { SearchModal } from "@/components/search/SearchModal";
 
 export default function LibraryPage() {
   return (
@@ -12,7 +12,7 @@ export default function LibraryPage() {
           Library features are on the way. Soon you&apos;ll see your books, filters, and quick actions
           right here.
         </p>
-        <Button disabled>Add Book</Button>
+        <SearchModal />
       </div>
     </section>
   );
