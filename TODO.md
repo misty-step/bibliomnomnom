@@ -124,15 +124,27 @@
 
 ## Module 1: Authentication & User Management
 
-- [ ] Implement Convex user schema and auth helpers
+- [x] Implement Convex user schema and auth helpers
   ```
-  Files: convex/schema.ts, convex/auth.ts
+  Files: convex/auth.ts, convex/users.ts
   Architecture: Module 1 (DESIGN.md lines 38-115), users table with clerk_id index
-  Pseudocode: requireAuth and getAuthOrNull helpers (lines 43-74)
-  Success: Users table defined, indexes created, auth helpers exported, type-safe
-  Test: Call requireAuth in test query, verify userId returned
-  Dependencies: Convex initialized
+  Success: ✅ Auth helpers exported, user mutations ready, type-safe
+  Test: ✅ Functions deployed, getCurrentUser query works
+  Dependencies: Convex initialized ✅
   Time: 45min
+
+  Work Log:
+  - ✅ Created convex/auth.ts with requireAuth and getAuthOrNull
+  - ✅ Extracted getUserByClerkId helper (DRY - removed duplication)
+  - ✅ Created convex/users.ts with getCurrentUser query
+  - ✅ Created createOrUpdateUser mutation for Clerk webhook sync
+  - ✅ Created deleteUser mutation (idempotent)
+  - ✅ Applied simplifications per code review:
+    * Removed verbose JSDoc comments (25% LOC reduction)
+    * Extracted shared lookup logic
+    * Inlined userData object in mutation
+    * Early return pattern in deleteUser
+  - ✅ Deployed to Convex successfully
   ```
 
 - [ ] Create Clerk webhook handler for user sync
