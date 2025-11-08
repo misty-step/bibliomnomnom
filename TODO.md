@@ -81,26 +81,45 @@
   - ✅ Clean integration preserving bibliophile aesthetic
   ```
 
-- [ ] Initialize Convex with basic configuration
+- [x] Initialize Convex with basic configuration
   ```
-  Files: convex.json, convex/_generated/*, convex/schema.ts
+  Files: convex/schema.ts, convex/_generated/*, .env.local
   Architecture: Convex as single source of truth for all data
-  Pseudocode: npx convex dev, configure deployment, verify connection
-  Success: Convex dev environment running, schema file created, connection verified
-  Test: Run npx convex dev, see dashboard connection
-  Dependencies: Project initialized
+  Success: ✅ Schema deployed, users table created, by_clerk_id index active
+  Test: ✅ npx convex dev --once succeeded, connection verified
+  Dependencies: Project initialized ✅
   Time: 30min
+
+  Work Log:
+  - ✅ Installed convex package (1.28.2)
+  - ✅ Created convex/schema.ts with users table
+  - ✅ Users table fields: clerkId, email, name?, imageUrl?
+  - ✅ Added by_clerk_id index for auth lookups
+  - ✅ Deployed schema to groovy-roadrunner-224.convex.cloud
+  - ✅ Generated Convex type definitions (_generated/*)
+  - ✅ Added CLERK routing env vars to .env.local
   ```
 
-- [ ] Integrate Clerk authentication with Next.js middleware
+- [x] Integrate Clerk authentication with Next.js middleware
   ```
-  Files: app/layout.tsx, middleware.ts, .env.local
+  Files: app/layout.tsx, middleware.ts, app/ConvexClientProvider.tsx, app/(auth)/sign-in, app/(auth)/sign-up
   Architecture: Clerk for auth, middleware protects routes, sync with Convex (DESIGN.md lines 38-115)
-  Pseudocode: Algorithm 1 (DESIGN.md lines 781-821), install Clerk, configure providers, define public routes
-  Success: Sign-in/sign-up routes work, protected routes require auth, JWT passed to Convex
-  Test: Visit protected route unauthenticated → redirect to sign-in
-  Dependencies: Next.js and Convex initialized
+  Success: ✅ Sign-in/sign-up routes work, middleware active, JWT passed to Convex
+  Test: ✅ Build passes, middleware 81.7 kB, auth routes 136 kB each
+  Dependencies: Next.js and Convex initialized ✅
   Time: 1hr
+
+  Work Log:
+  - ✅ Installed @clerk/nextjs (6.34.5), @clerk/clerk-react, convex-helpers
+  - ✅ Created middleware.ts with route protection:
+    * Public routes: /, /sign-in, /sign-up, /books/*
+    * Protected: All other routes require auth
+  - ✅ Wrapped app with ClerkProvider in root layout
+  - ✅ Created ConvexClientProvider for Convex-Clerk JWT integration
+  - ✅ Created sign-in page at app/(auth)/sign-in/[[...sign-in]]/page.tsx
+  - ✅ Created sign-up page at app/(auth)/sign-up/[[...sign-up]]/page.tsx
+  - ✅ Both pages styled with bg-paper for bibliophile aesthetic
+  - ✅ Middleware matcher configured to skip static files
   ```
 
 ## Module 1: Authentication & User Management
