@@ -322,7 +322,7 @@
 
 ## UI Components & Pages
 
-- [ ] Build library grid view with filtering
+- [~] Build library grid view with filtering
   ```
   Files: app/(dashboard)/library/page.tsx, components/book/BookGrid.tsx, components/book/BookCard.tsx
   Architecture: Library view (DESIGN.md lines 1056-1058), filter by status/favorites
