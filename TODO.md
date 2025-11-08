@@ -204,7 +204,7 @@
   Time: 1.5hr
   ```
 
-- [ ] Create book mutation functions (create, update, remove)
+- [x] Create book mutation functions (create, update, remove)
   ```
   Files: convex/books.ts (mutations)
   Architecture: Module 2 CRUD operations (DESIGN.md lines 196-275)
