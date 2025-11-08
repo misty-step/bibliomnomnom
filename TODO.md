@@ -193,7 +193,7 @@
   Time: 45min
   ```
 
-- [ ] Create book query functions (list, get, getPublic)
+- [x] Create book query functions (list, get, getPublic)
   ```
   Files: convex/books.ts (queries)
   Architecture: Module 2 public interface (DESIGN.md lines 123-194)
