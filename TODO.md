@@ -252,7 +252,7 @@
 
 ## Module 4: Notes & Content
 
-- [ ] Implement Convex notes schema with indexes
+- [x] Implement Convex notes schema with indexes
   ```
   Files: convex/schema.ts (notes table)
   Architecture: Module 4 data structures (DESIGN.md lines 646-665)

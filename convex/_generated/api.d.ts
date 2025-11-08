@@ -9,6 +9,8 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as books from "../books.js";
+import type * as search from "../search.js";
 import type * as users from "../users.js";
 
 import type {
@@ -27,6 +29,8 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  books: typeof books;
+  search: typeof search;
   users: typeof users;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

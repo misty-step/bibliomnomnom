@@ -44,4 +44,19 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_status", ["userId", "status"])
     .index("by_user_favorite", ["userId", "isFavorite"]),
+  notes: defineTable({
+    bookId: v.id("books"),
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("note"),
+      v.literal("quote"),
+      v.literal("reflection")
+    ),
+    content: v.string(),
+    page: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_book", ["bookId"])
+    .index("by_user", ["userId"]),
 });
