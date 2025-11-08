@@ -182,7 +182,7 @@
 
 ## Module 2: Books Data Layer
 
-- [ ] Implement Convex books schema with indexes
+- [x] Implement Convex books schema with indexes
   ```
   Files: convex/schema.ts (books table)
   Architecture: Module 2 data structures (DESIGN.md lines 369-417)
