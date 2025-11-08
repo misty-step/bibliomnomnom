@@ -263,7 +263,7 @@
   Time: 30min
   ```
 
-- [ ] Create note query and mutation functions
+- [x] Create note query and mutation functions
   ```
   Files: convex/notes.ts
   Architecture: Module 4 public interface (DESIGN.md lines 544-632)
