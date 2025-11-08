@@ -309,7 +309,7 @@
   Time: 1hr
   ```
 
-- [ ] Create cover upload component
+- [x] Create cover upload component
   ```
   Files: components/book/UploadCover.tsx
   Architecture: Client-side Blob upload (DESIGN.md lines 716-738)
