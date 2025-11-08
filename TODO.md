@@ -215,7 +215,7 @@
   Time: 2hr
   ```
 
-- [ ] Create specialized book mutations (updateStatus, toggleFavorite, updatePrivacy)
+- [x] Create specialized book mutations (updateStatus, toggleFavorite, updatePrivacy)
   ```
   Files: convex/books.ts (specialized mutations)
   Architecture: Module 2 quick operations (DESIGN.md lines 277-352)

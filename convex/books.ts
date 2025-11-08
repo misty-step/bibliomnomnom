@@ -191,3 +191,82 @@ export const remove = mutation({
     await ctx.db.delete(args.id);
   },
 });
+
+export const updateStatus = mutation({
+  args: {
+    id: v.id("books"),
+    status: statusField,
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const book = await ctx.db.get(args.id);
+
+    if (!book || book.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    const now = Date.now();
+    const updates: Partial<Doc<"books">> = {
+      status: args.status,
+      updatedAt: now,
+    };
+
+    if (args.status === "currently-reading" && !book.dateStarted) {
+      updates.dateStarted = now;
+    }
+
+    if (args.status === "read") {
+      if (!book.dateFinished) {
+        updates.dateFinished = now;
+      }
+
+      updates.timesRead = book.timesRead + 1;
+
+      if (!book.dateStarted) {
+        updates.dateStarted = now;
+      }
+    }
+
+    await ctx.db.patch(args.id, updates);
+  },
+});
+
+export const toggleFavorite = mutation({
+  args: { id: v.id("books") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const book = await ctx.db.get(args.id);
+
+    if (!book || book.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    const newValue = !book.isFavorite;
+    await ctx.db.patch(args.id, {
+      isFavorite: newValue,
+      updatedAt: Date.now(),
+    });
+
+    return newValue;
+  },
+});
+
+export const updatePrivacy = mutation({
+  args: {
+    id: v.id("books"),
+    privacy: v.union(v.literal("private"), v.literal("public")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const book = await ctx.db.get(args.id);
+
+    if (!book || book.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    await ctx.db.patch(args.id, {
+      privacy: args.privacy,
+      updatedAt: Date.now(),
+    });
+  },
+});
