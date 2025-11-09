@@ -344,7 +344,7 @@
   Time: 2.5hr
   ```
 
-- [ ] Build public book page
+- [x] Build public book page
   ```
   Files: app/books/[id]/page.tsx
   Architecture: Public book view (DESIGN.md lines 1064-1065, privacy algorithm lines 883-931)
