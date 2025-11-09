@@ -379,7 +379,7 @@
 
 ## Layout & Navigation
 
-- [~] Build dashboard layout with navigation
+- [x] Build dashboard layout with navigation
   ```
   Files: app/(dashboard)/layout.tsx
   Architecture: Persistent dashboard layout (DESIGN.md lines 1054)

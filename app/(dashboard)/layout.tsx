@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { UserButton } from "@clerk/nextjs";
+import { DashboardNav } from "@/components/layout/DashboardNav";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -22,32 +23,40 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
 
   return (
     <div className="min-h-screen bg-paper text-ink">
-      <header className="border-b border-border bg-paper-secondary/60 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col lg:flex-row">
+        <aside className="hidden w-64 flex-col border-r border-border bg-paper-secondary/70 px-6 py-8 lg:flex">
           <Link href="/library" className="font-serif text-2xl text-leather">
             bibliomnomnom
           </Link>
-          <nav className="flex items-center gap-4 text-sm font-medium text-ink-faded">
-            {links.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-md px-3 py-2 transition hover:bg-paper hover:text-ink"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-3">
-            <div className="hidden text-right text-xs sm:block">
+          <p className="mt-2 text-sm text-ink-faded">
+            Beautiful tools for voracious readers.
+          </p>
+          <div className="mt-6">
+            <DashboardNav links={links} orientation="vertical" />
+          </div>
+          <div className="mt-auto flex items-center gap-3 rounded-2xl border border-border bg-paper p-3">
+            <div className="flex-1 text-xs">
               <p className="font-semibold text-ink">{user.firstName ?? "Reader"}</p>
               <p className="text-ink-faded">{user.emailAddresses[0]?.emailAddress}</p>
             </div>
             <UserButton appearance={{ elements: { avatarBox: "h-10 w-10" } }} />
           </div>
+        </aside>
+        <div className="flex-1">
+          <header className="border-b border-border bg-paper-secondary/60 px-4 py-4 lg:hidden">
+            <div className="flex items-center justify-between">
+              <Link href="/library" className="font-serif text-2xl text-leather">
+                bibliomnomnom
+              </Link>
+              <UserButton appearance={{ elements: { avatarBox: "h-10 w-10" } }} />
+            </div>
+            <div className="mt-3">
+              <DashboardNav links={links} />
+            </div>
+          </header>
+          <main className="px-4 py-10 sm:px-6">{children}</main>
         </div>
-      </header>
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6">{children}</main>
+      </div>
     </div>
   );
 }
