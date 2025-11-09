@@ -355,7 +355,7 @@
   Time: 1.5hr
   ```
 
-- [ ] Create book form and add book modal
+- [x] Create book form and add book modal
   ```
   Files: components/book/BookForm.tsx, components/search/SearchModal.tsx integration
   Architecture: Add/edit book UI (DESIGN.md lines 1091), manual entry fallback
