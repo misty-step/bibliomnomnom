@@ -426,6 +426,8 @@ export const books = defineTable({
 
 ### Module 3: External Book Search
 
+> **Status (Nov 10, 2025):** Deferred for MVP. Manual entry-only flow shipped while we revisit Google Books integration later. Architecture notes remain for future implementation.
+
 **Responsibility**: Hide Google Books API complexity—rate limiting, error handling, response transformation, caching—behind simple search interface.
 
 **Public Interface**:
@@ -509,8 +511,8 @@ async function cacheSearchResults(
 ```
 
 **Dependencies**:
-- **Requires**: Google Books API key (env var), fetch API
-- **Used by**: Add Book modal, search UI
+- **Requires**: Google Books API key (env var), fetch API *(inactive until feature resumes)*
+- **Used by**: Add Book modal, search UI *(future)*
 
 **Data Structures**:
 ```typescript
@@ -1339,8 +1341,8 @@ CONVEX_DEPLOYMENT=dev:your-deployment
 # Vercel Blob
 BLOB_READ_WRITE_TOKEN=vercel_blob_...
 
-# Google Books API
-GOOGLE_BOOKS_API_KEY=AIza...
+# (Deferred) Google Books API
+# GOOGLE_BOOKS_API_KEY=AIza...
 ```
 
 ---
@@ -2177,4 +2179,3 @@ After architecture approval:
 **Confidence Level**: High—architecture is simple, explicit, and robust
 
 🚀 **Ready to build something beautiful.**
-

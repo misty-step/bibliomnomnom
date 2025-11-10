@@ -45,17 +45,23 @@ Required variables:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` / `CLERK_SECRET_KEY` / `CLERK_WEBHOOK_SECRET`
 - `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_URL` (defaults already set)
 - `NEXT_PUBLIC_CONVEX_URL` / `CONVEX_DEPLOYMENT` (and optional `CONVEX_DEPLOYMENT_URL` for webhooks)
-- `GOOGLE_BOOKS_API_KEY` (used for the search modal)
 - `BLOB_READ_WRITE_TOKEN` (used by `/api/blob/upload` + `UploadCover`)
 
 After populating the values, restart `pnpm dev` so Next.js can pick up the new environment.
 
+## Backend Setup
+
+1. **Sync Convex**: run `pnpm convex:push` once after pulling new code. This pushes the latest schema/functions to your configured dev deployment so queries like `api.books.list` exist. If you keep a terminal open for live updates/logs, use `pnpm convex:dev`. Seeing `[CONVEX Q(...)] Could not find public function` almost always means this step (or `NEXT_PUBLIC_CONVEX_URL`) is misconfigured.
+2. **Clerk JWT template**: in the Clerk dashboard create a JWT template named `convex`. Include `convex` in the template metadata and enable it for the instance you’re using locally. Without this template Clerk returns `404` for `.../tokens/convex`, which prevents Convex auth from working.
+3. **Dev console noise**: React DevTools reminders, Clerk dev-key warnings, and Cloudflare Turnstile messages are expected when you run with development keys. They do not block the app as long as the steps above are complete.
+
 ## Using The App Locally
 
-- The landing page CTA is currently decorative; visit `/sign-in` to start the Clerk auth flow.
+- The landing page CTA routes to `/sign-in`; you can also hit that path directly to start the Clerk auth flow.
 - After signing in, you are redirected to `/library`, which hosts the private dashboard experience.
 - Public book details live under `/books/[id]`; private, editable book details are under `/library/books/[id]`.
 - If you need to test uploads, ensure `BLOB_READ_WRITE_TOKEN` is present; otherwise the cover uploader will fail.
+- Adding books is manual for the MVP—use the “Add Book” button in the library header to enter details.
 
 ## Package Manager Enforcement
 

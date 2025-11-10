@@ -12,7 +12,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "convex:dev": "convex dev",
+    "convex:push": "convex dev --once"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.53.8",

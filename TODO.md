@@ -226,28 +226,15 @@
   Time: 1.5hr
   ```
 
-## Module 3: External Book Search
+## Module 3: External Book Search (Deferred)
 
-- [x] Implement Google Books API search action
+- [x] Move Google Books integration to backlog
   ```
-  Files: convex/search.ts, .env.local (GOOGLE_BOOKS_API_KEY)
-  Architecture: Module 3 (DESIGN.md lines 427-536), Convex actions for external calls
-  Pseudocode: Algorithm 4 (lines 935-1002), transform Google Books response to SearchResult format
-  Success: Search action returns transformed results, API key hidden, errors handled gracefully
-  Test: Search "Thinking Fast and Slow", verify 10 results returned with metadata
-  Dependencies: Convex initialized, environment variables configured
-  Time: 1.5hr
-  ```
-
-- [x] Create search modal with real-time results
-  ```
-  Files: components/search/SearchModal.tsx, components/search/SearchBar.tsx, components/search/SearchResults.tsx
-  Architecture: Search UI (DESIGN.md lines 1102-1105), debounced search pattern (lines 1888-1899)
-  Pseudocode: Debounce input, call search action, display grid of results, click to add
-  Success: Modal opens, search debounced 500ms, results display with covers, add button works
-  Test: Type query, verify debounce, see results render, click add
-  Dependencies: Search action implemented, shadcn dialog component installed
-  Time: 2hr
+  Files removed: convex/search.ts, components/search/*
+  Architecture: Module 3 (DESIGN.md lines 427-536) deferred in favor of manual entry
+  Decision: API friction + limited value for MVP; manual entry covers core use case
+  Note: Added backlog item to revisit richer search/import later
+  Date: 2025-11-10
   ```
 
 ## Module 4: Notes & Content
@@ -355,14 +342,14 @@
   Time: 1.5hr
   ```
 
-- [x] Create book form and add book modal
+- [x] Build manual add book modal
   ```
-  Files: components/book/BookForm.tsx, components/search/SearchModal.tsx integration
-  Architecture: Add/edit book UI (DESIGN.md lines 1091), manual entry fallback
-  Pseudocode: Search modal → select result OR manual form, create book with defaults, success toast
-  Success: Can add via search or manual entry, form validation works, book created with correct defaults
-  Test: Search and add, manually add book, verify both paths work
-  Dependencies: Search modal and book create mutation implemented
+  Files: components/book/AddBookModal.tsx, app/(dashboard)/library/page.tsx
+  Architecture: Add/edit book UI (DESIGN.md lines 1091), manual entry-only flow
+  Pseudocode: Modal with required title/author + status selector, optional metadata, create book mutation
+  Success: Can add via manual entry, validation ensures required fields, optimistic feedback
+  Test: Add book manually, verify it appears in grid, check validation for missing title/author
+  Dependencies: Book create mutation implemented
   Time: 2hr
   ```
 

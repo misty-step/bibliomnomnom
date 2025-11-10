@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { motion } from "framer-motion";
-import { SearchModal } from "@/components/search/SearchModal";
+import { AddBookModal } from "@/components/book/AddBookModal";
 import { LibraryView } from "@/components/book/LibraryView";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -23,7 +23,7 @@ export default function LibraryPage() {
             Browse every book you&apos;re dreaming about, reading, or remembering.
           </p>
         </div>
-        <SearchModal triggerLabel="Add Book" />
+        <AddBookModal triggerLabel="Add Book" />
       </div>
       <ErrorBoundary
         fallback={

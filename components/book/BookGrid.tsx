@@ -112,7 +112,7 @@ function LibraryEmptyState() {
   return (
     <EmptyState
       title="Your shelves are empty"
-      description="Search for a book or add one manually to start your collection."
+      description="Use the Add Book button to start logging your collection."
     />
   );
 }

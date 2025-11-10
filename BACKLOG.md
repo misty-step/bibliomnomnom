@@ -808,6 +808,12 @@ These ideas were considered but deliberately rejected:
 
 ---
 
+## Deferred From MVP
+
+- [ ] External book search/import (Google Books or similar) with API-backed modal
+
+---
+
 ## Contribution Ideas
 
 If opening to community contributions:
