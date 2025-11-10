@@ -4,6 +4,7 @@ import { useQuery } from "convex/react";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { NoteCard } from "./NoteCard";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 type NoteListProps = {
   bookId: Id<"books">;
@@ -19,9 +20,10 @@ export function NoteList({ bookId, onEdit }: NoteListProps) {
 
   if (!notes.length) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-paper-secondary p-8 text-center text-sm text-ink-faded">
-        No notes yet. Use the editor to capture your thoughts.
-      </div>
+      <EmptyState
+        title="No notes yet"
+        description="Use the editor on the right to capture your first thought."
+      />
     );
   }
 

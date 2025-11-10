@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { BookCard } from "./BookCard";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 type StatusFilter = "all" | "want-to-read" | "currently-reading" | "read";
 
@@ -33,7 +34,7 @@ export function BookGrid() {
           ))}
         </div>
       ) : (
-        <EmptyState />
+        <LibraryEmptyState />
       )}
     </div>
   );
@@ -107,12 +108,11 @@ function GridSkeleton() {
   );
 }
 
-function EmptyState() {
+function LibraryEmptyState() {
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-paper-secondary/70 p-8 text-center">
-      <p className="text-sm text-ink-faded">
-        Nothing here yet. Add a book to start growing your library.
-      </p>
-    </div>
+    <EmptyState
+      title="Your shelves are empty"
+      description="Search for a book or add one manually to start your collection."
+    />
   );
 }
