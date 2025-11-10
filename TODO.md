@@ -447,7 +447,7 @@
   Time: 30min
   ```
 
-- [ ] Set up environment variables and configuration
+- [x] Set up environment variables and configuration
   ```
   Files: .env.local, .env.example, next.config.js
   Architecture: Environment setup (DESIGN.md lines 1323-1344)
@@ -456,6 +456,11 @@
   Test: Copy .env.example to .env.local, verify app starts
   Dependencies: All features implemented
   Time: 30min
+  Work Log:
+  - ✅ Created .env.example with Clerk, Convex, Google Books, and Vercel Blob secrets plus defaults
+  - ✅ Documented environment + usage steps in README (sign in via /sign-in, dashboard at /library)
+  - ✅ Added Vercel Blob domain to next.config.ts remotePatterns so uploaded covers render
+  - ✅ Ran `pnpm lint` to make sure config + docs changes keep the repo clean
   ```
 
 ## Deployment Preparation
