@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
@@ -10,7 +12,20 @@ export default function Home() {
         <p className="text-center sm:text-left text-ink-faded text-lg">
           A digital garden for voracious readers
         </p>
-        <Button>Get Started</Button>
+        <SignedOut>
+          <Button asChild>
+            <Link href="/sign-in" prefetch>
+              Get Started
+            </Link>
+          </Button>
+        </SignedOut>
+        <SignedIn>
+          <Button asChild variant="secondary">
+            <Link href="/library" prefetch>
+              Enter Library
+            </Link>
+          </Button>
+        </SignedIn>
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
         <p className="text-sm text-ink-faded border-t border-border pt-4">
