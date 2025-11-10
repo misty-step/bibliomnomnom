@@ -436,7 +436,7 @@
   Time: 2.5hr
   ```
 
-- [ ] Create toast notification system
+- [~] Create toast notification system
   ```
   Files: components/ui/toast.tsx (shadcn), lib/hooks/useToast.ts
   Architecture: User feedback (DESIGN.md error handling and success states)
