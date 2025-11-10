@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { useQuery, useMutation } from "convex/react";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
@@ -75,7 +76,12 @@ export function BookDetail({ bookId }: BookDetailProps) {
   };
 
   return (
-    <section className="space-y-8">
+    <motion.section
+      className="space-y-8"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <header className="space-y-6 rounded-3xl border border-border bg-paper-secondary/70 p-6">
         <div className="flex flex-col gap-6 lg:flex-row">
           <div className="relative h-64 w-full max-w-xs overflow-hidden rounded-2xl border border-border bg-paper">
@@ -130,7 +136,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
       ) : (
         <NotesSection bookId={book._id} />
       )}
-    </section>
+    </motion.section>
   );
 }
 

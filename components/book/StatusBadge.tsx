@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const STATUS_MAP = {
@@ -27,13 +28,15 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const meta = STATUS_MAP[status];
 
   return (
-    <span
+    <motion.span
+      layout
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className={cn(
         "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
         meta.className
       )}
     >
       {meta.label}
-    </span>
+    </motion.span>
   );
 }

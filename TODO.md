@@ -414,7 +414,7 @@
 
 ## Polish & Testing
 
-- [~] Add Framer Motion animations
+- [x] Add Framer Motion animations
   ```
   Files: components/book/BookCard.tsx, components/shared/* (wrap with motion)
   Architecture: Subtle animations (DESIGN.md lines 287-293)

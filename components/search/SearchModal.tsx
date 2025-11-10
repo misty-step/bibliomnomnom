@@ -3,6 +3,7 @@
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { SearchBar } from "./SearchBar";
 import { SearchResults } from "./SearchResults";
@@ -103,10 +104,22 @@ export function SearchModal({
   return (
     <>
       <Button onClick={() => setIsOpen(true)}>{triggerLabel}</Button>
-      {isOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="mx-4 w-full max-w-4xl rounded-2xl border border-border bg-paper p-6 shadow-2xl">
-            <div className="flex items-start justify-between">
+      <AnimatePresence>
+        {isOpen ? (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="mx-4 w-full max-w-4xl rounded-2xl border border-border bg-paper p-6 shadow-2xl"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="flex items-start justify-between">
               <div>
                 <h2 className="font-serif text-2xl text-leather">Find a Book</h2>
                 <p className="text-sm text-ink-faded">
@@ -137,9 +150,10 @@ export function SearchModal({
                 onSelect={handleSelect}
               />
             </div>
-          </div>
-        </div>
-      ) : null}
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </>
   );
 }

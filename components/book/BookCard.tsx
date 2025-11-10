@@ -1,4 +1,7 @@
+"use client";
+
 import Image from "next/image";
+import { motion, useReducedMotion } from "framer-motion";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { StatusBadge } from "./StatusBadge";
 
@@ -7,8 +10,20 @@ type BookCardProps = {
 };
 
 export function BookCard({ book }: BookCardProps) {
+  const shouldReduce = useReducedMotion();
+
   return (
-    <article className="flex flex-col rounded-2xl border border-border bg-paper p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+    <motion.article
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={
+        shouldReduce
+          ? undefined
+          : { y: -8, boxShadow: "0 20px 30px rgba(0,0,0,0.08)" }
+      }
+      transition={{ duration: 0.25, ease: "easeOut" }}
+      className="flex flex-col rounded-2xl border border-border bg-paper p-4"
+    >
       <div className="relative mb-4 h-48 w-full overflow-hidden rounded-xl border border-border bg-paper-secondary">
         {book.coverUrl || book.apiCoverUrl ? (
           <Image
@@ -29,6 +44,6 @@ export function BookCard({ book }: BookCardProps) {
         <h3 className="font-serif text-xl text-leather">{book.title}</h3>
         <p className="text-sm text-ink-faded">{book.author}</p>
       </div>
-    </article>
+    </motion.article>
   );
 }

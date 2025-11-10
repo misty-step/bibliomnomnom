@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense } from "react";
+import { motion } from "framer-motion";
 import { SearchModal } from "@/components/search/SearchModal";
 import { LibraryView } from "@/components/book/LibraryView";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
@@ -9,7 +10,12 @@ import { BookCardSkeleton } from "@/components/book/BookCardSkeleton";
 
 export default function LibraryPage() {
   return (
-    <section className="space-y-8">
+    <motion.section
+      className="space-y-8"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+    >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-serif text-3xl text-leather">Your Library</h1>
@@ -28,7 +34,7 @@ export default function LibraryPage() {
           <LibraryView />
         </Suspense>
       </ErrorBoundary>
-    </section>
+    </motion.section>
   );
 }
 
