@@ -1,6 +1,11 @@
+"use client";
+
 import { Suspense } from "react";
 import { SearchModal } from "@/components/search/SearchModal";
 import { LibraryView } from "@/components/book/LibraryView";
+import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { ErrorState } from "@/components/shared/ErrorState";
+import { BookCardSkeleton } from "@/components/book/BookCardSkeleton";
 
 export default function LibraryPage() {
   return (
@@ -14,25 +19,26 @@ export default function LibraryPage() {
         </div>
         <SearchModal triggerLabel="Add Book" />
       </div>
-
-      <Suspense fallback={<Placeholder />}>
-        <LibraryView />
-      </Suspense>
+      <ErrorBoundary
+        fallback={
+          <ErrorState message="We couldn’t load your library. Please refresh and try again." />
+        }
+      >
+        <Suspense fallback={<LibrarySkeleton />}>
+          <LibraryView />
+        </Suspense>
+      </ErrorBoundary>
     </section>
   );
 }
 
-function Placeholder() {
+function LibrarySkeleton() {
   return (
-    <div className="space-y-4">
-      <div className="h-10 w-full animate-pulse rounded-lg bg-paper-secondary" />
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-6">
+      <div className="h-10 w-48 animate-pulse rounded bg-paper-secondary/80" />
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, idx) => (
-          <div key={idx} className="space-y-3 rounded-2xl border border-border p-4">
-            <div className="h-48 rounded-xl bg-paper animate-pulse" />
-            <div className="h-4 w-3/4 rounded bg-paper" />
-            <div className="h-3 w-1/2 rounded bg-paper" />
-          </div>
+          <BookCardSkeleton key={idx} />
         ))}
       </div>
     </div>

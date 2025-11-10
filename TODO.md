@@ -390,7 +390,7 @@
   Time: 1.5hr
   ```
 
-- [~] Create loading states and error boundaries
+- [x] Create loading states and error boundaries
   ```
   Files: components/shared/LoadingSkeleton.tsx, components/shared/ErrorBoundary.tsx, app/(dashboard)/library/loading.tsx
   Architecture: Loading and error handling (DESIGN.md lines 1107-1110)
