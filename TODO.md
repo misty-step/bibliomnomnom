@@ -401,7 +401,7 @@
   Time: 1.5hr
   ```
 
-- [ ] Implement empty states
+- [~] Implement empty states
   ```
   Files: components/shared/EmptyState.tsx
   Architecture: No data placeholder (DESIGN.md line 1109)
