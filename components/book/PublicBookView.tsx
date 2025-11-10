@@ -29,9 +29,9 @@ export function PublicBookView({ bookId }: PublicBookViewProps) {
   }
 
   return (
-    <section className="mx-auto max-w-4xl space-y-6 rounded-3xl border border-border bg-paper-secondary/70 p-8">
+    <section className="mx-auto max-w-4xl space-y-6 rounded-3xl border border-border bg-paper-secondary/70 px-4 py-8 sm:px-8">
       <header className="flex flex-col gap-8 lg:flex-row">
-        <div className="relative h-72 w-full max-w-xs overflow-hidden rounded-2xl border border-border bg-paper">
+        <div className="relative h-64 w-full overflow-hidden rounded-2xl border border-border bg-paper sm:h-72 lg:max-w-xs">
           {book.coverUrl || book.apiCoverUrl ? (
             <Image
               src={(book.coverUrl ?? book.apiCoverUrl) as string}

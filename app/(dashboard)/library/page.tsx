@@ -11,7 +11,7 @@ import { BookCardSkeleton } from "@/components/book/BookCardSkeleton";
 export default function LibraryPage() {
   return (
     <motion.section
-      className="space-y-8"
+      className="space-y-8 px-4 py-8 sm:px-6"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}

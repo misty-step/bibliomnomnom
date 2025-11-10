@@ -28,7 +28,7 @@ export function BookGrid() {
       {books === undefined ? (
         <GridSkeleton />
       ) : books.length ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {books.map((book) => (
             <BookCard key={book._id} book={book} />
           ))}
@@ -64,7 +64,7 @@ function Filters({
   );
 
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-paper-secondary/70 p-4">
+    <div className="flex flex-col gap-4 rounded-2xl border border-border bg-paper-secondary/70 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap gap-2">
         {chips.map((chip) => (
           <button
@@ -96,7 +96,7 @@ function Filters({
 
 function GridSkeleton() {
   return (
-    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {Array.from({ length: 6 }).map((_, idx) => (
         <div key={idx} className="space-y-3 rounded-2xl border border-border p-4">
           <div className="h-48 rounded-xl bg-paper animate-pulse" />
