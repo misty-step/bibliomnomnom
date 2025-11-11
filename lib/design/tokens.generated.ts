@@ -57,7 +57,12 @@ export const designTokens = {
     "lg": "1.5rem",
     "xl": "2rem",
     "2xl": "3rem",
-    "3xl": "4rem"
+    "3xl": "4rem",
+    "heroInset": "1.25rem",
+    "coverColumn": "12.5rem",
+    "notePanel": "15.625rem",
+    "formFieldMin": "6rem",
+    "toastMax": "26.25rem"
   },
   "radii": {
     "xs": "0.35rem",
@@ -154,9 +159,14 @@ export const tokenVars = {
     "2xs": "var(--space-2xs)",
     "3xl": "var(--space-3xl)",
     "3xs": "var(--space-3xs)",
+    "coverColumn": "var(--space-cover-column)",
+    "formFieldMin": "var(--space-form-field-min)",
+    "heroInset": "var(--space-hero-inset)",
     "lg": "var(--space-lg)",
     "md": "var(--space-md)",
+    "notePanel": "var(--space-note-panel)",
     "sm": "var(--space-sm)",
+    "toastMax": "var(--space-toast-max)",
     "xl": "var(--space-xl)",
     "xs": "var(--space-xs)"
   },

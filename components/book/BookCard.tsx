@@ -1,9 +1,12 @@
 "use client";
 
+import type { KeyboardEvent } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { StatusBadge } from "./StatusBadge";
+import { tokenVars } from "@/lib/design/tokens.generated";
 
 type BookCardProps = {
   book: Doc<"books">;
@@ -11,6 +14,18 @@ type BookCardProps = {
 
 export function BookCard({ book }: BookCardProps) {
   const shouldReduce = useReducedMotion();
+  const router = useRouter();
+
+  const navigateToDetails = () => {
+    router.push(`/library/books/${book._id}`);
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      navigateToDetails();
+    }
+  };
 
   return (
     <motion.article
@@ -19,10 +34,15 @@ export function BookCard({ book }: BookCardProps) {
       whileHover={
         shouldReduce
           ? undefined
-          : { y: -8, boxShadow: "0 20px 30px rgba(0,0,0,0.08)" }
+          : { y: -8, boxShadow: tokenVars.elevation.raised }
       }
       transition={{ duration: 0.25, ease: "easeOut" }}
-      className="flex flex-col rounded-2xl border border-border bg-paper p-4"
+      className="flex cursor-pointer flex-col rounded-2xl border border-border bg-paper p-4 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leather"
+      role="button"
+      tabIndex={0}
+      aria-label={`View details for ${book.title}`}
+      onClick={navigateToDetails}
+      onKeyDown={handleKeyDown}
     >
       <div className="relative mb-4 h-48 w-full overflow-hidden rounded-xl border border-border bg-paper-secondary">
         {book.coverUrl || book.apiCoverUrl ? (

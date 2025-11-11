@@ -57,7 +57,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
     editorProps: {
       attributes: {
         class:
-          "prose prose-sm max-w-none min-h-[250px] rounded-2xl border border-border bg-paper px-4 py-3 focus:outline-none",
+          "prose prose-sm max-w-none min-h-[var(--space-note-panel)] rounded-2xl border border-border bg-paper px-4 py-3 focus:outline-none",
       },
     },
     onUpdate: ({ editor }) => {
@@ -225,7 +225,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
 
 function SkeletonEditor() {
   return (
-    <div className="flex min-h-[250px] animate-pulse flex-col gap-2 rounded-2xl border border-border bg-paper p-4">
+    <div className="flex min-h-[var(--space-note-panel)] animate-pulse flex-col gap-2 rounded-2xl border border-border bg-paper p-4">
       <div className="h-4 w-3/4 rounded bg-border" />
       <div className="h-4 w-full rounded bg-border" />
       <div className="h-4 w-5/6 rounded bg-border" />
