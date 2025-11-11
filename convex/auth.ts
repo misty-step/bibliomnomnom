@@ -1,9 +1,10 @@
 import { QueryCtx, MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 async function getUserByClerkId(
   ctx: QueryCtx | MutationCtx,
   clerkId: string
-): Promise<string | null> {
+): Promise<Id<"users"> | null> {
   const user = await ctx.db
     .query("users")
     .withIndex("by_clerk_id", (q) => q.eq("clerkId", clerkId))
@@ -15,7 +16,7 @@ async function getUserByClerkId(
 // Returns authenticated user ID or throws
 export async function requireAuth(
   ctx: QueryCtx | MutationCtx
-): Promise<string> {
+): Promise<Id<"users">> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
     throw new Error("Unauthenticated: User must be signed in");
@@ -32,7 +33,7 @@ export async function requireAuth(
 // Returns authenticated user ID or null
 export async function getAuthOrNull(
   ctx: QueryCtx | MutationCtx
-): Promise<string | null> {
+): Promise<Id<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 

@@ -68,7 +68,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
 
   useEffect(() => {
     if (!editor) return;
-    editor.commands.setContent(markdownToHtml(note?.content ?? ""), false);
+    editor.commands.setContent(markdownToHtml(note?.content ?? ""));
   }, [editor, note?.content]);
 
   useEffect(() => {

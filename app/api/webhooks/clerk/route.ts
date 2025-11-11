@@ -7,10 +7,7 @@ import { api } from "@/convex/_generated/api";
 
 export const runtime = "nodejs";
 
-const convexUrl =
-  process.env.CONVEX_DEPLOYMENT_URL ??
-  process.env.CONVEX_DEPLOYMENT ??
-  process.env.NEXT_PUBLIC_CONVEX_URL;
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 
 const convex = convexUrl ? new ConvexHttpClient(convexUrl) : null;
 

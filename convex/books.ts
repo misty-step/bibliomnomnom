@@ -141,17 +141,28 @@ export const create = mutation({
   },
 });
 
-const optionalBookFields = Object.fromEntries(
-  Object.entries(baseBookFields).map(([key, validator]) => [
-    key,
-    v.optional(validator as any),
-  ])
-);
-
 export const update = mutation({
   args: {
     id: v.id("books"),
-    ...optionalBookFields,
+    title: v.optional(v.string()),
+    author: v.optional(v.string()),
+    description: v.optional(v.string()),
+    isbn: v.optional(v.string()),
+    edition: v.optional(v.string()),
+    publishedYear: v.optional(v.number()),
+    pageCount: v.optional(v.number()),
+    status: v.optional(statusField),
+    isAudiobook: v.optional(v.boolean()),
+    coverUrl: v.optional(v.string()),
+    apiCoverUrl: v.optional(v.string()),
+    apiId: v.optional(v.string()),
+    apiSource: v.optional(
+      v.union(
+        v.literal("google-books"),
+        v.literal("open-library"),
+        v.literal("manual")
+      )
+    ),
     privacy: v.optional(v.union(v.literal("private"), v.literal("public"))),
     isFavorite: v.optional(v.boolean()),
   },

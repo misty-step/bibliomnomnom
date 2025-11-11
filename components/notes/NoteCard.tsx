@@ -33,7 +33,7 @@ const TYPE_STYLES: Record<
 
 export function NoteCard({ note, onEdit }: NoteCardProps) {
   const content = useMemo(() => {
-    const raw = marked(note.content ?? "");
+    const raw = marked.parse(note.content ?? "", { async: false }) as string;
     return DOMPurify.sanitize(raw);
   }, [note.content]);
 

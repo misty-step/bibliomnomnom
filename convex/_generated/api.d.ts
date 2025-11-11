@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as books from "../books.js";
+import type * as notes from "../notes.js";
 import type * as users from "../users.js";
 
 import type {
@@ -29,6 +30,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   books: typeof books;
+  notes: typeof notes;
   users: typeof users;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

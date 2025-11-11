@@ -2,11 +2,12 @@ import { BookDetail } from "@/components/book/BookDetail";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type Params = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
-export default function BookDetailPage({ params }: Params) {
-  return <BookDetail bookId={params.id as Id<"books">} />;
+export default async function BookDetailPage({ params }: Params) {
+  const { id } = await params;
+  return <BookDetail bookId={id as Id<"books">} />;
 }
