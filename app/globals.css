@@ -1,3 +1,5 @@
+@import "./design-tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -9,30 +11,17 @@
 }
 
 @layer base {
-  :root {
-    --background: 39 36 30;
-    --foreground: 0 0% 10%;
-    --card: 39 36 30;
-    --card-foreground: 0 0% 10%;
-    --popover: 39 36 30;
-    --popover-foreground: 0 0% 10%;
-    --primary: 25 77% 31%;
-    --primary-foreground: 39 36 30;
-    --secondary: 32 39% 91%;
-    --secondary-foreground: 0 0% 10%;
-    --muted: 32 39% 91%;
-    --muted-foreground: 27 17% 38%;
-    --accent: 25 77% 31%;
-    --accent-foreground: 39 36 30;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 39 36 30;
-    --border: 32 27% 87%;
-    --input: 32 27% 87%;
-    --ring: 25 77% 31%;
-    --radius: 0.5rem;
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-line-ghost);
   }
 
   body {
-    @apply bg-paper text-ink font-sans;
+    font-family: var(--font-sans);
+    background-color: var(--color-canvas-bone);
+    color: var(--color-text-ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }

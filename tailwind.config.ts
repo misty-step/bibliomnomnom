@@ -1,84 +1,113 @@
 import type { Config } from "tailwindcss";
+import { tokenVars } from "./lib/design/tokens.generated";
+
+const colorVars = tokenVars.colors;
 
 const config: Config = {
-    darkMode: ["class"],
-    content: [
+  darkMode: ["class"],
+  content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}"
   ],
   theme: {
-  	extend: {
-  		colors: {
-  			paper: {
-  				DEFAULT: '#FDFBF7',
-  				secondary: '#F5F1E8'
-  			},
-  			ink: {
-  				DEFAULT: '#1A1A1A',
-  				faded: '#6B5D52'
-  			},
-  			leather: {
-  				DEFAULT: '#8B4513',
-  				light: '#D4A574'
-  			},
-  			border: '#E8DED0',
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
-  			},
-  			popover: {
-  				DEFAULT: 'hsl(var(--popover))',
-  				foreground: 'hsl(var(--popover-foreground))'
-  			},
-  			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
-  			},
-  			secondary: {
-  				DEFAULT: 'hsl(var(--secondary))',
-  				foreground: 'hsl(var(--secondary-foreground))'
-  			},
-  			muted: {
-  				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
-  			},
-  			accent: {
-  				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))'
-  			},
-  			destructive: {
-  				DEFAULT: 'hsl(var(--destructive))',
-  				foreground: 'hsl(var(--destructive-foreground))'
-  			},
-  			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))'
-  		},
-  		fontFamily: {
-  			serif: [
-  				'Crimson Text',
-  				'Georgia',
-  				'serif'
-  			],
-  			sans: [
-  				'Inter',
-  				'system-ui',
-  				'sans-serif'
-  			],
-  			mono: [
-  				'JetBrains Mono',
-  				'monospace'
-  			]
-  		},
-  		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
-  		}
-  	}
+    extend: {
+      colors: {
+        canvas: colorVars.canvas,
+        surface: colorVars.surface,
+        text: colorVars.text,
+        action: colorVars.action,
+        accentPalette: colorVars.accent,
+        line: colorVars.line,
+        status: colorVars.status,
+        paper: {
+          DEFAULT: colorVars.canvas.bone,
+          secondary: colorVars.canvas.boneMuted
+        },
+        ink: {
+          DEFAULT: colorVars.text.ink,
+          faded: colorVars.text.inkMuted
+        },
+        leather: {
+          DEFAULT: colorVars.accent.sunset,
+          light: colorVars.accent.nectar
+        },
+        background: colorVars.canvas.bone,
+        foreground: colorVars.text.ink,
+        card: {
+          DEFAULT: colorVars.surface.dawn,
+          foreground: colorVars.text.ink
+        },
+        popover: {
+          DEFAULT: colorVars.surface.dawn,
+          foreground: colorVars.text.ink
+        },
+        primary: {
+          DEFAULT: colorVars.action.electric,
+          foreground: colorVars.surface.dawn
+        },
+        secondary: {
+          DEFAULT: colorVars.canvas.boneMuted,
+          foreground: colorVars.text.ink
+        },
+        muted: {
+          DEFAULT: colorVars.canvas.boneMuted,
+          foreground: colorVars.text.inkMuted
+        },
+        accent: {
+          DEFAULT: colorVars.accent.orchid,
+          foreground: colorVars.surface.dawn
+        },
+        destructive: {
+          DEFAULT: colorVars.status.danger,
+          foreground: colorVars.surface.dawn
+        },
+        input: colorVars.line.ember,
+        border: colorVars.line.ghost,
+        ring: colorVars.action.electric
+      },
+      fontFamily: {
+        display: [tokenVars.typography.display],
+        sans: [tokenVars.typography.sans],
+        mono: [tokenVars.typography.mono]
+      },
+      spacing: tokenVars.spacing,
+      borderRadius: {
+        lg: tokenVars.radii.lg,
+        md: tokenVars.radii.md,
+        sm: tokenVars.radii.sm,
+        pill: tokenVars.radii.pill
+      },
+      boxShadow: {
+        surface: tokenVars.elevation.soft,
+        raised: tokenVars.elevation.raised,
+        overlay: tokenVars.elevation.overlay
+      },
+      backgroundImage: {
+        "gradient-sky": tokenVars.gradients["sky-dawn"],
+        "gradient-azure": tokenVars.gradients["azure-orchid"],
+        "gradient-twilight": tokenVars.gradients["twilight"],
+        "texture-cloud": tokenVars.textures.cloud,
+        "texture-matrix": tokenVars.textures.matrix,
+        "texture-grain": tokenVars.textures.grain
+      },
+      blur: {
+        frosted: tokenVars.glass.frosted,
+        panel: tokenVars.glass.panel
+      },
+      transitionTimingFunction: {
+        snappy: tokenVars.motion.snappy.easing,
+        drift: tokenVars.motion.drift.easing,
+        pulse: tokenVars.motion.pulse.easing
+      },
+      transitionDuration: {
+        snappy: tokenVars.motion.snappy.duration,
+        drift: tokenVars.motion.drift.duration,
+        pulse: tokenVars.motion.pulse.duration
+      }
+    }
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [require("tailwindcss-animate")]
 };
+
 export default config;
