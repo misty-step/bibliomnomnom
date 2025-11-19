@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Fraunces, Geist, JetBrains_Mono } from "next/font/google";
+import { Playfair_Display, Geist, JetBrains_Mono } from "next/font/google";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
-const fontDisplay = Fraunces({
+const fontDisplay = Playfair_Display({
   subsets: ["latin"],
   variable: "--font-display",
   display: "swap",
-  // Fraunces is a variable font, weights are automatic
+  weight: ["400", "500", "600", "700"],
 });
 
 const fontSans = Geist({

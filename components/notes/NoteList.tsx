@@ -1,17 +1,15 @@
 "use client";
 
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { NoteCard } from "./NoteCard";
-import { EmptyState } from "@/components/shared/EmptyState";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 
 type NoteListProps = {
   bookId: Id<"books">;
-  onEdit?: (note: Doc<"notes">) => void;
 };
 
-export function NoteList({ bookId, onEdit }: NoteListProps) {
+export function NoteList({ bookId }: NoteListProps) {
   const notes = useAuthedQuery(api.notes.list, { bookId });
 
   if (notes === undefined) {
@@ -20,17 +18,16 @@ export function NoteList({ bookId, onEdit }: NoteListProps) {
 
   if (!notes.length) {
     return (
-      <EmptyState
-        title="No notes yet"
-        description="Use the editor on the right to capture your first thought."
-      />
+      <div className="py-12 text-center">
+        <p className="text-sm text-text-inkSubtle">No notes yet.</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
       {notes.map((note) => (
-        <NoteCard key={note._id} note={note} onEdit={onEdit} />
+        <NoteCard key={note._id} note={note} />
       ))}
     </div>
   );
@@ -42,13 +39,13 @@ function NoteListSkeleton() {
       {Array.from({ length: 3 }).map((_, idx) => (
         <div
           key={idx}
-          className="animate-pulse rounded-2xl border border-border bg-paper p-5"
+          className="animate-pulse rounded-2xl border border-line-ghost bg-canvas-bone p-5"
         >
-          <div className="mb-3 h-4 w-24 rounded bg-border" />
+          <div className="mb-3 h-4 w-24 rounded bg-line-ghost" />
           <div className="space-y-2">
-            <div className="h-4 w-full rounded bg-border" />
-            <div className="h-4 w-5/6 rounded bg-border" />
-            <div className="h-4 w-2/3 rounded bg-border" />
+            <div className="h-4 w-full rounded bg-line-ghost" />
+            <div className="h-4 w-5/6 rounded bg-line-ghost" />
+            <div className="h-4 w-2/3 rounded bg-line-ghost" />
           </div>
         </div>
       ))}

@@ -7,23 +7,10 @@ export type NoteType = "note" | "quote" | "reflection";
 const TYPES: Array<{
   value: NoteType;
   label: string;
-  helper: string;
 }> = [
-  {
-    value: "note",
-    label: "Note",
-    helper: "General thoughts and reactions",
-  },
-  {
-    value: "quote",
-    label: "Quote",
-    helper: "Verbatim text you want to remember",
-  },
-  {
-    value: "reflection",
-    label: "Reflection",
-    helper: "Deeper synthesis and connections",
-  },
+  { value: "note", label: "Note" },
+  { value: "quote", label: "Quote" },
+  { value: "reflection", label: "Reflection" },
 ];
 
 type NoteTypeSelectorProps = {
@@ -33,31 +20,22 @@ type NoteTypeSelectorProps = {
 
 export function NoteTypeSelector({ value, onChange }: NoteTypeSelectorProps) {
   return (
-    <div className="flex flex-col gap-3">
-      <p className="font-mono text-xs uppercase tracking-wide text-ink-faded">Note Type</p>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        {TYPES.map((type, index) => (
-          <span
-            key={type.value}
-            onClick={() => onChange(type.value)}
-            className={cn(
-              "group relative cursor-pointer font-mono text-sm uppercase tracking-wider",
-              value === type.value
-                ? "text-ink"
-                : "text-inkMuted hover:text-ink"
-            )}
-          >
-            {type.label}
-            <span
-              className={cn(
-                "absolute inset-x-0 bottom-0 h-px bg-ink transition-transform duration-150 ease-out origin-left",
-                value === type.value ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-              )}
-            />
-            {index < TYPES.length - 1 && <span className="mx-1 text-inkMuted">·</span>}
-          </span>
-        ))}
-      </div>
+    <div className="flex rounded-md bg-canvas-boneMuted p-1">
+      {TYPES.map((type) => (
+        <button
+          key={type.value}
+          type="button"
+          onClick={() => onChange(type.value)}
+          className={cn(
+            "flex-1 rounded-md px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-all duration-150",
+            value === type.value
+              ? "bg-text-ink text-canvas-bone shadow-sm"
+              : "text-text-inkMuted hover:text-text-ink"
+          )}
+        >
+          {type.label}
+        </button>
+      ))}
     </div>
   );
 }

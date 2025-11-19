@@ -30,8 +30,8 @@ export const designTokens = {
     }
   },
   "typography": {
-    "display": "\"Canela\", \"Times New Roman\", serif",
-    "sans": "\"Söhne\", \"Neue Montreal\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+    "display": "\"Playfair Display\", Georgia, serif",
+    "sans": "\"Geist\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
     "mono": "\"JetBrains Mono\", \"IBM Plex Mono\", monospace"
   },
   "spacing": {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Star } from "lucide-react";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -8,40 +9,40 @@ import { cn } from "@/lib/utils";
 export type BookFormValues = {
   title: string;
   author: string;
-  description: string;
   edition: string;
   isbn: string;
   publishedYear: string;
   pageCount: string;
-  isAudiobook: boolean;
   isFavorite: boolean;
   status: BookStatus;
+  dateStarted: string;
+  dateFinished: string;
 };
 
 export type SanitizedBookFormValues = {
   title: string;
   author: string;
-  description?: string;
-  edition?: string;
-  isbn?: string;
-  publishedYear?: number;
-  pageCount?: number;
-  isAudiobook: boolean;
+  edition?: string | null;
+  isbn?: string | null;
+  publishedYear?: number | null;
+  pageCount?: number | null;
   isFavorite: boolean;
   status: BookStatus;
+  dateStarted?: number | null;
+  dateFinished?: number | null;
 };
 
 const DEFAULT_VALUES: BookFormValues = {
   title: "",
   author: "",
-  description: "",
   edition: "",
   isbn: "",
   publishedYear: "",
   pageCount: "",
-  isAudiobook: false,
   isFavorite: false,
   status: "want-to-read",
+  dateStarted: "",
+  dateFinished: "",
 };
 
 type BookFormProps = {
@@ -56,10 +57,6 @@ type BookFormProps = {
   requireDirtyForSubmit?: boolean;
   failureMessage?: string;
   showFavoriteToggle?: boolean;
-  showAudiobookToggle?: boolean;
-  useCollapsibleMetadata?: boolean;
-  metadataInitiallyCollapsed?: boolean;
-  metadataToggleLabel?: string;
 };
 
 export function BookForm({
@@ -74,10 +71,6 @@ export function BookForm({
   requireDirtyForSubmit = false,
   failureMessage = "Unable to save changes. Please retry.",
   showFavoriteToggle = false,
-  showAudiobookToggle = true,
-  useCollapsibleMetadata = false,
-  metadataInitiallyCollapsed = false,
-  metadataToggleLabel = "More details",
 }: BookFormProps) {
   const snapshot = useMemo(
     () => ({
@@ -90,22 +83,11 @@ export function BookForm({
   const [values, setValues] = useState<BookFormValues>(snapshot);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [metadataExpanded, setMetadataExpanded] = useState(
-    useCollapsibleMetadata ? !metadataInitiallyCollapsed : true
-  );
 
   useEffect(() => {
     setValues(snapshot);
     setError(null);
   }, [snapshot]);
-
-  useEffect(() => {
-    if (useCollapsibleMetadata) {
-      setMetadataExpanded(!metadataInitiallyCollapsed);
-    } else {
-      setMetadataExpanded(true);
-    }
-  }, [useCollapsibleMetadata, metadataInitiallyCollapsed]);
 
   const isDirty = useMemo(() => {
     return Object.entries(snapshot).some(([key]) => {
@@ -143,153 +125,163 @@ export function BookForm({
     }
   };
 
-  const renderMetadataFields = () => (
-    <>
-      <div className="grid gap-4 sm:grid-cols-2">
+  return (
+    <form className="space-y-8" onSubmit={handleSubmit}>
+      {/* Title */}
+      <FormField label="Title" required>
+        <input
+          type="text"
+          className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
+          value={values.title}
+          onChange={(event) => handleChange("title", event.target.value)}
+          placeholder="The Name of the Wind"
+          disabled={isSubmitting}
+        />
+      </FormField>
+
+      {/* Author */}
+      <FormField label="Author" required>
+        <input
+          type="text"
+          className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
+          value={values.author}
+          onChange={(event) => handleChange("author", event.target.value)}
+          placeholder="Patrick Rothfuss"
+          disabled={isSubmitting}
+        />
+      </FormField>
+
+      {/* Status - Segmented Control */}
+      {includeStatusField && (
+        <FormField label="Status">
+          <div className="flex rounded-md bg-canvas-boneMuted p-1">
+            {BOOK_STATUS_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => handleChange("status", option.value)}
+                className={cn(
+                  "flex-1 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
+                  values.status === option.value
+                    ? "bg-text-ink text-canvas-bone shadow-sm"
+                    : "text-text-inkMuted hover:text-text-ink"
+                )}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </FormField>
+      )}
+
+      {/* Favorite Toggle */}
+      {showFavoriteToggle && (
+        <FormField label="Favorite">
+          <button
+            type="button"
+            onClick={() => handleChange("isFavorite", !values.isFavorite)}
+            className={cn(
+              "flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
+              values.isFavorite
+                ? "bg-text-ink text-canvas-bone shadow-sm"
+                : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink"
+            )}
+          >
+            <Star className={cn("h-3.5 w-3.5", values.isFavorite && "fill-amber-400 text-amber-400")} />
+            Favorite
+          </button>
+        </FormField>
+      )}
+
+      {/* Dates */}
+      <div className="grid gap-8 sm:grid-cols-2">
+        <FormField label="Date Started">
+          <input
+            type="date"
+            className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
+            value={values.dateStarted}
+            onChange={(event) => handleChange("dateStarted", event.target.value)}
+            disabled={isSubmitting}
+          />
+        </FormField>
+        <FormField label="Date Finished">
+          <input
+            type="date"
+            className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
+            value={values.dateFinished}
+            onChange={(event) => handleChange("dateFinished", event.target.value)}
+            disabled={isSubmitting}
+          />
+        </FormField>
+      </div>
+
+      {/* Metadata Fields */}
+      <div className="space-y-8">
         <FormField label="Edition">
           <input
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
+            type="text"
+            className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
             value={values.edition}
             onChange={(event) => handleChange("edition", event.target.value)}
-            placeholder="First, Deluxe, Annotated…"
+            placeholder="First, Deluxe…"
+            disabled={isSubmitting}
           />
         </FormField>
         <FormField label="ISBN">
           <input
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
+            type="text"
+            className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
             value={values.isbn}
             onChange={(event) => handleChange("isbn", event.target.value)}
             placeholder="9780000000000"
+            disabled={isSubmitting}
           />
         </FormField>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <FormField label="Published Year">
           <input
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
+            type="text"
             inputMode="numeric"
             pattern="[0-9]*"
+            className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
             value={values.publishedYear}
             onChange={(event) => handleChange("publishedYear", event.target.value)}
             placeholder="2024"
+            disabled={isSubmitting}
           />
         </FormField>
         <FormField label="Page Count">
           <input
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
+            type="text"
             inputMode="numeric"
             pattern="[0-9]*"
+            className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
             value={values.pageCount}
             onChange={(event) => handleChange("pageCount", event.target.value)}
             placeholder="320"
+            disabled={isSubmitting}
           />
         </FormField>
       </div>
 
-      <FormField label="Description">
-        <textarea
-          className="min-h-[var(--space-form-field-min)] w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
-          value={values.description}
-          onChange={(event) => handleChange("description", event.target.value)}
-          placeholder="Add notes, favorite passages, or why this book matters."
-        />
-      </FormField>
-    </>
-  );
-
-  const metadataSection = useCollapsibleMetadata ? (
-    <div className="rounded-2xl border border-border/80 bg-paper-secondary/60 p-4">
-      <button
-        type="button"
-        className="flex w-full items-center justify-between font-mono text-xs uppercase tracking-wider text-inkMuted"
-        onClick={() => setMetadataExpanded((prev) => !prev)}
-        aria-expanded={metadataExpanded}
-      >
-        <span>{metadataToggleLabel}</span>
-        <span className="text-xs uppercase tracking-wide text-ink-faded">
-          {metadataExpanded ? "Hide" : "Show"}
-        </span>
-      </button>
-      {metadataExpanded ? <div className="mt-4 space-y-4">{renderMetadataFields()}</div> : null}
-    </div>
-  ) : (
-    <div className="space-y-4">{renderMetadataFields()}</div>
-  );
-
-  return (
-    <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FormField label="Title" required>
-          <input
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
-            value={values.title}
-            onChange={(event) => handleChange("title", event.target.value)}
-            placeholder="The Name of the Book"
-          />
-        </FormField>
-        <FormField label="Author" required>
-          <input
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
-            value={values.author}
-            onChange={(event) => handleChange("author", event.target.value)}
-            placeholder="Author Name"
-          />
-        </FormField>
-      </div>
-
-      {includeStatusField ? (
-        <FormField label="Reading Status">
-          <select
-            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm text-ink focus:border-line-ember focus:outline-none"
-            value={values.status}
-            onChange={(event) => handleChange("status", event.target.value as BookStatus)}
-          >
-            {BOOK_STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </FormField>
-      ) : null}
-
-      <div className="flex flex-wrap gap-4">
-        {showAudiobookToggle ? (
-          <ToggleField
-            label="Audiobook"
-            checked={values.isAudiobook}
-            onChange={(checked) => handleChange("isAudiobook", checked)}
-          />
-        ) : null}
-        {showFavoriteToggle ? (
-          <ToggleField
-            label="Favorite"
-            checked={values.isFavorite}
-            onChange={(checked) => handleChange("isFavorite", checked)}
-          />
-        ) : null}
-      </div>
-
-      {metadataSection}
-
-      {error ? (
-        <p className="text-sm text-destructive" role="alert">
+      {/* Error */}
+      {error && (
+        <div className="rounded-md border border-accent-ember/20 bg-accent-ember/10 px-4 py-3 text-sm text-accent-ember">
           {error}
-        </p>
-      ) : null}
+        </div>
+      )}
 
-      <div className="flex justify-end gap-3">
-        {onCancel ? (
+      {/* Actions */}
+      <div className="flex justify-end gap-3 pt-4">
+        {onCancel && (
           <button
             type="button"
             disabled={isSubmitting}
             onClick={onCancel}
-            className="font-sans text-sm text-inkMuted hover:text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
+            className="font-sans text-sm text-text-inkMuted hover:text-text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
           >
             Cancel
           </button>
-        ) : null}
+        )}
         <Button
           type="submit"
           disabled={isSubmitting || (requireDirtyForSubmit && !isDirty)}
@@ -312,22 +304,30 @@ export function sanitizeBookForm(values: BookFormValues): SanitizedBookFormValue
   return {
     title,
     author,
-    description: values.description.trim() || undefined,
-    edition: values.edition.trim() || undefined,
-    isbn: values.isbn.trim() || undefined,
+    edition: values.edition.trim() || null,
+    isbn: values.isbn.trim() || null,
     publishedYear: toOptionalNumber(values.publishedYear),
     pageCount: toOptionalNumber(values.pageCount),
-    isAudiobook: values.isAudiobook,
     isFavorite: values.isFavorite,
     status: values.status,
+    dateStarted: toTimestamp(values.dateStarted),
+    dateFinished: toTimestamp(values.dateFinished),
   };
 }
 
-function toOptionalNumber(value: string): number | undefined {
+function toOptionalNumber(value: string): number | null {
   const trimmed = value.trim();
-  if (!trimmed) return undefined;
+  if (!trimmed) return null;
   const parsed = Number(trimmed);
-  return Number.isFinite(parsed) ? parsed : undefined;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toTimestamp(value: string): number | null {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  // Create date at local noon to avoid timezone shifting issues when displaying back
+  // or just create a "local date"
+  return new Date(year, month - 1, day).getTime();
 }
 
 function FormField({
@@ -340,39 +340,12 @@ function FormField({
   required?: boolean;
 }) {
   return (
-    <label className="flex flex-col gap-2">
-      <span className="font-mono text-xs uppercase tracking-wider text-inkMuted">
+    <div>
+      <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
         {label}
-        {required ? <span className="text-accent-ember"> *</span> : null}
-      </span>
+        {required && <span className="text-accent-ember"> *</span>}
+      </label>
       {children}
-    </label>
-  );
-}
-
-function ToggleField({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex items-center gap-2 rounded-full border border-border bg-paper-secondary/70 px-4 py-2 font-mono text-xs uppercase tracking-wider text-inkMuted transition",
-        checked ? "border-leather text-leather" : null
-      )}
-    >
-      <input
-        type="checkbox"
-        className="h-4 w-4 rounded border-border text-leather focus:ring-leather"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      {label}
-    </label>
+    </div>
   );
 }

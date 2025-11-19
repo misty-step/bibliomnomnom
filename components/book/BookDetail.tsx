@@ -1,22 +1,25 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
+import { upload } from "@vercel/blob/client";
+import { Star, Pencil, Lock, Globe, Headphones } from "lucide-react";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
-import { PrivacyToggle } from "./PrivacyToggle";
-import { UploadCover } from "./UploadCover";
-import { EditBookModal } from "./EditBookModal";
-import { NoteEditor } from "@/components/notes/NoteEditor";
+import { CreateNote } from "@/components/notes/CreateNote";
 import { NoteList } from "@/components/notes/NoteList";
-import { Button } from "@/components/ui/button";
-import { Surface } from "@/components/ui/Surface";
 import { BOOK_STATUS_OPTIONS } from "./constants";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Assuming Popover component exists or will be created
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useToast } from "@/hooks/use-toast";
+import { BookForm, type SanitizedBookFormValues } from "./BookForm";
+import { SideSheet } from "@/components/ui/SideSheet";
+
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_BYTES = 5 * 1024 * 1024;
 
 type BookDetailProps = {
   bookId: Id<"books">;
@@ -26,16 +29,32 @@ export function BookDetail({ bookId }: BookDetailProps) {
   const book = useAuthedQuery(api.books.get, { id: bookId });
   const updateStatus = useMutation(api.books.updateStatus);
   const toggleFavorite = useMutation(api.books.toggleFavorite);
+  const updatePrivacy = useMutation(api.books.updatePrivacy);
+  const updateBook = useMutation(api.books.update);
+  const { toast } = useToast();
 
   const [localStatus, setLocalStatus] = useState<Doc<"books">["status"]>("want-to-read");
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
+  const [isTogglingAudiobook, setIsTogglingAudiobook] = useState(false);
+  const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false);
+  const [localPrivacy, setLocalPrivacy] = useState<"private" | "public">("private");
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverHovered, setCoverHovered] = useState(false);
 
   const currentStatus = book?.status;
+  const currentPrivacy = book?.privacy;
+
   useEffect(() => {
     if (currentStatus) {
       setLocalStatus(currentStatus);
     }
   }, [currentStatus]);
+
+  useEffect(() => {
+    if (currentPrivacy) {
+      setLocalPrivacy(currentPrivacy);
+    }
+  }, [currentPrivacy]);
 
   if (book === undefined) {
     return <BookDetailSkeleton />;
@@ -43,8 +62,11 @@ export function BookDetail({ bookId }: BookDetailProps) {
 
   if (!book) {
     return (
-      <div className="rounded-3xl border border-dashed border-border bg-paper-secondary/70 p-8 text-center">
-        <p className="text-sm text-ink-faded">We couldn&apos;t find that book.</p>
+      <div className="py-16 text-center">
+        <p className="font-display text-xl text-text-inkMuted">Book not found</p>
+        <p className="mt-2 text-sm text-text-inkSubtle">
+          This book may have been removed or you don&apos;t have access.
+        </p>
       </div>
     );
   }
@@ -70,6 +92,92 @@ export function BookDetail({ bookId }: BookDetailProps) {
     }
   };
 
+  const handleAudiobookToggle = async () => {
+    setIsTogglingAudiobook(true);
+    try {
+      await updateBook({ id: book._id, isAudiobook: !book.isAudiobook });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsTogglingAudiobook(false);
+    }
+  };
+
+  const handlePrivacyToggle = async () => {
+    const nextPrivacy = localPrivacy === "private" ? "public" : "private";
+    const previousPrivacy = localPrivacy;
+    setIsTogglingPrivacy(true);
+    setLocalPrivacy(nextPrivacy);
+    try {
+      await updatePrivacy({ id: book._id, privacy: nextPrivacy });
+    } catch (err) {
+      console.error(err);
+      setLocalPrivacy(previousPrivacy);
+    } finally {
+      setIsTogglingPrivacy(false);
+    }
+  };
+
+  const handleCoverUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a JPG, PNG, or WebP image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > MAX_BYTES) {
+      toast({
+        title: "File too large",
+        description: "Images must be smaller than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploadingCover(true);
+    try {
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/blob/upload",
+      });
+      await updateBook({ id: book._id, coverUrl: blob.url });
+      toast({ title: "Cover updated" });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Upload failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingCover(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleCoverRemove = async () => {
+    setIsUploadingCover(true);
+    try {
+      await updateBook({ id: book._id, coverUrl: undefined });
+      toast({ title: "Cover removed" });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Remove failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   // Helper to format date
   const formatDate = (timestamp: number | undefined) => {
     if (!timestamp) return null;
@@ -87,84 +195,95 @@ export function BookDetail({ bookId }: BookDetailProps) {
       ? `Started ${formatDate(book.dateStarted)}`
       : null;
 
+  const coverSrc = book.coverUrl ?? book.apiCoverUrl;
+
   return (
     <motion.article
-      className="mx-auto grid max-w-full grid-cols-1 gap-y-16 motion-page md:grid-cols-[35%_50%_1fr] md:gap-x-8"
+      className="grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-12"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
     >
-      {/* Cover Column */}
-      <div className="relative flex flex-col items-center md:items-start">
-        <div className="relative w-full max-w-md">
-          <div className="relative aspect-[2/3] overflow-hidden rounded-[var(--radius-lg)] bg-surface-dawn shadow-[var(--elevation-raised)]">
-            {book.coverUrl || book.apiCoverUrl ? (
-              <Image
-                src={(book.coverUrl ?? book.apiCoverUrl) as string}
-                alt={`${book.title} cover`}
-                fill
-                className="object-cover"
-                priority
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-canvas-boneMuted to-surface-dawn">
-                <span className="font-display text-8xl text-text-ink/10">{book.title[0]}</span>
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Cover Column - Sticky */}
+      <div className="flex justify-center lg:justify-start">
+        <div className="lg:sticky lg:top-8 lg:self-start w-full">
+          <div
+            className="group relative w-full"
+            onMouseEnter={() => setCoverHovered(true)}
+            onMouseLeave={() => setCoverHovered(false)}
+          >
+            {/* Cover Image */}
+            <div className="relative aspect-[2/3] overflow-hidden rounded-sm shadow-lg">
+              {coverSrc ? (
+                <Image
+                  src={coverSrc}
+                  alt={`${book.title} cover`}
+                  fill
+                  className="object-cover"
+                  priority
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-canvas-boneMuted to-canvas-bone">
+                  <span className="font-display text-8xl text-text-ink/10">{book.title[0]}</span>
+                </div>
+              )}
 
-        {/* Upload Cover */}
-        <div className="mt-6">
-          <UploadCover
-            bookId={book._id}
-            coverUrl={book.coverUrl}
-            apiCoverUrl={book.apiCoverUrl}
-          />
+              {/* Hover Overlay for Cover Edit */}
+              <motion.div
+                initial={false}
+                animate={{ opacity: coverHovered ? 1 : 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70"
+              >
+                <label
+                  className={cn(
+                    "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
+                    isUploadingCover && "pointer-events-none opacity-50"
+                  )}
+                >
+                  <input
+                    type="file"
+                    accept={ALLOWED_TYPES.join(",")}
+                    onChange={handleCoverUpload}
+                    className="hidden"
+                    disabled={isUploadingCover}
+                  />
+                  {isUploadingCover ? "Uploading…" : "Change"}
+                </label>
+                {coverSrc && (
+                  <button
+                    onClick={handleCoverRemove}
+                    disabled={isUploadingCover}
+                    className="text-sm text-white/80 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
+              </motion.div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Details Column */}
-      <div className="space-y-8 text-center md:col-span-2 md:text-left">
-        <motion.h1
-          className="font-display text-3xl text-text-ink md:text-5xl"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0 }}
-        >
-          {book.title}
-        </motion.h1>
-        <motion.p
-          className="text-lg text-text-inkMuted md:text-xl"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          {book.author}
-        </motion.p>
-        <motion.hr
-          className="w-full border-t border-line-ember mt-4 mb-6"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        />
+      {/* Content Column */}
+      <div className="space-y-8">
+        {/* Title & Author */}
+        <div>
+          <h1 className="font-display text-3xl leading-tight text-text-ink md:text-4xl">
+            {book.title}
+          </h1>
+          <p className="mt-2 text-lg text-text-inkMuted">
+            {book.author}
+          </p>
+        </div>
 
-        <motion.div
-          className="mb-6 flex items-center justify-center gap-4 md:justify-start"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
-          {/* Status Display */}
+        {/* Status & Actions */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Status Badge */}
           <Popover>
             <PopoverTrigger asChild>
-              <button
-                className="cursor-pointer text-left focus:outline-none"
-              >
-                <p className="font-sans text-base text-ink">{statusLabel}</p>
-                {statusDate && (
-                  <p className="font-sans text-sm text-inkMuted">{statusDate}</p>
-                )}
+              <button className="flex items-center gap-2 rounded-full bg-canvas-boneMuted px-4 py-1.5 font-mono text-xs uppercase tracking-wider text-text-inkMuted transition hover:bg-line-ghost hover:text-text-ink">
+                {statusLabel}
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0">
@@ -174,7 +293,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                     key={option.value}
                     onClick={() => handleStatusChange(option.value)}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-2 text-sm text-ink hover:bg-canvas-boneMuted",
+                      "px-4 py-2 text-left text-sm text-text-ink hover:bg-canvas-boneMuted",
                       localStatus === option.value && "bg-canvas-boneMuted"
                     )}
                   >
@@ -185,76 +304,174 @@ export function BookDetail({ bookId }: BookDetailProps) {
             </PopoverContent>
           </Popover>
 
-          {book.isFavorite && (
-            <span className="text-accent-ember text-base md:text-xl" aria-label="Favorite">
-              ★
-            </span>
-          )}
-        </motion.div>
+          {/* Action Icons */}
+          <div className="flex items-center gap-1">
+            {/* Favorite */}
+            <button
+              onClick={handleFavoriteToggle}
+              disabled={isTogglingFavorite}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full transition",
+                book.isFavorite
+                  ? "bg-amber-100 text-amber-600"
+                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+              )}
+              title={book.isFavorite ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Star className={cn("h-4 w-4", book.isFavorite && "fill-current")} />
+            </button>
 
-        {book.description && (
-          <motion.p
-            className="mb-8 text-text-inkMuted leading-relaxed text-sm md:text-base"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            {book.description}
-          </motion.p>
+            {/* Audiobook */}
+            <button
+              onClick={handleAudiobookToggle}
+              disabled={isTogglingAudiobook}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full transition",
+                book.isAudiobook
+                  ? "bg-purple-100 text-purple-600"
+                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+              )}
+              title={book.isAudiobook ? "Mark as physical book" : "Mark as audiobook"}
+            >
+              <Headphones className="h-4 w-4" />
+            </button>
+
+            {/* Edit Details */}
+            <EditBookModalIcon book={book} />
+
+            {/* Privacy Toggle */}
+            <button
+              onClick={handlePrivacyToggle}
+              disabled={isTogglingPrivacy}
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-full transition",
+                localPrivacy === "public"
+                  ? "bg-blue-100 text-blue-600"
+                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+              )}
+              title={localPrivacy === "private" ? "Make public" : "Make private"}
+            >
+              {localPrivacy === "private" ? (
+                <Lock className="h-4 w-4" />
+              ) : (
+                <Globe className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Status Date */}
+        {statusDate && (
+          <p className="text-sm text-text-inkSubtle">{statusDate}</p>
         )}
 
-        <motion.div
-          className="flex items-center justify-center gap-3 md:justify-start"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <button
-            onClick={handleFavoriteToggle}
-            disabled={isTogglingFavorite}
-            className="font-sans text-sm text-inkMuted hover:text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
-          >
-            {book.isFavorite ? "★ Unfavorite" : "☆ Favorite"}
-          </button>
-          <EditBookModal book={book} />
-        </motion.div>
+        {/* Description */}
+        {book.description && (
+          <p className="text-sm leading-relaxed text-text-inkMuted">
+            {book.description}
+          </p>
+        )}
 
-        {/* Privacy Toggle */}
-        <motion.div
-          className="mt-6"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          <PrivacyToggle bookId={book._id} privacy={book.privacy} />
-        </motion.div>
-
-        {/* Metadata */}
+        {/* Metadata Details */}
         {(book.edition || book.isbn || book.pageCount || book.publishedYear) && (
-          <motion.div
-            className="border-t border-line-ghost pt-16"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <h2 className="mb-6 text-center font-display text-2xl text-text-ink md:text-left">Details</h2>
+          <div className="border-t border-line-ghost pt-6">
             <BookMetadata book={book} />
-          </motion.div>
+          </div>
         )}
 
         {/* Notes Section */}
-        <motion.div
-          className="mt-16"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-        >
-          <h2 className="font-mono text-xs uppercase tracking-wider text-ink">NOTES</h2>
-          <hr className="w-full border-t border-line-ember mt-2 mb-8" />
-          <NotesSection bookId={book._id} />
-        </motion.div>
+        <div className="border-t border-line-ghost pt-6">
+          <h2 className="mb-6 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+            Notes
+          </h2>
+          <div className="space-y-6">
+            <CreateNote bookId={book._id} />
+            <NoteList bookId={book._id} />
+          </div>
+        </div>
       </div>
     </motion.article>
+  );
+}
+
+// Icon-only edit button that opens the edit sheet
+function EditBookModalIcon({ book }: { book: Doc<"books"> }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const updateBook = useMutation(api.books.update);
+  const { toast } = useToast();
+
+  const handleOpen = () => setIsOpen(true);
+  const handleClose = () => setIsOpen(false);
+
+  // Helper to format timestamp for date input (YYYY-MM-DD)
+  const timestampToDateInput = (timestamp?: number) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const initialValues = {
+    title: book.title,
+    author: book.author,
+    edition: book.edition ?? "",
+    isbn: book.isbn ?? "",
+    publishedYear: book.publishedYear ? String(book.publishedYear) : "",
+    pageCount: book.pageCount ? String(book.pageCount) : "",
+    isFavorite: book.isFavorite ?? false,
+    status: book.status,
+    dateStarted: timestampToDateInput(book.dateStarted),
+    dateFinished: timestampToDateInput(book.dateFinished),
+  };
+
+  const handleSubmit = async (values: SanitizedBookFormValues) => {
+    await updateBook({
+      id: book._id,
+      title: values.title,
+      author: values.author,
+      edition: values.edition,
+      isbn: values.isbn,
+      publishedYear: values.publishedYear,
+      pageCount: values.pageCount,
+      dateStarted: values.dateStarted,
+      dateFinished: values.dateFinished,
+    });
+  };
+
+  return (
+    <>
+      <button
+        onClick={handleOpen}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-text-inkMuted transition hover:bg-canvas-boneMuted hover:text-text-ink"
+        title="Edit details"
+      >
+        <Pencil className="h-4 w-4" />
+      </button>
+      <SideSheet
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        title="Edit Book"
+        description="Update metadata, clean up typos, or note new editions."
+      >
+        <BookForm
+          initialValues={initialValues}
+          submitLabel="Save Changes"
+          busyLabel="Saving…"
+          onCancel={handleClose}
+          onSubmit={handleSubmit}
+          onSuccess={() => {
+            toast({
+              title: "Book updated",
+              description: "Details saved.",
+            });
+            handleClose();
+          }}
+          requireDirtyForSubmit
+        />
+      </SideSheet>
+    </>
   );
 }
 
@@ -267,38 +484,37 @@ function BookMetadata({ book }: { book: Doc<"books"> }) {
   ].filter((item) => item.value);
 
   return (
-    <div className="mx-auto grid max-w-lg gap-6 sm:grid-cols-2">
+    <div className="flex flex-wrap gap-x-6 gap-y-3">
       {items.map((item) => (
-        <div key={item.label} className="text-center">
-          <p className="mb-1 text-xs font-mono uppercase tracking-wider text-text-inkSubtle">{item.label}</p>
-          <p className="font-display text-base text-text-ink">{item.value}</p>
+        <div key={item.label}>
+          <p className="font-mono text-xs uppercase tracking-wider text-text-inkSubtle">
+            {item.label}
+          </p>
+          <p className="mt-0.5 text-sm text-text-ink">{item.value}</p>
         </div>
       ))}
     </div>
   );
 }
 
-function NotesSection({ bookId }: { bookId: Id<"books"> }) {
-  const [selectedNote, setSelectedNote] = useState<Doc<"notes"> | null>(null);
-
-  return (
-    <div className="mx-auto max-w-3xl space-y-8">
-      <div>
-        <NoteEditor bookId={bookId} note={selectedNote} onSaved={() => setSelectedNote(null)} />
-      </div>
-      <div>
-        <NoteList bookId={bookId} onEdit={setSelectedNote} />
-      </div>
-    </div>
-  );
-}
-
 function BookDetailSkeleton() {
   return (
-    <div className="space-y-6">
-      <div className="h-72 animate-pulse rounded-3xl border border-border bg-paper-secondary/70" />
-      <div className="h-12 animate-pulse rounded-full border border-border bg-paper-secondary/70" />
-      <div className="h-96 animate-pulse rounded-3xl border border-border bg-paper-secondary/70" />
+    <div className="grid gap-8 lg:grid-cols-[2fr_3fr] lg:gap-12">
+      {/* Cover skeleton */}
+      <div className="flex justify-center lg:justify-start">
+        <div className="aspect-[2/3] w-full animate-pulse rounded-sm bg-text-ink/5" />
+      </div>
+      {/* Content skeleton */}
+      <div className="space-y-6">
+        <div className="h-10 w-3/4 animate-pulse rounded bg-text-ink/5" />
+        <div className="h-6 w-1/2 animate-pulse rounded bg-text-ink/5" />
+        <div className="flex gap-2">
+          <div className="h-8 w-24 animate-pulse rounded-full bg-text-ink/5" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-text-ink/5" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-text-ink/5" />
+        </div>
+        <div className="h-32 animate-pulse rounded bg-text-ink/5" />
+      </div>
     </div>
   );
 }

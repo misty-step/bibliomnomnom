@@ -5,6 +5,12 @@
 
 This document contains features, enhancements, and ideas for **post-MVP** development of bibliomnomnom. All items here are explicitly **NOT** in the initial MVP scope but represent the future vision for the platform.
 
+## FOUNDER NOTED ISSUES
+- llm powered import system
+  * take a wide range of inputs -- csv, txt, md, etc -- and intelligently parse it into records in the user account
+  * must have strong undo / visibility / staged changes / etc
+- export system
+
 ---
 
 ## Priority System
@@ -19,15 +25,15 @@ This document contains features, enhancements, and ideas for **post-MVP** develo
 ## Engineering Health (P1-P2)
 
 ### Auth-Safe Dashboard Shell
-**Priority:** P1  
-**Why:** Streaming layouts currently render dashboard chrome before Clerk finishes redirecting, so Convex hooks fire while the session is missing and blow up the page.  
-**What:** Wrap `app/(dashboard)` routes in a shared shell that uses Clerk’s `<SignedIn>/<SignedOut>` boundaries (or a server loader) so child components never mount until a user session + Convex identity exist. Provide a consistent signed-out placeholder instead of component-level hacks.  
+**Priority:** P1
+**Why:** Streaming layouts currently render dashboard chrome before Clerk finishes redirecting, so Convex hooks fire while the session is missing and blow up the page.
+**What:** Wrap `app/(dashboard)` routes in a shared shell that uses Clerk’s `<SignedIn>/<SignedOut>` boundaries (or a server loader) so child components never mount until a user session + Convex identity exist. Provide a consistent signed-out placeholder instead of component-level hacks.
 **Outcome:** Prevents wasted renders, removes auth plumbing from individual components, and keeps future dashboards from repeating the `Unauthenticated` regressions we just fixed piecemeal.
 
 ### Auto-Provision Convex Users
-**Priority:** P1  
-**Why:** `requireAuth` throws “User not found in database” whenever Clerk webhooks lag or fail, taking down every query/mutation even though the client is signed in.  
-**What:** Extend `requireAuth` to upsert a user record on-demand from `ctx.auth.getUserIdentity()` (or queue a background sync) when the Clerk ID is missing. Log when this fallback runs so we can alert on webhook failures.  
+**Priority:** P1
+**Why:** `requireAuth` throws “User not found in database” whenever Clerk webhooks lag or fail, taking down every query/mutation even though the client is signed in.
+**What:** Extend `requireAuth` to upsert a user record on-demand from `ctx.auth.getUserIdentity()` (or queue a background sync) when the Clerk ID is missing. Log when this fallback runs so we can alert on webhook failures.
 **Outcome:** Eliminates a class of hard-to-debug auth errors and keeps the app usable even if background provisioning misfires, improving overall resilience.
 
 ---

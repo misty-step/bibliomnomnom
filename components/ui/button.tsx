@@ -11,7 +11,12 @@ const buttonVariants = cva(
       variant: {
         primary:
           "bg-text-ink text-canvas-bone hover:bg-text-inkMuted",
-
+        secondary:
+          "bg-canvas-boneMuted text-text-ink hover:bg-canvas-bone border border-line-ghost",
+        ghost:
+          "bg-transparent text-text-ink hover:bg-canvas-boneMuted",
+        destructive:
+          "bg-accent-ember text-white hover:bg-accent-ember/90",
       },
       size: {
         sm: "px-sm py-2xs text-xs",

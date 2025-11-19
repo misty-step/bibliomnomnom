@@ -88,23 +88,24 @@ export const getPublic = query({
 const baseBookFields = {
   title: v.string(),
   author: v.string(),
-  description: v.optional(v.string()),
-  isbn: v.optional(v.string()),
-  edition: v.optional(v.string()),
-  publishedYear: v.optional(v.number()),
-  pageCount: v.optional(v.number()),
+  description: v.optional(v.union(v.string(), v.null())),
+  isbn: v.optional(v.union(v.string(), v.null())),
+  edition: v.optional(v.union(v.string(), v.null())),
+  publishedYear: v.optional(v.union(v.number(), v.null())),
+  pageCount: v.optional(v.union(v.number(), v.null())),
   status: statusField,
   isAudiobook: v.optional(v.boolean()),
   isFavorite: v.optional(v.boolean()),
-  dateFinished: v.optional(v.number()),
-  coverUrl: v.optional(v.string()),
-  apiCoverUrl: v.optional(v.string()),
-  apiId: v.optional(v.string()),
+  dateFinished: v.optional(v.union(v.number(), v.null())),
+  coverUrl: v.optional(v.union(v.string(), v.null())),
+  apiCoverUrl: v.optional(v.union(v.string(), v.null())),
+  apiId: v.optional(v.union(v.string(), v.null())),
   apiSource: v.optional(
     v.union(
       v.literal("google-books"),
       v.literal("open-library"),
-      v.literal("manual")
+      v.literal("manual"),
+      v.null()
     )
   ),
 };
@@ -117,26 +118,33 @@ export const create = mutation({
     const userId = await requireAuth(ctx);
     const now = Date.now();
 
+    const cleanArgs = Object.fromEntries(
+      Object.entries(args).map(([key, value]) => [
+        key,
+        value === null ? undefined : value,
+      ])
+    );
+
     return await ctx.db.insert("books", {
       userId,
-      title: args.title,
-      author: args.author,
-      description: args.description,
-      isbn: args.isbn,
-      edition: args.edition,
-      publishedYear: args.publishedYear,
-      pageCount: args.pageCount,
-      status: args.status,
-      isFavorite: args.isFavorite ?? false,
-      isAudiobook: args.isAudiobook ?? false,
+      title: cleanArgs.title as string,
+      author: cleanArgs.author as string,
+      description: cleanArgs.description as string | undefined,
+      isbn: cleanArgs.isbn as string | undefined,
+      edition: cleanArgs.edition as string | undefined,
+      publishedYear: cleanArgs.publishedYear as number | undefined,
+      pageCount: cleanArgs.pageCount as number | undefined,
+      status: cleanArgs.status as Doc<"books">["status"],
+      isFavorite: cleanArgs.isFavorite as boolean ?? false,
+      isAudiobook: cleanArgs.isAudiobook as boolean ?? false,
       privacy: "private",
-      timesRead: args.status === "read" ? 1 : 0,
-      dateStarted: args.status === "currently-reading" ? now : undefined,
-      dateFinished: args.dateFinished,
-      coverUrl: args.coverUrl,
-      apiCoverUrl: args.apiCoverUrl,
-      apiId: args.apiId,
-      apiSource: args.apiSource,
+      timesRead: cleanArgs.status === "read" ? 1 : 0,
+      dateStarted: cleanArgs.status === "currently-reading" ? now : undefined,
+      dateFinished: cleanArgs.dateFinished as number | undefined,
+      coverUrl: cleanArgs.coverUrl as string | undefined,
+      apiCoverUrl: cleanArgs.apiCoverUrl as string | undefined,
+      apiId: cleanArgs.apiId as string | undefined,
+      apiSource: cleanArgs.apiSource as Doc<"books">["apiSource"],
       createdAt: now,
       updatedAt: now,
     });
@@ -148,25 +156,28 @@ export const update = mutation({
     id: v.id("books"),
     title: v.optional(v.string()),
     author: v.optional(v.string()),
-    description: v.optional(v.string()),
-    isbn: v.optional(v.string()),
-    edition: v.optional(v.string()),
-    publishedYear: v.optional(v.number()),
-    pageCount: v.optional(v.number()),
+    description: v.optional(v.union(v.string(), v.null())),
+    isbn: v.optional(v.union(v.string(), v.null())),
+    edition: v.optional(v.union(v.string(), v.null())),
+    publishedYear: v.optional(v.union(v.number(), v.null())),
+    pageCount: v.optional(v.union(v.number(), v.null())),
     status: v.optional(statusField),
     isAudiobook: v.optional(v.boolean()),
-    coverUrl: v.optional(v.string()),
-    apiCoverUrl: v.optional(v.string()),
-    apiId: v.optional(v.string()),
+    coverUrl: v.optional(v.union(v.string(), v.null())),
+    apiCoverUrl: v.optional(v.union(v.string(), v.null())),
+    apiId: v.optional(v.union(v.string(), v.null())),
     apiSource: v.optional(
       v.union(
         v.literal("google-books"),
         v.literal("open-library"),
-        v.literal("manual")
+        v.literal("manual"),
+        v.null()
       )
     ),
     privacy: v.optional(v.union(v.literal("private"), v.literal("public"))),
     isFavorite: v.optional(v.boolean()),
+    dateStarted: v.optional(v.union(v.number(), v.null())),
+    dateFinished: v.optional(v.union(v.number(), v.null())),
   },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
@@ -182,7 +193,9 @@ export const update = mutation({
     };
 
     for (const [key, value] of Object.entries(updates)) {
-      if (typeof value !== "undefined") {
+      if (value === null) {
+        (patch as any)[key] = undefined;
+      } else if (typeof value !== "undefined") {
         (patch as any)[key] = value;
       }
     }
