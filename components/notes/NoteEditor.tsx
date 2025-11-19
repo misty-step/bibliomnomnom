@@ -45,6 +45,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
   }, [type]);
 
   const editor = useEditor({
+    immediatelyRender: false,
     extensions: [
       StarterKit.configure({
         codeBlock: false,
@@ -175,7 +176,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
   }, [status, error]);
 
   return (
-    <div className="space-y-6 rounded-3xl border border-border bg-paper-secondary/70 p-6 shadow-sm">
+    <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex-1">
           <NoteTypeSelector
@@ -187,7 +188,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
           />
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-48">
-          <label className="text-xs uppercase tracking-wide text-ink-faded">Page / Location</label>
+          <label className="font-mono text-xs uppercase tracking-wider text-inkMuted">Page / Location</label>
           <input
             value={page}
             onChange={(event) => {
@@ -195,7 +196,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
               setDirty(true);
             }}
             placeholder="e.g. 123 or Chapter 5"
-            className="rounded-lg border border-border bg-paper px-3 py-2 text-sm focus:border-leather focus:outline-none focus:ring-2 focus:ring-leather/40"
+            className="w-full border-b border-transparent bg-transparent px-4 py-3 text-sm focus:border-line-ember focus:outline-none"
           />
         </div>
       </div>
@@ -206,9 +207,12 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
         <p className="text-sm text-ink-faded">{statusLabel}</p>
         <div className="flex items-center gap-3">
           {noteId ? (
-            <Button variant="ghost" onClick={handleDelete}>
+            <button
+              onClick={handleDelete}
+              className="font-sans text-sm text-inkMuted hover:text-ink hover:underline"
+            >
               Delete
-            </Button>
+            </button>
           ) : null}
           <Button onClick={handleManualSave}>Save</Button>
         </div>
@@ -225,7 +229,7 @@ export function NoteEditor({ bookId, note = null, onSaved }: NoteEditorProps) {
 
 function SkeletonEditor() {
   return (
-    <div className="flex min-h-[var(--space-note-panel)] animate-pulse flex-col gap-2 rounded-2xl border border-border bg-paper p-4">
+    <div className="flex min-h-[var(--space-note-panel)] animate-pulse flex-col gap-2 rounded-none border-b border-line-ghost bg-transparent p-4">
       <div className="h-4 w-3/4 rounded bg-border" />
       <div className="h-4 w-full rounded bg-border" />
       <div className="h-4 w-5/6 rounded bg-border" />

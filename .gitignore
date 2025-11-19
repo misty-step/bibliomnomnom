@@ -37,3 +37,6 @@ next-env.d.ts
 
 # pnpm
 # Note: pnpm-lock.yaml should be committed for reproducible builds
+
+*storybook.log
+storybook-static

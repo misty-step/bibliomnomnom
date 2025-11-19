@@ -1,10 +1,10 @@
 "use client";
 
-import { useQuery } from "convex/react";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { NoteCard } from "./NoteCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 
 type NoteListProps = {
   bookId: Id<"books">;
@@ -12,7 +12,7 @@ type NoteListProps = {
 };
 
 export function NoteList({ bookId, onEdit }: NoteListProps) {
-  const notes = useQuery(api.notes.list, { bookId });
+  const notes = useAuthedQuery(api.notes.list, { bookId });
 
   if (notes === undefined) {
     return <NoteListSkeleton />;

@@ -31,15 +31,11 @@ const tokenRuleConfig = {
   }
 };
 
-export default [
-  {
-    name: "global-ignores",
-    ignores: ["node_modules/**", ".next/**", "dist/**"]
-  },
-  ...compat.extends("next/core-web-vitals"),
-  {
-    name: "design-system-enforcement",
-    ...tokenRuleConfig,
-    files: ["**/*.{js,jsx,ts,tsx}"]
-  }
-];
+export default [{
+  name: "global-ignores",
+  ignores: ["node_modules/**", ".next/**", "dist/**"]
+}, ...compat.extends("next/core-web-vitals"), {
+  name: "design-system-enforcement",
+  ...tokenRuleConfig,
+  files: ["**/*.{js,jsx,ts,tsx}"]
+}];

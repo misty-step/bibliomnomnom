@@ -1,4 +1,4 @@
-import { BookCardSkeleton } from "@/components/book/BookCardSkeleton";
+import { BookTileSkeleton } from "@/components/book/BookTile";
 
 export default function LibraryLoading() {
   return (
@@ -6,7 +6,7 @@ export default function LibraryLoading() {
       <div className="h-10 w-48 animate-pulse rounded bg-paper-secondary/80" />
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, idx) => (
-          <BookCardSkeleton key={idx} />
+          <BookTileSkeleton key={idx} />
         ))}
       </div>
     </div>

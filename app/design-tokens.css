@@ -15,9 +15,7 @@
   --elevation-flat: none;
   --elevation-raised: 0 8px 24px rgba(5,8,16,0.12);
   --elevation-soft: 0 4px 16px rgba(12,22,38,0.06);
-  --font-display: "Canela", "Times New Roman", serif;
-  --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
-  --font-sans: "Söhne", "Neue Montreal", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Font variables are managed by next/font in app/layout.tsx */
   --layout-spine: 12.5rem;
   --motion-base-duration: 300ms;
   --motion-base-easing: cubic-bezier(0.16, 0.84, 0.44, 1);

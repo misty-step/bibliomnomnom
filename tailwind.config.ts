@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 import { tokenVars } from "./lib/design/tokens.generated";
 
 const colorVars = tokenVars.colors;
@@ -16,22 +17,9 @@ const config: Config = {
         canvas: colorVars.canvas,
         surface: colorVars.surface,
         text: colorVars.text,
-        action: colorVars.action,
-        accentPalette: colorVars.accent,
         line: colorVars.line,
         status: colorVars.status,
-        paper: {
-          DEFAULT: colorVars.canvas.bone,
-          secondary: colorVars.canvas.boneMuted
-        },
-        ink: {
-          DEFAULT: colorVars.text.ink,
-          faded: colorVars.text.inkMuted
-        },
-        leather: {
-          DEFAULT: colorVars.accent.sunset,
-          light: colorVars.accent.nectar
-        },
+        // Shadcn-compatible aliases using our monochrome palette
         background: colorVars.canvas.bone,
         foreground: colorVars.text.ink,
         card: {
@@ -43,7 +31,7 @@ const config: Config = {
           foreground: colorVars.text.ink
         },
         primary: {
-          DEFAULT: colorVars.action.electric,
+          DEFAULT: colorVars.text.ink,
           foreground: colorVars.surface.dawn
         },
         secondary: {
@@ -55,16 +43,16 @@ const config: Config = {
           foreground: colorVars.text.inkMuted
         },
         accent: {
-          DEFAULT: colorVars.accent.orchid,
+          DEFAULT: colorVars.text.ink,
           foreground: colorVars.surface.dawn
         },
         destructive: {
           DEFAULT: colorVars.status.danger,
           foreground: colorVars.surface.dawn
         },
-        input: colorVars.line.ember,
         border: colorVars.line.ghost,
-        ring: colorVars.action.electric
+        input: colorVars.line.ember,
+        ring: colorVars.text.ink
       },
       fontFamily: {
         display: [tokenVars.typography.display],
@@ -75,39 +63,23 @@ const config: Config = {
       borderRadius: {
         lg: tokenVars.radii.lg,
         md: tokenVars.radii.md,
-        sm: tokenVars.radii.sm,
-        pill: tokenVars.radii.pill
+        sm: tokenVars.radii.sm
       },
       boxShadow: {
         surface: tokenVars.elevation.soft,
-        raised: tokenVars.elevation.raised,
-        overlay: tokenVars.elevation.overlay
-      },
-      backgroundImage: {
-        "gradient-sky": tokenVars.gradients["sky-dawn"],
-        "gradient-azure": tokenVars.gradients["azure-orchid"],
-        "gradient-twilight": tokenVars.gradients["twilight"],
-        "texture-cloud": tokenVars.textures.cloud,
-        "texture-matrix": tokenVars.textures.matrix,
-        "texture-grain": tokenVars.textures.grain
-      },
-      blur: {
-        frosted: tokenVars.glass.frosted,
-        panel: tokenVars.glass.panel
+        raised: tokenVars.elevation.raised
       },
       transitionTimingFunction: {
-        snappy: tokenVars.motion.snappy.easing,
-        drift: tokenVars.motion.drift.easing,
-        pulse: tokenVars.motion.pulse.easing
+        fast: tokenVars.motion.fast.easing,
+        base: tokenVars.motion.base.easing
       },
       transitionDuration: {
-        snappy: tokenVars.motion.snappy.duration,
-        drift: tokenVars.motion.drift.duration,
-        pulse: tokenVars.motion.pulse.duration
+        fast: tokenVars.motion.fast.duration,
+        base: tokenVars.motion.base.duration
       }
     }
   },
-  plugins: [require("tailwindcss-animate")]
+  plugins: [tailwindcssAnimate]
 };
 
 export default config;

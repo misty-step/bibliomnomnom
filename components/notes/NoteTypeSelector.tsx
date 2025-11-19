@@ -34,21 +34,28 @@ type NoteTypeSelectorProps = {
 export function NoteTypeSelector({ value, onChange }: NoteTypeSelectorProps) {
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-xs uppercase tracking-wide text-ink-faded">Note Type</p>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {TYPES.map((type) => (
-          <button
+      <p className="font-mono text-xs uppercase tracking-wide text-ink-faded">Note Type</p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {TYPES.map((type, index) => (
+          <span
             key={type.value}
-            type="button"
             onClick={() => onChange(type.value)}
             className={cn(
-              "rounded-xl border border-border bg-paper px-4 py-3 text-left transition hover:border-leather",
-              value === type.value && "border-leather shadow-inner"
+              "group relative cursor-pointer font-mono text-sm uppercase tracking-wider",
+              value === type.value
+                ? "text-ink"
+                : "text-inkMuted hover:text-ink"
             )}
           >
-            <p className="font-semibold text-ink">{type.label}</p>
-            <p className="text-xs text-ink-faded">{type.helper}</p>
-          </button>
+            {type.label}
+            <span
+              className={cn(
+                "absolute inset-x-0 bottom-0 h-px bg-ink transition-transform duration-150 ease-out origin-left",
+                value === type.value ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
+              )}
+            />
+            {index < TYPES.length - 1 && <span className="mx-1 text-inkMuted">·</span>}
+          </span>
         ))}
       </div>
     </div>

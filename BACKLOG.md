@@ -16,6 +16,22 @@ This document contains features, enhancements, and ideas for **post-MVP** develo
 
 ---
 
+## Engineering Health (P1-P2)
+
+### Auth-Safe Dashboard Shell
+**Priority:** P1  
+**Why:** Streaming layouts currently render dashboard chrome before Clerk finishes redirecting, so Convex hooks fire while the session is missing and blow up the page.  
+**What:** Wrap `app/(dashboard)` routes in a shared shell that uses Clerk’s `<SignedIn>/<SignedOut>` boundaries (or a server loader) so child components never mount until a user session + Convex identity exist. Provide a consistent signed-out placeholder instead of component-level hacks.  
+**Outcome:** Prevents wasted renders, removes auth plumbing from individual components, and keeps future dashboards from repeating the `Unauthenticated` regressions we just fixed piecemeal.
+
+### Auto-Provision Convex Users
+**Priority:** P1  
+**Why:** `requireAuth` throws “User not found in database” whenever Clerk webhooks lag or fail, taking down every query/mutation even though the client is signed in.  
+**What:** Extend `requireAuth` to upsert a user record on-demand from `ctx.auth.getUserIdentity()` (or queue a background sync) when the Clerk ID is missing. Log when this fallback runs so we can alert on webhook failures.  
+**Outcome:** Eliminates a class of hard-to-debug auth errors and keeps the app usable even if background provisioning misfires, improving overall resilience.
+
+---
+
 ## Phase 1: AI & Intelligence (P1)
 
 The AI features that will transform bibliomnomnom from a book tracker to an intelligent reading companion.

@@ -1,104 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { api } from "@/convex/_generated/api";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
+import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
-export function Spine() {
-  const pathname = usePathname();
-  const books = useAuthedQuery(api.books.list, {});
+type SpineProps = {
+  isMobileOverlay?: boolean;
+  onClose?: () => void;
+};
 
-  const isActive = (path: string) => {
-    if (path === "/library") {
-      return pathname === path || pathname.startsWith("/library/");
-    }
-    return pathname === path;
+export function Spine({ isMobileOverlay = false, onClose }: SpineProps) {
+  const readCount = useAuthedQuery(api.books.list, { status: "read" })?.length || 0;
+  const readingCount = useAuthedQuery(api.books.list, { status: "currently-reading" })?.length || 0;
+  const wantCount = useAuthedQuery(api.books.list, { status: "want-to-read" })?.length || 0;
+  const totalCount = useAuthedQuery(api.books.list, {})?.length || 0;
+  const router = useRouter();
+
+  const handleNavLinkClick = (href: string) => {
+    router.push(href);
+    onClose?.();
   };
 
-  // Calculate stats
-  const totalBooks = books?.length ?? 0;
-  const booksRead = books?.filter((b) => b.status === "read").length ?? 0;
-  const currentlyReading =
-    books?.filter((b) => b.status === "currently-reading").length ?? 0;
-  const wantToRead =
-    books?.filter((b) => b.status === "want-to-read").length ?? 0;
-
+  // Mobile overlay: full column layout
+  // Desktop (lg+): fixed left sidebar
+  // Below lg: hidden (use hamburger menu)
   return (
-    <aside className="fixed left-0 top-20 h-[calc(100vh-5rem)] w-[var(--layout-spine)] bg-transparent px-8 py-12">
-      {/* Navigation links */}
-      <nav className="space-y-4">
-        <Link
-          href="/library"
-          className={cn(
-            "group relative block font-mono text-sm uppercase tracking-widest transition",
-            isActive("/library") ? "text-text-ink" : "text-text-inkMuted hover:text-text-ink"
-          )}
-        >
-          Library
-          <span
-            className={cn(
-              "absolute bottom-0 left-0 h-px bg-text-ink transition-transform duration-150 ease-out",
-              isActive("/library")
-                ? "w-full scale-x-100"
-                : "w-full origin-left scale-x-0 group-hover:scale-x-100"
-            )}
-          />
-        </Link>
-        <Link
-          href="/settings"
-          className={cn(
-            "group relative block font-mono text-sm uppercase tracking-widest transition",
-            isActive("/settings") ? "text-text-ink" : "text-text-inkMuted hover:text-text-ink"
-          )}
-        >
-          Settings
-          <span
-            className={cn(
-              "absolute bottom-0 left-0 h-px bg-text-ink transition-transform duration-150 ease-out",
-              isActive("/settings")
-                ? "w-full scale-x-100"
-                : "w-full origin-left scale-x-0 group-hover:scale-x-100"
-            )}
-          />
-        </Link>
-      </nav>
+    <aside
+      className={cn(
+        "bg-transparent",
+        isMobileOverlay
+          ? "block h-full w-full"
+          : "fixed left-0 top-20 bottom-0 z-10 hidden w-[var(--layout-spine)] border-r border-line-ember lg:block"
+      )}
+    >
+      <div className="flex h-full flex-col p-6">
+        {/* Navigation */}
+        <nav className="flex flex-col space-y-3">
+          <Link
+            href="/library"
+            onClick={() => handleNavLinkClick("/library")}
+            className="group relative font-mono text-sm uppercase tracking-widest text-text-inkMuted transition-colors duration-150 ease-out hover:text-text-ink"
+          >
+            <span className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-text-ink transition-transform duration-150 ease-out group-hover:scale-x-100" />
+          </Link>
+          <Link
+            href="/settings"
+            onClick={() => handleNavLinkClick("/settings")}
+            className="group relative font-mono text-sm uppercase tracking-widest text-text-inkMuted transition-colors duration-150 ease-out hover:text-text-ink"
+          >
+            Settings
+            <span className="absolute inset-x-0 bottom-0 h-px origin-left scale-x-0 bg-text-ink transition-transform duration-150 ease-out group-hover:scale-x-100" />
+          </Link>
+        </nav>
 
-      {/* Separator */}
-      <hr className="my-8 border-line-ember" />
+        <hr className="my-6 border-line-ember" />
 
-      {/* Stats display */}
-      <div className="space-y-4">
-        <div>
-          <span className="font-display text-2xl text-text-ink">{booksRead}</span>
-          <span className="ml-2 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
-            read
-          </span>
+        {/* Stats */}
+        <div className="flex flex-col space-y-4">
+          <div className="flex flex-col">
+            <span className="font-display text-3xl text-text-ink">{readCount}</span>
+            <span className="font-mono text-xs uppercase tracking-wider text-text-inkMuted">read</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-display text-3xl text-text-ink">{readingCount}</span>
+            <span className="font-mono text-xs uppercase tracking-wider text-text-inkMuted">reading</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-display text-3xl text-text-ink">{wantCount}</span>
+            <span className="font-mono text-xs uppercase tracking-wider text-text-inkMuted">want</span>
+          </div>
         </div>
-        <div>
-          <span className="font-display text-2xl text-text-ink">{currentlyReading}</span>
-          <span className="ml-2 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
-            reading
-          </span>
-        </div>
-        <div>
-          <span className="font-display text-2xl text-text-ink">{wantToRead}</span>
-          <span className="ml-2 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
-            want
-          </span>
-        </div>
-      </div>
 
-      {/* Separator */}
-      <hr className="my-8 border-line-ember" />
+        <hr className="my-6 border-line-ember" />
 
-      {/* Total */}
-      <div>
-        <span className="font-display text-2xl text-text-ink">{totalBooks}</span>
-        <span className="ml-2 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
-          total
-        </span>
+        {/* Total */}
+        <div className="flex flex-col">
+          <span className="font-display text-3xl text-text-ink">{totalCount}</span>
+          <span className="font-mono text-xs uppercase tracking-wider text-text-inkMuted">total</span>
+        </div>
       </div>
     </aside>
   );

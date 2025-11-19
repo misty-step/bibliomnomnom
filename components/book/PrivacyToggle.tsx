@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useMutation } from "convex/react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button"; // No longer needed
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // Assuming Popover component exists or will be created
 
 type Privacy = "private" | "public";
 
@@ -36,25 +37,30 @@ export function PrivacyToggle({ bookId, privacy }: PrivacyToggleProps) {
     }
   };
 
+  const currentStatusText = currentPrivacy === "private" ? "🔒 Private" : "🌐 Public";
+  const nextActionText = currentPrivacy === "private" ? "Make Public" : "Make Private";
+  const nextActionIcon = currentPrivacy === "private" ? "🌐" : "🔒";
+
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border bg-paper-secondary/70 p-4">
-      <div className="flex-1 space-y-1">
-        <p className="text-sm font-semibold text-ink">
-          {currentPrivacy === "private" ? "Private" : "Public"}
-        </p>
-        <p className="text-xs text-ink-faded">
-          {currentPrivacy === "private"
-            ? "Only you can see this book."
-            : "Anyone with the link can view this book."}
-        </p>
-      </div>
-      <Button
-        variant="outline"
-        onClick={handleToggle}
-        disabled={isLoading}
-      >
-        {isLoading ? "Saving…" : currentPrivacy === "private" ? "Make Public" : "Make Private"}
-      </Button>
-    </div>
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          disabled={isLoading}
+          className="font-sans text-sm text-inkMuted hover:text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
+        >
+          {isLoading ? "Saving…" : currentStatusText}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <div className="flex flex-col">
+          <button
+            onClick={handleToggle}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-ink hover:bg-canvas-boneMuted"
+          >
+            {nextActionIcon} {nextActionText}
+          </button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

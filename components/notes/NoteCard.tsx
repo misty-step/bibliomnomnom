@@ -41,7 +41,7 @@ export function NoteCard({ note, onEdit }: NoteCardProps) {
   const updatedAt = new Date(note.updatedAt);
 
   return (
-    <article className="space-y-4 rounded-2xl border border-border bg-paper p-5 shadow-sm">
+    <article className="space-y-4 p-5">
       <header className="flex items-start justify-between gap-4">
         <div>
           <span
@@ -59,9 +59,12 @@ export function NoteCard({ note, onEdit }: NoteCardProps) {
           ) : null}
         </div>
         {onEdit ? (
-          <Button variant="ghost" size="sm" onClick={() => onEdit(note)}>
+          <button
+            onClick={() => onEdit(note)}
+            className="font-sans text-sm text-inkMuted hover:text-ink hover:underline"
+          >
             Edit
-          </Button>
+          </button>
         ) : null}
       </header>
       <div

@@ -127,15 +127,14 @@ export function UploadCover({
             {isUploading ? "Uploading…" : "Upload new cover"}
           </label>
           {preview ? (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="sm"
               onClick={handleRemove}
               disabled={isUploading}
+              className="font-sans text-sm text-inkMuted hover:text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
             >
               Remove cover
-            </Button>
+            </button>
           ) : null}
           <p className="text-xs text-ink-faded">
             JPG, PNG, or WebP up to 5MB. Uploads are stored securely via Vercel Blob.
