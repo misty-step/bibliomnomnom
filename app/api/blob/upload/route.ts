@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         return {
           allowedContentTypes: ALLOWED_TYPES,
           maximumSizeInBytes: MAX_FILE_SIZE,
+          addRandomSuffix: true,
           tokenPayload: JSON.stringify({ userId }),
         };
       },
