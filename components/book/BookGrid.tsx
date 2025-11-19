@@ -3,31 +3,41 @@
 import { useMemo, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { BookTile, BookTileSkeleton } from "./BookTile";
+import { AddBookSheet } from "./AddBookSheet";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 
-type FilterType = "all" | "currently-reading" | "read" | "want-to-read" | "favorites";
+type FilterType = "library" | "to-read" | "favorites";
 
 export function BookGrid() {
   const allBooks = useAuthedQuery(api.books.list, {});
-  const [activeFilter, setActiveFilter] = useState<FilterType>("currently-reading");
+  const [activeFilter, setActiveFilter] = useState<FilterType>("library");
 
-  const filteredBooks = useMemo(() => {
-    if (!allBooks) return null;
+  // Compute counts and filtered books
+  const { counts, libraryBooks, toReadBooks, favoriteBooks } = useMemo(() => {
+    if (!allBooks) {
+      return {
+        counts: { library: 0, toRead: 0, favorites: 0 },
+        libraryBooks: { reading: [], finished: [] },
+        toReadBooks: [],
+        favoriteBooks: [],
+      };
+    }
 
-    if (activeFilter === "all") return allBooks;
-    if (activeFilter === "favorites") return allBooks.filter((b) => b.isFavorite);
-    return allBooks.filter((b) => b.status === activeFilter);
-  }, [allBooks, activeFilter]);
+    const reading = allBooks.filter((b) => b.status === "currently-reading");
+    const finished = allBooks.filter((b) => b.status === "read");
+    const toRead = allBooks.filter((b) => b.status === "want-to-read");
+    const favorites = allBooks.filter((b) => b.isFavorite);
 
-  const counts = useMemo(() => {
-    if (!allBooks) return { currentlyReading: 0, read: 0, wantToRead: 0, favorites: 0, all: 0 };
     return {
-      currentlyReading: allBooks.filter((b) => b.status === "currently-reading").length,
-      read: allBooks.filter((b) => b.status === "read").length,
-      wantToRead: allBooks.filter((b) => b.status === "want-to-read").length,
-      favorites: allBooks.filter((b) => b.isFavorite).length,
-      all: allBooks.length,
+      counts: {
+        library: reading.length + finished.length,
+        toRead: toRead.length,
+        favorites: favorites.length,
+      },
+      libraryBooks: { reading, finished },
+      toReadBooks: toRead,
+      favoriteBooks: favorites,
     };
   }, [allBooks]);
 
@@ -35,75 +45,207 @@ export function BookGrid() {
     return <GridSkeleton />;
   }
 
-  if (allBooks.length === 0) {
-    return (
-      <div className="text-left">
-        <p className="font-display text-xl text-text-inkMuted">Your reading list awaits.</p>
-        <p className="mt-2">
-          <span className="cursor-pointer font-sans text-base text-ink hover:text-inkMuted relative group">
-            + Add your first book
-            <span className="absolute bottom-0 left-0 w-full h-px bg-ink transform scaleX(0) group-hover:scaleX(1) transition-transform duration-150 ease-out origin-left"></span>
-          </span>
-        </p>
+  const filters = [
+    { label: "Library", type: "library" as FilterType, count: counts.library },
+    { label: "To Read", type: "to-read" as FilterType, count: counts.toRead },
+    { label: "Favorites", type: "favorites" as FilterType, count: counts.favorites },
+  ];
+
+  return (
+    <div className="space-y-6">
+      {/* Filter Bar */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Filter Pills */}
+        <nav className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
+          {filters.map((filter) => (
+            <button
+              key={filter.type}
+              onClick={() => setActiveFilter(filter.type)}
+              className={cn(
+                "flex-shrink-0 rounded-md px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-all duration-150",
+                activeFilter === filter.type
+                  ? "bg-text-ink text-canvas-bone font-medium"
+                  : "text-text-inkMuted hover:bg-line-ghost hover:text-text-ink"
+              )}
+            >
+              {filter.label}
+              {filter.count > 0 && (
+                <span
+                  className={cn(
+                    "ml-1.5",
+                    activeFilter === filter.type ? "opacity-70" : "opacity-50"
+                  )}
+                >
+                  {filter.count}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Add Book Button */}
+        <AddBookButton />
       </div>
+
+      {/* Content */}
+      {activeFilter === "library" && (
+        <LibraryView
+          readingBooks={libraryBooks.reading}
+          finishedBooks={libraryBooks.finished}
+        />
+      )}
+      {activeFilter === "to-read" && <ToReadView books={toReadBooks} />}
+      {activeFilter === "favorites" && <FavoritesView books={favoriteBooks} />}
+    </div>
+  );
+}
+
+// Library View - sectioned into Currently Reading and Finished
+function LibraryView({
+  readingBooks,
+  finishedBooks,
+}: {
+  readingBooks: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+  finishedBooks: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+}) {
+  const hasReading = readingBooks && readingBooks.length > 0;
+  const hasFinished = finishedBooks && finishedBooks.length > 0;
+  const isEmpty = !hasReading && !hasFinished;
+
+  if (isEmpty) {
+    return (
+      <EmptyState
+        title="Your library awaits"
+        subtitle="Add your first book to get started"
+      />
     );
   }
 
   return (
-    <div className="space-y-8">
-      {/* Filter Links */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-8">
-        {[
-          { label: "Currently Reading", type: "currently-reading", count: counts.currentlyReading },
-          { label: "Read", type: "read", count: counts.read },
-          { label: "Want to Read", type: "want-to-read", count: counts.wantToRead },
-          { label: "Favorites", type: "favorites", count: counts.favorites },
-          { label: "All", type: "all", count: counts.all },
-        ].map((filter, index) => (
-          <span
-            key={filter.type}
-            onClick={() => setActiveFilter(filter.type as FilterType)}
-            className={cn(
-              "group relative cursor-pointer font-mono text-sm uppercase tracking-wider",
-              activeFilter === filter.type
-                ? "text-ink"
-                : "text-inkMuted hover:text-ink"
-            )}
-          >
-            {filter.label}
-            <span
-              className={cn(
-                "absolute inset-x-0 bottom-0 h-px bg-ink transition-transform duration-150 ease-out origin-left",
-                activeFilter === filter.type ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-              )}
-            />
-            {index < 4 && <span className="mx-1 text-inkMuted">·</span>} {/* Middot separator */}
-          </span>
-        ))}
-      </div>
-
-      {/* Grid */}
-      {filteredBooks && filteredBooks.length > 0 ? (
-        <div className="grid gap-8 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
-          {filteredBooks.map((book) => (
-            <BookTile key={book._id} book={book} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-left">
-          <p className="font-display text-xl text-text-inkMuted">No books in this category yet</p>
-        </div>
+    <div className="space-y-10">
+      {/* Currently Reading Section */}
+      {hasReading && (
+        <section>
+          <SectionHeader>Currently Reading</SectionHeader>
+          <BooksGrid books={readingBooks} />
+        </section>
       )}
+
+      {/* Finished Section */}
+      {hasFinished && (
+        <section>
+          <SectionHeader>Finished</SectionHeader>
+          <BooksGrid books={finishedBooks} />
+        </section>
+      )}
+    </div>
+  );
+}
+
+// To Read View
+function ToReadView({
+  books,
+}: {
+  books: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+}) {
+  if (!books || books.length === 0) {
+    return (
+      <EmptyState
+        title="Nothing queued yet"
+        subtitle="Add books you want to read"
+      />
+    );
+  }
+
+  return <BooksGrid books={books} />;
+}
+
+// Favorites View
+function FavoritesView({
+  books,
+}: {
+  books: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+}) {
+  if (!books || books.length === 0) {
+    return (
+      <EmptyState
+        title="No favorites yet"
+        subtitle="Mark books as favorites to see them here"
+      />
+    );
+  }
+
+  return <BooksGrid books={books} />;
+}
+
+// Shared Components
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-4 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+      {children}
+    </h2>
+  );
+}
+
+function BooksGrid({
+  books,
+}: {
+  books: NonNullable<ReturnType<typeof useAuthedQuery<typeof api.books.list>>>;
+}) {
+  return (
+    <div
+      className="grid gap-4"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(10rem, 1fr))" }}
+    >
+      {books.map((book) => (
+        <BookTile key={book._id} book={book} />
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div className="py-12 text-center">
+      <p className="font-display text-xl text-text-inkMuted">{title}</p>
+      <p className="mt-2 text-sm text-text-inkSubtle">{subtitle}</p>
+    </div>
+  );
+}
+
+function AddBookButton() {
+  return (
+    <div className="flex-shrink-0">
+      <AddBookSheet
+        triggerLabel="Add Book"
+        triggerClassName="rounded-md bg-text-ink px-4 py-1.5 font-sans text-sm font-medium text-canvas-bone transition-colors hover:bg-text-inkMuted"
+      />
     </div>
   );
 }
 
 function GridSkeleton() {
   return (
-    <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-      {Array.from({ length: 10 }).map((_, idx) => (
-        <BookTileSkeleton key={idx} />
-      ))}
+    <div className="space-y-6">
+      {/* Skeleton filter bar */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="h-8 w-20 animate-pulse rounded-md bg-text-ink/5" />
+          ))}
+        </div>
+        <div className="h-8 w-24 animate-pulse rounded-md bg-text-ink/5" />
+      </div>
+
+      {/* Skeleton grid */}
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(10rem, 1fr))" }}
+      >
+        {Array.from({ length: 12 }).map((_, idx) => (
+          <BookTileSkeleton key={idx} />
+        ))}
+      </div>
     </div>
   );
 }

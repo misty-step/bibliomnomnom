@@ -4,9 +4,10 @@ import { useState, useEffect, type ChangeEvent } from "react";
 import { useMutation } from "convex/react";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
+import { Star, Headphones } from "lucide-react";
 import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/button"; // Keep Button for the submit button inside the form
-import { SideSheet } from "@/components/ui/SideSheet"; // Import SideSheet
+import { Button } from "@/components/ui/button";
+import { SideSheet } from "@/components/ui/SideSheet";
 import { useToast } from "@/hooks/use-toast";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { cn } from "@/lib/utils";
@@ -14,15 +15,28 @@ import { cn } from "@/lib/utils";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
 
-export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: string }) {
+type AddBookSheetProps = {
+  triggerLabel?: string;
+  triggerClassName?: string;
+};
+
+// Helper to get today's date in YYYY-MM-DD format
+function getTodayString(): string {
+  return new Date().toISOString().split("T")[0];
+}
+
+export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName }: AddBookSheetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [status, setStatus] = useState<BookStatus>("want-to-read");
+  const [status, setStatus] = useState<BookStatus>("currently-reading");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isAudiobook, setIsAudiobook] = useState(false);
+  const [dateFinished, setDateFinished] = useState("");
 
   const createBook = useMutation(api.books.create);
   const { toast } = useToast();
@@ -46,10 +60,21 @@ export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: str
     // Reset form
     setTitle("");
     setAuthor("");
-    setStatus("want-to-read");
+    setStatus("currently-reading");
     setCoverFile(null);
     setCoverPreview(null);
     setError(null);
+    setIsFavorite(false);
+    setIsAudiobook(false);
+    setDateFinished("");
+  };
+
+  const handleStatusChange = (newStatus: BookStatus) => {
+    setStatus(newStatus);
+    // Set default date when switching to Finished
+    if (newStatus === "read" && !dateFinished) {
+      setDateFinished(getTodayString());
+    }
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -108,14 +133,20 @@ export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: str
         coverUrl = blob.url;
       }
 
+      // Convert date string to timestamp if provided
+      const dateFinishedTimestamp = dateFinished
+        ? new Date(dateFinished).getTime()
+        : undefined;
+
       // Create book
       await createBook({
         title: trimmedTitle,
         author: trimmedAuthor,
         status,
         coverUrl,
-        isAudiobook: false,
-        isFavorite: false,
+        isAudiobook,
+        isFavorite,
+        dateFinished: status === "read" ? dateFinishedTimestamp : undefined,
         apiSource: "manual",
       });
 
@@ -133,57 +164,64 @@ export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: str
     }
   };
 
+  const defaultTriggerClassName = "relative group cursor-pointer font-sans text-base text-ink hover:text-inkMuted";
+
   return (
     <>
-      <span
+      <button
+        type="button"
         onClick={handleOpen}
-        className="relative group cursor-pointer font-sans text-base text-ink hover:text-inkMuted"
+        className={triggerClassName || defaultTriggerClassName}
       >
-        + {triggerLabel}
-        <span className="absolute bottom-0 left-0 w-full h-px bg-ink transform scaleX(0) group-hover:scaleX(1) transition-transform duration-150 ease-out origin-left"></span>
-      </span>
-      <SideSheet open={isOpen} onOpenChange={setIsOpen} title="ADD BOOK">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
+      </button>
+      <SideSheet open={isOpen} onOpenChange={setIsOpen} title="Add Book">
+        <form onSubmit={handleSubmit} className="space-y-8">
           {/* Cover Upload */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-wider text-inkMuted">
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
               Cover Image
             </label>
             {coverPreview ? (
-              <div className="flex gap-4">
-                <div className="relative h-48 w-32 overflow-hidden rounded-lg">
-                  <Image
-                    src={coverPreview}
-                    alt="Cover preview"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-line-ghost bg-canvas-bone px-4 py-2 text-sm font-medium text-text-ink transition hover:border-text-ink hover:bg-canvas-boneMuted">
-                    <input
-                      type="file"
-                      accept={ALLOWED_TYPES.join(",")}
-                      onChange={handleFileChange}
-                      className="hidden"
-                      disabled={isSubmitting}
+              <div className="flex justify-center">
+                <div className="group relative w-40">
+                  {/* Cover Image */}
+                  <div className="aspect-[2/3] overflow-hidden rounded-sm shadow-md">
+                    <Image
+                      src={coverPreview}
+                      alt="Cover preview"
+                      fill
+                      className="object-cover"
                     />
-                    Change
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleRemoveCover}
-                    disabled={isSubmitting}
-                    className="font-sans text-sm text-inkMuted hover:text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
+                  </div>
+
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-sm bg-black/70 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                    <label className="cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30">
+                      <input
+                        type="file"
+                        accept={ALLOWED_TYPES.join(",")}
+                        onChange={handleFileChange}
+                        className="hidden"
+                        disabled={isSubmitting}
+                      />
+                      Change
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleRemoveCover}
+                      disabled={isSubmitting}
+                      className="text-sm text-white/80 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
               <label
                 className={cn(
-                  "flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-line-ghost bg-canvas-boneMuted transition hover:border-text-inkMuted hover:bg-canvas-bone",
+                  "flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-line-ghost bg-canvas-boneMuted transition hover:border-text-inkMuted hover:bg-canvas-bone",
                   isSubmitting && "pointer-events-none opacity-60"
                 )}
               >
@@ -206,7 +244,7 @@ export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: str
 
           {/* Title */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-wider text-inkMuted">
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
               Title <span className="text-accent-ember">*</span>
             </label>
             <input
@@ -214,14 +252,14 @@ export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: str
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="The Name of the Wind"
-              className="w-full border-b border-transparent bg-transparent px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-line-ember focus:outline-none"
+              className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
               disabled={isSubmitting}
             />
           </div>
 
           {/* Author */}
           <div>
-            <label className="mb-2 block font-mono text-xs uppercase tracking-wider text-inkMuted">
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
               Author <span className="text-accent-ember">*</span>
             </label>
             <input
@@ -229,55 +267,100 @@ export function AddBookSheet({ triggerLabel = "Add Book" }: { triggerLabel?: str
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder="Patrick Rothfuss"
-              className="w-full border-b border-transparent bg-transparent px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-line-ember focus:outline-none"
+              className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
               disabled={isSubmitting}
             />
           </div>
 
-          {/* Status */}
+          {/* Status - Segmented Control */}
           <div>
-            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-inkMuted">
-              Reading Status
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+              Status
             </label>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              {BOOK_STATUS_OPTIONS.map((option, index) => (
-                <span
+            <div className="flex rounded-md bg-canvas-boneMuted p-1">
+              {BOOK_STATUS_OPTIONS.map((option) => (
+                <button
                   key={option.value}
-                  onClick={() => setStatus(option.value)}
+                  type="button"
+                  onClick={() => handleStatusChange(option.value)}
                   className={cn(
-                    "group relative cursor-pointer font-mono text-sm uppercase tracking-wider",
+                    "flex-1 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
                     status === option.value
-                      ? "text-ink"
-                      : "text-inkMuted hover:text-ink"
+                      ? "bg-text-ink text-canvas-bone shadow-sm"
+                      : "text-text-inkMuted hover:text-text-ink"
                   )}
                 >
                   {option.label}
-                  <span
-                    className={cn(
-                      "absolute inset-x-0 bottom-0 h-px bg-ink transition-transform duration-150 ease-out origin-left",
-                      status === option.value ? "scale-x-100" : "scale-x-0 group-hover:scale-x-100"
-                    )}
-                  />
-                  {index < BOOK_STATUS_OPTIONS.length - 1 && <span className="mx-1 text-inkMuted">·</span>}
-                </span>
+                </button>
               ))}
+            </div>
+          </div>
+
+          {/* Finished Date - Conditional */}
+          {status === "read" && (
+            <div>
+              <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+                Finished On
+              </label>
+              <input
+                type="date"
+                value={dateFinished}
+                onChange={(e) => setDateFinished(e.target.value)}
+                className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
+
+          {/* Flags */}
+          <div>
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+              Flags
+            </label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsFavorite(!isFavorite)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
+                  isFavorite
+                    ? "bg-text-ink text-canvas-bone shadow-sm"
+                    : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink"
+                )}
+              >
+                <Star className={cn("h-3.5 w-3.5", isFavorite && "fill-amber-400 text-amber-400")} />
+                Favorite
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAudiobook(!isAudiobook)}
+                className={cn(
+                  "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
+                  isAudiobook
+                    ? "bg-text-ink text-canvas-bone shadow-sm"
+                    : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink"
+                )}
+              >
+                <Headphones className="h-3.5 w-3.5" />
+                Audiobook
+              </button>
             </div>
           </div>
 
           {/* Error */}
           {error && (
-            <div className="rounded-lg border border-accent-ember/20 bg-accent-ember/10 px-4 py-3 text-sm text-accent-ember">
+            <div className="rounded-md border border-accent-ember/20 bg-accent-ember/10 px-4 py-3 text-sm text-accent-ember">
               {error}
             </div>
           )}
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-4">
             <button
               type="button"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="font-sans text-sm text-inkMuted hover:text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
+              className="font-sans text-sm text-text-inkMuted hover:text-text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
             >
               Cancel
             </button>
