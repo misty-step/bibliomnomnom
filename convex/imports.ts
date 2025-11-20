@@ -11,6 +11,13 @@ import {
 } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
 import { llmExtract } from "../lib/import/llm";
+import type { Doc } from "./_generated/dataModel";
+
+type Decision = {
+  tempId: string;
+  action: "skip" | "merge" | "create";
+  fieldsToMerge?: string[];
+};
 
 const isCsvSource = (source: string) =>
   source === "goodreads-csv" || source === "csv";
@@ -31,6 +38,26 @@ export const preparePreview = mutation({
     totalPages: v.optional(v.number()),
   },
   handler: async (ctx, args) => preparePreviewHandler(ctx, args),
+});
+
+export const commitImport = mutation({
+  args: {
+    importRunId: v.string(),
+    page: v.number(),
+    decisions: v.array(
+      v.object({
+        tempId: v.string(),
+        action: v.union(
+          v.literal("skip"),
+          v.literal("merge"),
+          v.literal("create")
+        ),
+        fieldsToMerge: v.optional(v.array(v.string())),
+        existingBookId: v.optional(v.id("books")),
+      })
+    ),
+  },
+  handler: async (ctx, args) => commitImportHandler(ctx, args),
 });
 
 export type PreparePreviewArgs = Parameters<typeof preparePreview>[0]["args"];
@@ -55,6 +82,15 @@ export const preparePreviewHandler = async (
   }
 
   const dedupMatches = await dedupHelpers.findMatches(ctx.db, userId, books);
+
+  // Store latest preview payload for commit validation/idempotency.
+  await ctx.db.insert("importPreviews", {
+    importRunId: args.importRunId,
+    userId,
+    books,
+    page: args.page,
+    createdAt: Date.now(),
+  });
 
   await upsertImportRun(ctx, {
     userId,
@@ -132,4 +168,131 @@ const upsertImportRun = async (
     updatedAt: now,
     errorMessage: undefined,
   });
+};
+
+export type CommitImportArgs = Parameters<typeof commitImport>[0]["args"];
+
+export const commitImportHandler = async (ctx: any, args: CommitImportArgs) => {
+  const userId = (await requireAuth(ctx)) as Id<"users">;
+
+  const run = await ctx.db
+    .query("importRuns")
+    .withIndex("by_user_run", (q: any) =>
+      q.eq("userId", userId).eq("importRunId", args.importRunId)
+    )
+    .first();
+
+  if (!run) {
+    throw new Error("Preview required before commit");
+  }
+
+  if (run.status === "committed" && run.page === args.page) {
+    return {
+      created: run.counts.created,
+      merged: run.counts.merged,
+      skipped: run.counts.skipped,
+      errors: [],
+    } satisfies Summary;
+  }
+
+  const now = Date.now();
+  const decisionsByTempId = new Map<string, Decision>();
+  args.decisions.forEach((d) => decisionsByTempId.set(d.tempId, d));
+
+  const incomingMap = await loadPreviewRows(ctx, userId, args.importRunId, args.page);
+
+  let created = 0;
+  let merged = 0;
+  let skipped = 0;
+  const errors: ParseError[] = [];
+
+  for (const decision of args.decisions) {
+    const incoming = incomingMap.get(decision.tempId);
+    if (!incoming) {
+      errors.push({
+        message: `Unknown tempId ${decision.tempId}`,
+      });
+      continue;
+    }
+
+    if (decision.action === "skip") {
+      skipped += 1;
+      continue;
+    }
+
+    if (decision.action === "create") {
+      await ctx.db.insert("books", dedupHelpers.buildNewBook(incoming, userId));
+      created += 1;
+      continue;
+    }
+
+    if (!decision.existingBookId) {
+      errors.push({ message: `Missing existingBookId for merge ${decision.tempId}` });
+      continue;
+    }
+
+    const existing = await ctx.db.get(decision.existingBookId as Id<"books">);
+    if (!existing || existing.userId !== userId) {
+      errors.push({ message: `Book not found for merge ${decision.existingBookId}` });
+      continue;
+    }
+
+    const patch = dedupHelpers.applyDecision(existing as Doc<"books">, incoming, "merge");
+    if (patch && Object.keys(patch).length) {
+      await ctx.db.patch(existing._id, {
+        ...patch,
+        updatedAt: now,
+      });
+      merged += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+
+  await ctx.db.patch(run._id, {
+    status: "committed",
+    page: args.page,
+    counts: {
+      ...run.counts,
+      created: run.counts.created + created,
+      merged: run.counts.merged + merged,
+      skipped: run.counts.skipped + skipped,
+      errors: run.counts.errors + errors.length,
+    },
+    updatedAt: now,
+  });
+
+  return {
+    created,
+    merged,
+    skipped,
+    errors,
+  } satisfies Summary;
+};
+
+type Summary = { created: number; merged: number; skipped: number; errors: ParseError[] };
+
+const loadPreviewRows = async (
+  ctx: any,
+  userId: Id<"users">,
+  importRunId: string,
+  page: number
+): Promise<Map<string, ParsedBook>> => {
+  const map = new Map<string, ParsedBook>();
+  const preview = await ctx.db
+    .query("importPreviews")
+    .withIndex("by_user_run_page", (q: any) =>
+      q.eq("userId", userId).eq("importRunId", importRunId).eq("page", page)
+    )
+    .first();
+
+  if (!preview || !Array.isArray(preview.books)) {
+    return map;
+  }
+
+  preview.books.forEach((row: ParsedBook) => {
+    map.set(row.tempId, row);
+  });
+
+  return map;
 };

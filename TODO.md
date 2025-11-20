@@ -139,7 +139,7 @@
   Estimate: 1.5h
   ```
 
-- [ ] Add Convex commitImport mutation
+- [~] Add Convex commitImport mutation
   ```
   Files:
   - convex/imports.ts (mutation section)
