@@ -12,6 +12,7 @@ import {
 import { dedupHelpers } from "../lib/import/dedup";
 import { llmExtract } from "../lib/import/llm";
 import type { Doc } from "./_generated/dataModel";
+import { logImportEvent } from "../lib/import/metrics";
 
 type Decision = {
   tempId: string;
@@ -68,6 +69,8 @@ export const preparePreviewHandler = async (
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
 
+  await enforceRateLimits(ctx, userId);
+
   let books: ParsedBook[] = args.rows ?? [];
   const warnings: string[] = [];
   const errors: ParseError[] = [];
@@ -110,6 +113,15 @@ export const preparePreviewHandler = async (
     errors,
     importRunId: args.importRunId,
   };
+
+  logImportEvent({
+    phase: "preview",
+    importRunId: args.importRunId,
+    sourceType: args.sourceType,
+    counts: { rows: books.length, errors: errors.length },
+    tokenUsage: 0, // llmExtract returns usage internally if needed later
+    page: args.page,
+  });
 };
 
 const upsertImportRun = async (
@@ -174,6 +186,8 @@ export type CommitImportArgs = Parameters<typeof commitImport>[0]["args"];
 
 export const commitImportHandler = async (ctx: any, args: CommitImportArgs) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
+
+  await enforceRateLimits(ctx, userId);
 
   const run = await ctx.db
     .query("importRuns")
@@ -295,4 +309,26 @@ const loadPreviewRows = async (
   });
 
   return map;
+};
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const DAILY_LIMIT = 5;
+const CONCURRENT_LIMIT = 2;
+
+const enforceRateLimits = async (ctx: any, userId: Id<"users">) => {
+  const now = Date.now();
+  const runs = await ctx.db
+    .query("importRuns")
+    .withIndex("by_user_run", (q: any) => q.eq("userId", userId))
+    .collect();
+
+  const recent = runs.filter((r: any) => now - r.createdAt < ONE_DAY_MS);
+  if (recent.length >= DAILY_LIMIT) {
+    throw new Error("Too many imports today. Please try again tomorrow.");
+  }
+
+  const inFlight = recent.filter((r: any) => r.status === "previewed");
+  if (inFlight.length >= CONCURRENT_LIMIT) {
+    throw new Error("Too many concurrent imports. Finish existing imports before starting another.");
+  }
 };
