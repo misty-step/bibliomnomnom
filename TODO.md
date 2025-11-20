@@ -99,7 +99,7 @@
   Estimate: 1.5h
   ```
 
-- [ ] Implement LLM extraction for TXT/MD/unknown CSV
+- [x] Implement LLM extraction for TXT/MD/unknown CSV
   ```
   Files:
   - lib/import/llm.ts
