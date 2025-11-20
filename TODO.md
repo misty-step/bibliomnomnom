@@ -78,7 +78,7 @@
   Estimate: 1.25h
   ```
 
-- [ ] Build dedup engine + normalization helpers
+- [x] Build dedup engine + normalization helpers
   ```
   Files:
   - lib/import/dedup.ts
