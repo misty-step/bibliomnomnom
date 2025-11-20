@@ -119,7 +119,7 @@
   Estimate: 1.5h
   ```
 
-- [ ] Add Convex preparePreview action
+- [x] Add Convex preparePreview action
   ```
   Files:
   - convex/imports.ts (action section)
