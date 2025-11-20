@@ -1,22 +1,12 @@
-"use client";
-
-import { useUser } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 
-export default function HomePage() {
-  const { user, isLoaded } = useUser();
-  const [shouldRedirect, setShouldRedirect] = useState(false);
+export default async function HomePage() {
+  const user = await currentUser();
 
-  useEffect(() => {
-    if (isLoaded && user) {
-      setShouldRedirect(true);
-    }
-  }, [isLoaded, user]);
-
-  if (shouldRedirect) {
-    window.location.href = "/library";
-    return null;
+  if (user) {
+    redirect("/library");
   }
 
   return (
@@ -67,17 +57,6 @@ export default function HomePage() {
           </div>
         </div>
       </div>
-
-      {/* Reduced motion fallback */}
-      <style jsx>{`
-        @media (prefers-reduced-motion: reduce) {
-          * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }
