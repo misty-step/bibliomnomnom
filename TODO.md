@@ -19,7 +19,7 @@
   Estimate: 0.75h
   ```
 
-- [ ] Add Convex importRuns table for idempotency/rate limits
+- [x] Add Convex importRuns table for idempotency/rate limits
   ```
   Files:
   - convex/schema.ts

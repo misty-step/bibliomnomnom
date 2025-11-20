@@ -188,6 +188,22 @@ export const getPublic = query({
 - `by_book` - Filter by bookId
 - `by_user` - Filter by userId (for user's notes across all books)
 
+#### importRuns
+- `userId` (id<"users">) - Owner of the import run
+- `importRunId` (string) - Client-provided UUID used for idempotency
+- `status` ("previewed" | "committed" | "failed") - Current run state
+- `sourceType` (string) - Origin (goodreads-csv, csv, txt, md, unknown)
+- `page` (number) - Current page processed (0-based)
+- `totalPages` (number) - Total pages for the run
+- `counts` (object) - `{ rows, created, merged, skipped, errors }`
+- `errorMessage` (string, optional) - Latest failure message
+- `createdAt` / `updatedAt` (number) - Timestamps for tracing + rate limits
+
+**Indexes**:
+- `by_user_run` - Find a run by userId + importRunId (idempotency + rate limit guard)
+
+**After schema edits**: run `pnpm convex:push` to apply changes and regenerate `_generated/*` types.
+
 ## Auto-Dating Logic
 
 The `books.updateStatus` mutation automatically manages reading dates:
