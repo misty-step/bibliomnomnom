@@ -38,7 +38,7 @@
   Estimate: 0.75h
   ```
 
-- [ ] Implement Goodreads CSV parser (client)
+- [x] Implement Goodreads CSV parser (client)
   ```
   Files:
   - lib/import/client/goodreads.ts
