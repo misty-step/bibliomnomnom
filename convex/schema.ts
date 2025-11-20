@@ -59,4 +59,26 @@ export default defineSchema({
   })
     .index("by_book", ["bookId"])
     .index("by_user", ["userId"]),
+  importRuns: defineTable({
+    userId: v.id("users"),
+    importRunId: v.string(),
+    status: v.union(
+      v.literal("previewed"),
+      v.literal("committed"),
+      v.literal("failed")
+    ),
+    sourceType: v.string(),
+    page: v.number(),
+    totalPages: v.number(),
+    counts: v.object({
+      rows: v.number(),
+      created: v.number(),
+      merged: v.number(),
+      skipped: v.number(),
+      errors: v.number(),
+    }),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user_run", ["userId", "importRunId"]),
 });
