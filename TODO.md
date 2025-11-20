@@ -159,7 +159,7 @@
   Estimate: 1.5h
   ```
 
-- [ ] Wire observability + rate-limit counters
+- [x] Wire observability + rate-limit counters
   ```
   Files:
   - convex/imports.ts
