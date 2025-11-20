@@ -36,17 +36,6 @@ export function TopNav() {
             >
               Library
             </Link>
-            <Link
-              href="/settings"
-              className={cn(
-                "font-mono text-sm uppercase tracking-wider transition",
-                isActive("/settings")
-                  ? "text-accent-ember font-semibold"
-                  : "text-text-inkMuted hover:text-text-ink"
-              )}
-            >
-              Settings
-            </Link>
           </div>
         </div>
 

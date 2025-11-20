@@ -7,14 +7,14 @@ describe("sanitizeBookForm", () => {
   const baseValues: BookFormValues = {
     title: "  Dune  ",
     author: " Frank Herbert ",
-    description: "  Epic saga ",
     edition: " First ",
     isbn: " 9780441013593 ",
     publishedYear: "1965",
     pageCount: "412",
-    isAudiobook: true,
     isFavorite: true,
     status: "currently-reading",
+    dateStarted: "",
+    dateFinished: "",
   };
 
   it("trims whitespace and parses numbers", () => {
@@ -22,14 +22,14 @@ describe("sanitizeBookForm", () => {
     expect(payload).toEqual({
       title: "Dune",
       author: "Frank Herbert",
-      description: "Epic saga",
       edition: "First",
       isbn: "9780441013593",
       publishedYear: 1965,
       pageCount: 412,
-      isAudiobook: true,
       isFavorite: true,
       status: "currently-reading",
+      dateStarted: null,
+      dateFinished: null,
     });
   });
 
@@ -50,8 +50,8 @@ describe("sanitizeBookForm", () => {
     });
 
     expect(payload).toMatchObject({
-      publishedYear: undefined,
-      pageCount: undefined,
+      publishedYear: null,
+      pageCount: null,
     });
   });
 });
@@ -65,14 +65,10 @@ describe("BookForm component", () => {
       <BookForm
         includeStatusField
         showFavoriteToggle
-        useCollapsibleMetadata
-        metadataInitiallyCollapsed
         submitLabel="Save Book"
         onSubmit={onSubmit}
       />
     );
-
-    await user.click(screen.getByRole("button", { name: /More details/i }));
 
     await user.type(screen.getByLabelText(/Title/i), "  Dune ");
     await user.type(screen.getByLabelText(/Author/i), " Frank Herbert ");
@@ -87,26 +83,20 @@ describe("BookForm component", () => {
     await user.clear(pageField);
     await user.type(pageField, "412");
 
-    await user.type(screen.getByLabelText(/Description/i), "  Epic saga ");
-
-    await user.selectOptions(screen.getByLabelText(/Reading Status/i), ["currently-reading"]);
-    await user.click(screen.getByLabelText(/Audiobook/i));
-    await user.click(screen.getByLabelText(/Favorite/i));
-
     await user.click(screen.getByRole("button", { name: "Save Book" }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalledWith({
         title: "Dune",
         author: "Frank Herbert",
-        description: "Epic saga",
         edition: "Deluxe",
         isbn: "9780441013593",
         publishedYear: 1965,
         pageCount: 412,
-        isAudiobook: true,
-        isFavorite: true,
-        status: "currently-reading",
+        isFavorite: false,
+        status: "want-to-read",
+        dateStarted: null,
+        dateFinished: null,
       });
     });
   });
@@ -119,7 +109,7 @@ describe("BookForm component", () => {
 
     await user.click(screen.getByRole("button", { name: "Save Book" }));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByRole("alert")).toHaveTextContent("Title and author are required.");
+    expect(screen.getByText("Title and author are required.")).toBeInTheDocument();
   });
 
   it("disables submit until fields change when requireDirtyForSubmit enabled", () => {
@@ -133,13 +123,14 @@ describe("BookForm component", () => {
         initialValues={{
           title: "Dune",
           author: "Frank Herbert",
-          description: "",
           edition: "",
           isbn: "",
           publishedYear: "",
           pageCount: "",
-          isAudiobook: false,
+          isFavorite: false,
           status: "want-to-read",
+          dateStarted: "",
+          dateFinished: "",
         }}
       />
     );

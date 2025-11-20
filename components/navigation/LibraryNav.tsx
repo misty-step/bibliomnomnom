@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, ChevronLeft, ChevronRight, Settings } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Surface } from "@/components/ui/Surface";
 
-export type LibraryNavIcon = "book" | "settings";
+export type LibraryNavIcon = "book";
 
 export type LibraryNavLink = {
   href: string;
@@ -104,7 +104,6 @@ export function LibraryNav({ links, storageKey = DEFAULT_STORAGE_KEY, layout = "
 function Icon({ name, className, ...props }: { name: LibraryNavIcon; className?: string }) {
   const map = {
     book: BookOpen,
-    settings: Settings,
   } as const;
   const Component = map[name] ?? BookOpen;
   return <Component className={className} {...props} />;

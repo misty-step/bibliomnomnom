@@ -5,12 +5,11 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/library",
 }));
 
-import { BookOpen, Settings } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import { LibraryNav, type LibraryNavLink } from "../LibraryNav";
 
 const links: LibraryNavLink[] = [
-  { href: "/library", label: "Library", icon: BookOpen },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/library", label: "Library", icon: "book" },
 ];
 
 beforeEach(() => {

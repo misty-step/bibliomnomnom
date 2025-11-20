@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { Settings } from "lucide-react";
 
 export function Masthead() {
   return (
@@ -11,13 +10,6 @@ export function Masthead() {
         bibliomnomnom
       </Link>
       <div className="flex items-center gap-3">
-        <Link
-          href="/settings"
-          className="flex h-8 w-8 items-center justify-center rounded-md text-text-inkMuted transition-colors hover:bg-line-ghost hover:text-text-ink"
-          aria-label="Settings"
-        >
-          <Settings className="h-4 w-4" />
-        </Link>
         <UserButton afterSignOutUrl="/" />
       </div>
     </header>
