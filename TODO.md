@@ -58,7 +58,7 @@
   Estimate: 1.25h
   ```
 
-- [ ] Implement generic CSV inference parser
+- [x] Implement generic CSV inference parser
   ```
   Files:
   - lib/import/client/csvInfer.ts
