@@ -8,6 +8,7 @@ import { Star, Headphones } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { SideSheet } from "@/components/ui/SideSheet";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,7 @@ const MAX_BYTES = 5 * 1024 * 1024;
 type AddBookSheetProps = {
   triggerLabel?: string;
   triggerClassName?: string;
+  triggerVariant?: "primary" | "ghost";
 };
 
 // Helper to get today's date in YYYY-MM-DD format
@@ -25,7 +27,7 @@ function getTodayString(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName }: AddBookSheetProps) {
+export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, triggerVariant }: AddBookSheetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -164,17 +166,22 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName }: Ad
     }
   };
 
-  const defaultTriggerClassName = "relative group cursor-pointer font-sans text-base text-ink hover:text-inkMuted";
-
   return (
     <>
-      <button
-        type="button"
-        onClick={handleOpen}
-        className={triggerClassName || defaultTriggerClassName}
-      >
-        {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
-      </button>
+      {triggerVariant === "primary" ? (
+         <Button onClick={handleOpen} className={triggerClassName}>
+            {triggerLabel}
+         </Button>
+      ) : (
+        <button
+            type="button"
+            onClick={handleOpen}
+            className={triggerClassName || "relative group cursor-pointer font-sans text-sm text-ink hover:text-inkMuted"}
+        >
+            {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
+        </button>
+      )}
+
       <SideSheet open={isOpen} onOpenChange={setIsOpen} title="Add Book">
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Cover Upload */}
@@ -247,13 +254,13 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName }: Ad
             <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
               Title <span className="text-accent-ember">*</span>
             </label>
-            <input
+            <Input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="The Name of the Wind"
-              className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
               disabled={isSubmitting}
+              className="text-lg font-display"
             />
           </div>
 
@@ -262,12 +269,11 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName }: Ad
             <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
               Author <span className="text-accent-ember">*</span>
             </label>
-            <input
+            <Input
               type="text"
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
               placeholder="Patrick Rothfuss"
-              className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink placeholder:text-text-inkSubtle focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
               disabled={isSubmitting}
             />
           </div>
@@ -302,11 +308,10 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName }: Ad
               <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
                 Finished On
               </label>
-              <input
+              <Input
                 type="date"
                 value={dateFinished}
                 onChange={(e) => setDateFinished(e.target.value)}
-                className="w-full rounded-md border border-line-ghost bg-canvas-boneMuted px-4 py-3 text-text-ink focus:border-text-ink focus:bg-canvas-bone focus:outline-none"
                 disabled={isSubmitting}
               />
             </div>

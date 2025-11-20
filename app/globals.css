@@ -69,4 +69,16 @@
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
+
+  /* Global Film Grain / Paper Texture */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background-image: var(--texture-noise);
+    pointer-events: none;
+    opacity: 1;
+    mix-blend-mode: multiply;
+  }
 }

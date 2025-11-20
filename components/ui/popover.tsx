@@ -24,12 +24,9 @@ export function PopoverTrigger({
   className,
 }: {
   children: ReactNode;
-  asChild?: boolean; // Headless UI doesn't natively use asChild but we can mimic/ignore or use as='div'
+  asChild?: boolean;
   className?: string;
 }) {
-  // If asChild is true, we assume the child is an interactive element that handles the click.
-  // HeadlessPopover.Button renders a button by default.
-  // We'll just render it.
   return (
     <HeadlessPopover.Button as={Fragment as any} className={className}>
       {children}
@@ -47,23 +44,22 @@ export function PopoverContent({
   return (
     <Transition
       as={Fragment}
-      enter="transition ease-out duration-200"
+      enter="transition ease-out duration-fast"
       enterFrom="opacity-0 translate-y-1"
       enterTo="opacity-100 translate-y-0"
-      leave="transition ease-in duration-150"
+      leave="transition ease-in duration-fast"
       leaveFrom="opacity-100 translate-y-0"
       leaveTo="opacity-0 translate-y-1"
     >
       <HeadlessPopover.Panel
         className={cn(
-          "absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-xl bg-canvas-bone shadow-lg ring-1 ring-black/5 focus:outline-none",
+          "absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-lg bg-canvas-bone shadow-raised ring-1 ring-black/5 focus:outline-none border border-line-ghost",
           className
         )}
       >
         {({ close }) => (
           <div
             onClickCapture={(e) => {
-              // Auto-close when a button inside is clicked
               if ((e.target as HTMLElement).closest("button")) {
                 close();
               }

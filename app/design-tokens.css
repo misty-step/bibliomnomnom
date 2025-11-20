@@ -15,12 +15,14 @@
   --elevation-flat: none;
   --elevation-raised: 0 8px 24px rgba(5,8,16,0.12);
   --elevation-soft: 0 4px 16px rgba(12,22,38,0.06);
-  /* Font variables are managed by next/font in app/layout.tsx */
+  --font-display: "Playfair Display", "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
+  --font-sans: "Geist", "Söhne", "Neue Montreal", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --layout-spine: 12.5rem;
-  --motion-base-duration: 300ms;
-  --motion-base-easing: cubic-bezier(0.16, 0.84, 0.44, 1);
-  --motion-fast-duration: 150ms;
-  --motion-fast-easing: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-base-duration: 400ms;
+  --motion-base-easing: cubic-bezier(0.25, 1, 0.35, 1);
+  --motion-fast-duration: 200ms;
+  --motion-fast-easing: cubic-bezier(0.2, 0, 0, 1);
   --radius-lg: 1rem;
   --radius-md: 0.75rem;
   --radius-sm: 0.5rem;
@@ -33,4 +35,5 @@
   --space-sm: 0.75rem;
   --space-xl: 2rem;
   --space-xs: 0.5rem;
+  --texture-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
 }

@@ -30,8 +30,8 @@ export const designTokens = {
     }
   },
   "typography": {
-    "display": "\"Playfair Display\", Georgia, serif",
-    "sans": "\"Geist\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
+    "display": "\"Playfair Display\", \"Times New Roman\", serif",
+    "sans": "\"Geist\", \"Söhne\", \"Neue Montreal\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
     "mono": "\"JetBrains Mono\", \"IBM Plex Mono\", monospace"
   },
   "spacing": {
@@ -58,14 +58,17 @@ export const designTokens = {
     "soft": "0 4px 16px rgba(12,22,38,0.06)",
     "raised": "0 8px 24px rgba(5,8,16,0.12)"
   },
+  "textures": {
+    "noise": "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E\")"
+  },
   "motion": {
     "fast": {
-      "duration": "150ms",
-      "easing": "cubic-bezier(0.4, 0, 0.2, 1)"
+      "duration": "200ms",
+      "easing": "cubic-bezier(0.2, 0, 0, 1)"
     },
     "base": {
-      "duration": "300ms",
-      "easing": "cubic-bezier(0.16, 0.84, 0.44, 1)"
+      "duration": "400ms",
+      "easing": "cubic-bezier(0.25, 1, 0.35, 1)"
     }
   }
 } as const;
@@ -131,6 +134,9 @@ export const tokenVars = {
     "flat": "var(--elevation-flat)",
     "raised": "var(--elevation-raised)",
     "soft": "var(--elevation-soft)"
+  },
+  "textures": {
+    "noise": "var(--texture-noise)"
   },
   "motion": {
     "base": {

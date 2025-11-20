@@ -6,6 +6,9 @@ import { BookTile, BookTileSkeleton } from "./BookTile";
 import { AddBookSheet } from "./AddBookSheet";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Button } from "@/components/ui/button";
+import { BookOpen, Star, Library } from "lucide-react";
 
 type FilterType = "library" | "to-read" | "favorites";
 
@@ -46,41 +49,46 @@ export function BookGrid() {
   }
 
   const filters = [
-    { label: "Library", type: "library" as FilterType, count: counts.library },
-    { label: "To Read", type: "to-read" as FilterType, count: counts.toRead },
-    { label: "Favorites", type: "favorites" as FilterType, count: counts.favorites },
+    { label: "Library", type: "library" as FilterType, count: counts.library, icon: Library },
+    { label: "Queue", type: "to-read" as FilterType, count: counts.toRead, icon: BookOpen },
+    { label: "Favorites", type: "favorites" as FilterType, count: counts.favorites, icon: Star },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Filter Bar */}
-      <div className="flex items-center justify-between gap-4">
+    <div className="space-y-8">
+      {/* Filter Bar & Actions */}
+      <div className="flex flex-col items-start justify-between gap-6 border-b border-line-ghost pb-6 sm:flex-row sm:items-center">
         {/* Filter Pills */}
-        <nav className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-          {filters.map((filter) => (
-            <button
-              key={filter.type}
-              onClick={() => setActiveFilter(filter.type)}
-              className={cn(
-                "flex-shrink-0 rounded-md px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-all duration-150",
-                activeFilter === filter.type
-                  ? "bg-text-ink text-canvas-bone font-medium"
-                  : "text-text-inkMuted hover:bg-line-ghost hover:text-text-ink"
-              )}
-            >
-              {filter.label}
-              {filter.count > 0 && (
-                <span
-                  className={cn(
-                    "ml-1.5",
-                    activeFilter === filter.type ? "opacity-70" : "opacity-50"
-                  )}
-                >
-                  {filter.count}
-                </span>
-              )}
-            </button>
-          ))}
+        <nav className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+          {filters.map((filter) => {
+            const Icon = filter.icon;
+            const isActive = activeFilter === filter.type;
+            return (
+              <button
+                key={filter.type}
+                onClick={() => setActiveFilter(filter.type)}
+                className={cn(
+                  "group flex items-center gap-2 rounded-full border px-4 py-1.5 transition-all duration-fast ease-fast",
+                  isActive
+                    ? "border-text-ink bg-text-ink text-canvas-bone shadow-sm"
+                    : "border-transparent bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+                )}
+              >
+                <Icon className={cn("h-3.5 w-3.5", isActive ? "text-canvas-bone" : "text-text-inkSubtle group-hover:text-text-ink")} />
+                <span className="font-sans text-sm font-medium">{filter.label}</span>
+                {filter.count > 0 && (
+                  <span
+                    className={cn(
+                      "ml-1 font-mono text-xs",
+                      isActive ? "text-canvas-bone/70" : "text-text-inkSubtle group-hover:text-text-ink/70"
+                    )}
+                  >
+                    {filter.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </nav>
 
         {/* Add Book Button */}
@@ -88,14 +96,16 @@ export function BookGrid() {
       </div>
 
       {/* Content */}
-      {activeFilter === "library" && (
-        <LibraryView
-          readingBooks={libraryBooks.reading}
-          finishedBooks={libraryBooks.finished}
-        />
-      )}
-      {activeFilter === "to-read" && <ToReadView books={toReadBooks} />}
-      {activeFilter === "favorites" && <FavoritesView books={favoriteBooks} />}
+      <div className="min-h-[50vh]">
+        {activeFilter === "library" && (
+          <LibraryView
+            readingBooks={libraryBooks.reading}
+            finishedBooks={libraryBooks.finished}
+          />
+        )}
+        {activeFilter === "to-read" && <ToReadView books={toReadBooks} />}
+        {activeFilter === "favorites" && <FavoritesView books={favoriteBooks} />}
+      </div>
     </div>
   );
 }
@@ -115,14 +125,15 @@ function LibraryView({
   if (isEmpty) {
     return (
       <EmptyState
-        title="Your library awaits"
-        subtitle="Add your first book to get started"
+        title="Your shelves are bare."
+        description="A library without books is just a room. Add your first read to bring it to life."
+        action={<AddBookButton variant="primary" />}
       />
     );
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-16">
       {/* Currently Reading Section */}
       {hasReading && (
         <section>
@@ -151,8 +162,9 @@ function ToReadView({
   if (!books || books.length === 0) {
     return (
       <EmptyState
-        title="Nothing queued yet"
-        subtitle="Add books you want to read"
+        title="Your queue is empty."
+        description="No books waiting in the wings. Find something new to look forward to."
+        action={<AddBookButton variant="primary" />}
       />
     );
   }
@@ -169,8 +181,8 @@ function FavoritesView({
   if (!books || books.length === 0) {
     return (
       <EmptyState
-        title="No favorites yet"
-        subtitle="Mark books as favorites to see them here"
+        title="No favorites yet."
+        description="Mark the books that changed you as favorites. They'll appear here."
       />
     );
   }
@@ -181,9 +193,12 @@ function FavoritesView({
 // Shared Components
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="mb-4 font-mono text-xs uppercase tracking-wider text-text-inkMuted">
-      {children}
-    </h2>
+    <div className="mb-8 flex items-center gap-4">
+      <h2 className="font-display text-2xl font-medium text-text-ink">
+        {children}
+      </h2>
+      <div className="h-px flex-1 bg-line-ghost" />
+    </div>
   );
 }
 
@@ -194,8 +209,8 @@ function BooksGrid({
 }) {
   return (
     <div
-      className="grid gap-4"
-      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(10rem, 1fr))" }}
+      className="grid gap-x-6 gap-y-10"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(11rem, 1fr))" }}
     >
       {books.map((book) => (
         <BookTile key={book._id} book={book} />
@@ -204,21 +219,12 @@ function BooksGrid({
   );
 }
 
-function EmptyState({ title, subtitle }: { title: string; subtitle: string }) {
-  return (
-    <div className="py-12 text-center">
-      <p className="font-display text-xl text-text-inkMuted">{title}</p>
-      <p className="mt-2 text-sm text-text-inkSubtle">{subtitle}</p>
-    </div>
-  );
-}
-
-function AddBookButton() {
+function AddBookButton({ variant = "ghost" }: { variant?: "primary" | "ghost" }) {
   return (
     <div className="flex-shrink-0">
       <AddBookSheet
         triggerLabel="Add Book"
-        triggerClassName="rounded-md bg-text-ink px-4 py-1.5 font-sans text-sm font-medium text-canvas-bone transition-colors hover:bg-text-inkMuted"
+        triggerVariant={variant}
       />
     </div>
   );
@@ -226,23 +232,23 @@ function AddBookButton() {
 
 function GridSkeleton() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Skeleton filter bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between border-b border-line-ghost pb-6">
         <div className="flex gap-2">
           {Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="h-8 w-20 animate-pulse rounded-md bg-text-ink/5" />
+            <div key={idx} className="h-8 w-24 animate-pulse rounded-full bg-text-ink/5" />
           ))}
         </div>
-        <div className="h-8 w-24 animate-pulse rounded-md bg-text-ink/5" />
+        <div className="h-9 w-28 animate-pulse rounded-md bg-text-ink/5" />
       </div>
 
       {/* Skeleton grid */}
       <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(10rem, 1fr))" }}
+        className="grid gap-x-6 gap-y-10"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(11rem, 1fr))" }}
       >
-        {Array.from({ length: 12 }).map((_, idx) => (
+        {Array.from({ length: 8 }).map((_, idx) => (
           <BookTileSkeleton key={idx} />
         ))}
       </div>
