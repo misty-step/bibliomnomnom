@@ -88,6 +88,15 @@ Convex authentication requires a Clerk JWT template:
 pnpm install
 ```
 
+### 4. Enable Imports (Goodreads/CSV/TXT/MD)
+
+- Feature flag: `NEXT_PUBLIC_IMPORT_ENABLED=true` (defaults to true). Toggle to hide the import UI if needed.
+- LLM providers (for TXT/MD/unknown CSV): set `OPENAI_API_KEY` and/or `GEMINI_API_KEY` in `.env.local`.
+- Schema updates: run `pnpm convex:push` after pulling to apply `importRuns` and `importPreviews` tables and regenerate Convex types.
+- Rate limits: enforced per user (5 imports/day, 2 concurrent previews); adjust constants in `convex/imports.ts` if policy changes.
+- File limits: accepts CSV/TXT/MD up to 10MB; previews paginate at 300 rows/page.
+- Privacy: CSV stays client-side; TXT/MD data sent to LLM only; imported books default to `private`.
+
 ## Getting Started
 
 Now that services and configuration are complete:

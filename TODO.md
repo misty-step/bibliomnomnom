@@ -240,7 +240,7 @@
   Estimate: 1.5h
   ```
 
-- [ ] Document env/flags & limits
+- [~] Document env/flags & limits
   ```
   Files:
   - README.md (import section)
