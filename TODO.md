@@ -179,7 +179,7 @@
   Estimate: 0.75h
   ```
 
-- [ ] Implement import job hook (state machine)
+- [x] Implement import job hook (state machine)
   ```
   Files:
   - hooks/useImportJob.ts
