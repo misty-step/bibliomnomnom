@@ -259,7 +259,7 @@
   Estimate: 0.5h
   ```
 
-- [ ] Wire analytics/observability in client flow
+- [x] Wire analytics/observability in client flow
   ```
   Files:
   - components/import/ImportFlow.tsx
