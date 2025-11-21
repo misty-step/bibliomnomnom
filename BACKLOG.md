@@ -7,39 +7,6 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
 
 ## Now (Sprint-Ready, <2 weeks)
 
-### [ADOPTION BLOCKER] Goodreads/CSV Import System
-**File**: New feature - import module
-**Perspectives**: product-visionary, user-experience-advocate
-**Business Case**:
-- **Deal-breaker for 60%+ of target market**: Users with existing Goodreads libraries won't manually retype 50-200 books
-- **Competitive parity**: StoryGraph, Literal, Oku all have this - table stakes feature
-- **Zero-switch-cost trial**: "Import, try for a week, decide" vs. "I'd love to try but not retyping 200 books"
-- **Onboarding speed**: 5 minutes instead of 5 hours
-
-**Implementation** (Phase 1 - CSV):
-```typescript
-// 1. Parse Goodreads export CSV (title, author, ISBN, rating, date read, shelves)
-// 2. Map to bibliomnomnom schema:
-//    - rating 4-5 → isFavorite = true
-//    - shelves "currently-reading" → status = "currently-reading"
-//    - date read → dateFinished
-// 3. Preview import (show what will be created, allow exclude)
-// 4. Batch insert with progress indicator
-// 5. Handle duplicates (ISBN or title+author fuzzy match)
-```
-
-**Acceptance Criteria**:
-- User uploads Goodreads CSV, sees preview of 200 books
-- Click "Import" → books appear in library within 30 seconds
-- Duplicates detected and skipped (or user chooses merge/skip)
-- Status mapping correct (shelves → status)
-- Error handling for malformed CSV
-
-**Effort**: 2d | **Impact**: EXISTENTIAL for adoption
-**ROI**: Without this, product won't scale beyond early adopters. WITH this, removes #1 objection.
-
----
-
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
 **File**: New feature - export module
 **Perspectives**: product-visionary, security-sentinel (data portability)
