@@ -199,7 +199,7 @@
   Estimate: 1h
   ```
 
-- [ ] Build import UI shell (Upload → flow scaffold)
+- [x] Build import UI shell (Upload → flow scaffold)
   ```
   Files:
   - components/import/ImportFlow.tsx
