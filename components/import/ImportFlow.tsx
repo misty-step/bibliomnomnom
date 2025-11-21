@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { useMutation } from "convex/react";
 
@@ -12,6 +12,7 @@ import { UploadDropzone } from "./UploadDropzone";
 import { CommitSummary } from "./CommitSummary";
 import { PreviewTable } from "./PreviewTable";
 import { useImportJob } from "@/hooks/useImportJob";
+import { logImportEvent } from "@/lib/import/metrics";
 
 const IMPORT_ENABLED = process.env.NEXT_PUBLIC_IMPORT_ENABLED !== "false";
 
@@ -19,6 +20,10 @@ export function ImportFlow() {
   const { toast } = useToast();
   const preparePreview = useMutation(api.imports.preparePreview);
   const commitImport = useMutation(api.imports.commitImport);
+
+  const startedAtRef = useRef<number | null>(null);
+  const lastCommitRef = useRef<number | null>(null);
+  const prevStatus = useRef<string>("idle");
 
   const job = useImportJob({
     preparePreview: async (params) => await preparePreview(params),
@@ -32,8 +37,59 @@ export function ImportFlow() {
         description: job.state.errors[0],
         variant: "destructive",
       });
+
+      logImportEvent({
+        phase: "preview",
+        importRunId: job.state.importRunId ?? "unknown",
+        sourceType: job.state.sourceType ?? "unknown",
+        counts: { rows: job.state.pages.at(0)?.length ?? 0, errors: job.state.errors.length },
+      });
     }
-  }, [job.state.errors, toast]);
+  }, [job.state.errors, job.state.importRunId, job.state.pages, job.state.sourceType, toast]);
+
+  useEffect(() => {
+    const status = job.state.status;
+    const prev = prevStatus.current;
+
+    if (status !== prev) {
+      if (status === "parsing") {
+        startedAtRef.current = Date.now();
+        logImportEvent({ phase: "preview", importRunId: job.state.importRunId ?? "pending", sourceType: "detecting" });
+      }
+
+      if (status === "ready") {
+        logImportEvent({
+          phase: "preview",
+          importRunId: job.state.importRunId ?? "unknown",
+          sourceType: job.state.sourceType ?? "unknown",
+          counts: { rows: job.state.pages.flat().length },
+          durationMs: startedAtRef.current ? Date.now() - startedAtRef.current : undefined,
+        });
+      }
+
+      if (status === "committing") {
+        lastCommitRef.current = Date.now();
+        logImportEvent({
+          phase: "commit",
+          importRunId: job.state.importRunId ?? "unknown",
+          sourceType: job.state.sourceType ?? "unknown",
+          page: job.state.page,
+        });
+      }
+
+      if (status === "success") {
+        logImportEvent({
+          phase: "commit",
+          importRunId: job.state.importRunId ?? "unknown",
+          sourceType: job.state.sourceType ?? "unknown",
+          counts: job.state.summary,
+          durationMs: lastCommitRef.current ? Date.now() - lastCommitRef.current : undefined,
+        });
+      }
+
+      prevStatus.current = status;
+    }
+  }, [job.state.importRunId, job.state.page, job.state.pages, job.state.sourceType, job.state.status, job.state.summary]);
 
   if (!IMPORT_ENABLED) {
     return (
