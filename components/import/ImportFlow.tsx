@@ -10,6 +10,7 @@ import { Surface } from "@/components/ui/Surface";
 import { useToast } from "@/hooks/use-toast";
 import { UploadDropzone } from "./UploadDropzone";
 import { CommitSummary } from "./CommitSummary";
+import { PreviewTable } from "./PreviewTable";
 import { useImportJob } from "@/hooks/useImportJob";
 
 const IMPORT_ENABLED = process.env.NEXT_PUBLIC_IMPORT_ENABLED !== "false";
@@ -69,7 +70,7 @@ export function ImportFlow() {
           />
 
           {job.state.pages.length > 0 && job.state.status !== "idle" && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-text-ink">Preview (page {job.state.page + 1} of {job.state.totalPages})</p>
                 <div className="flex gap-2">
@@ -85,21 +86,18 @@ export function ImportFlow() {
                   )}
                 </div>
               </div>
-              <Surface className="divide-y divide-line-ghost border border-line-ghost">
-                {job.state.pages[job.state.page]?.slice(0, 5).map((row) => (
-                  <div key={row.tempId} className="flex items-center justify-between p-3">
-                    <div>
-                      <p className="font-medium text-text-ink">{row.title}</p>
-                      <p className="text-sm text-text-inkMuted">{row.author}</p>
-                    </div>
-                    <span className="text-xs text-text-inkMuted">{row.status ?? "want-to-read"}</span>
-                  </div>
-                ))}
-                {job.state.pages[job.state.page]?.length === 0 && (
-                  <p className="p-3 text-sm text-text-inkMuted">No rows on this page.</p>
-                )}
-              </Surface>
-              <div className="flex justify-end">
+
+              <PreviewTable
+                rows={job.state.pages[job.state.page] ?? []}
+                dedupMatches={job.state.dedupMatches}
+                decisions={job.state.decisions}
+                onDecisionChange={(tempId, action) => job.setDecision(tempId, { action })}
+              />
+
+              <div className="flex items-center justify-end gap-3">
+                <p className="text-xs text-text-inkMuted">
+                  Default action: skip. Choose merge or create for rows you want to keep.
+                </p>
                 <Button
                   size="sm"
                   onClick={() => job.commitPage()}

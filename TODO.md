@@ -220,7 +220,7 @@
   Estimate: 1.5h
   ```
 
-- [ ] Build preview table + dedup controls
+- [~] Build preview table + dedup controls
   ```
   Files:
   - components/import/PreviewTable.tsx
