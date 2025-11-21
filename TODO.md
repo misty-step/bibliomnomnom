@@ -279,7 +279,7 @@
   Estimate: 0.75h
   ```
 
-- [ ] Add CI/quality gates for import modules
+- [~] Add CI/quality gates for import modules
   ```
   Files:
   - .github/workflows/ci.yml (new or extend)
