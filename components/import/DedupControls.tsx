@@ -1,5 +1,3 @@
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
 type DedupControlProps = {
   tempId: string;
   decision: "skip" | "merge" | "create";
@@ -16,20 +14,16 @@ export function DedupControls({ tempId, decision, onChange, matchType, disabled 
           match: {matchType}
         </span>
       )}
-      <Select
+      <select
+        className="h-9 w-32 rounded-md border border-line-ghost bg-canvas-bone px-2 text-sm"
         value={decision}
-        onValueChange={(val) => onChange(tempId, val as DedupControlProps["decision"])}
+        onChange={(e) => onChange(tempId, e.target.value as DedupControlProps["decision"])}
         disabled={disabled}
       >
-        <SelectTrigger className="h-9 w-32 text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="skip">Skip</SelectItem>
-          <SelectItem value="merge">Merge</SelectItem>
-          <SelectItem value="create">Create</SelectItem>
-        </SelectContent>
-      </Select>
+        <option value="skip">Skip</option>
+        <option value="merge">Merge</option>
+        <option value="create">Create</option>
+      </select>
     </div>
   );
 }
