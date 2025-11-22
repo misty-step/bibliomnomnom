@@ -1,4 +1,4 @@
-import { mutation } from "./_generated/server";
+import { mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
@@ -10,7 +10,7 @@ import {
   LLM_TOKEN_CAP,
 } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
-import { llmExtract } from "../lib/import/llm";
+import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../lib/import/llm";
 import type { Doc } from "./_generated/dataModel";
 import { logImportEvent } from "../lib/import/metrics";
 
@@ -23,66 +23,148 @@ type Decision = {
 const isCsvSource = (source: string) =>
   source === "goodreads-csv" || source === "csv";
 
+const preparePreviewArgs = {
+  importRunId: v.string(),
+  sourceType: v.union(
+    v.literal("goodreads-csv"),
+    v.literal("csv"),
+    v.literal("txt"),
+    v.literal("md"),
+    v.literal("unknown")
+  ),
+  rows: v.optional(v.array(parsedBookSchema)),
+  rawText: v.optional(v.string()),
+  page: v.number(),
+  totalPages: v.optional(v.number()),
+};
+
 export const preparePreview = mutation({
+  args: preparePreviewArgs,
+  handler: async (ctx, args) => preparePreviewHandler(ctx, args),
+});
+
+const commitImportArgs = {
+  importRunId: v.string(),
+  page: v.number(),
+  decisions: v.array(
+    v.object({
+      tempId: v.string(),
+      action: v.union(
+        v.literal("skip"),
+        v.literal("merge"),
+        v.literal("create")
+      ),
+      fieldsToMerge: v.optional(v.array(v.string())),
+      existingBookId: v.optional(v.id("books")),
+    })
+  ),
+};
+
+export const commitImport = mutation({
+  args: commitImportArgs,
+  handler: async (ctx, args) => commitImportHandler(ctx, args),
+});
+
+export const cleanupStuckImports = mutation({
+  handler: async (ctx) => {
+    const userId = (await requireAuth(ctx)) as Id<"users">;
+
+    const stuck = await ctx.db
+      .query("importRuns")
+      .withIndex("by_user_run", (q: any) => q.eq("userId", userId))
+      .collect();
+
+    const previewed = stuck.filter((r) => r.status === "previewed");
+
+    for (const run of previewed) {
+      await ctx.db.delete(run._id);
+    }
+
+    return { deleted: previewed.length };
+  },
+});
+
+// Admin-only cleanup for all users (use carefully in development)
+export const adminCleanupAllStuckImports = mutation({
+  handler: async (ctx) => {
+    const allStuck = await ctx.db
+      .query("importRuns")
+      .filter((q) => q.eq(q.field("status"), "previewed"))
+      .collect();
+
+    for (const run of allStuck) {
+      await ctx.db.delete(run._id);
+    }
+
+    return { deleted: allStuck.length };
+  },
+});
+
+// Action to extract books from text using LLM (fetch allowed here)
+export const extractBooks = action({
   args: {
-    importRunId: v.string(),
+    rawText: v.string(),
     sourceType: v.union(
-      v.literal("goodreads-csv"),
-      v.literal("csv"),
       v.literal("txt"),
       v.literal("md"),
       v.literal("unknown")
     ),
-    rows: v.optional(v.array(parsedBookSchema)),
-    rawText: v.optional(v.string()),
-    page: v.number(),
-    totalPages: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => preparePreviewHandler(ctx, args),
-});
-
-export const commitImport = mutation({
-  args: {
     importRunId: v.string(),
-    page: v.number(),
-    decisions: v.array(
-      v.object({
-        tempId: v.string(),
-        action: v.union(
-          v.literal("skip"),
-          v.literal("merge"),
-          v.literal("create")
-        ),
-        fieldsToMerge: v.optional(v.array(v.string())),
-        existingBookId: v.optional(v.id("books")),
-      })
-    ),
   },
-  handler: async (ctx, args) => commitImportHandler(ctx, args),
-});
+  handler: async (ctx, args) => {
+    const openaiKey = process.env.OPENAI_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
 
-export type PreparePreviewArgs = Parameters<typeof preparePreview>[0]["args"];
+    if (!openaiKey && !geminiKey) {
+      return {
+        books: [],
+        warnings: [],
+        errors: [
+          {
+            message:
+              "No LLM provider configured. Please set OPENAI_API_KEY or GEMINI_API_KEY in your Convex environment variables to extract books from text files.",
+          },
+        ] as ParseError[],
+      };
+    }
+
+    const provider = openaiKey ? createOpenAIProvider(openaiKey) : undefined;
+    const fallbackProvider = geminiKey ? createGeminiProvider(geminiKey) : undefined;
+
+    const llmResult = await llmExtract(args.rawText ?? "", {
+      tokenCap: LLM_TOKEN_CAP,
+      provider,
+      fallbackProvider,
+    });
+
+    return {
+      books: llmResult.rows,
+      warnings: llmResult.warnings,
+      errors: llmResult.errors,
+    };
+  },
+});
 
 export const preparePreviewHandler = async (
   ctx: any,
-  args: PreparePreviewArgs
+  args: {
+    importRunId: string;
+    sourceType: "goodreads-csv" | "csv" | "txt" | "md" | "unknown";
+    rows?: ParsedBook[];
+    rawText?: string;
+    page: number;
+    totalPages?: number;
+  }
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
 
   await enforceRateLimits(ctx, userId);
 
-  let books: ParsedBook[] = args.rows ?? [];
+  // Note: LLM extraction now happens in extractBooks action (can use fetch)
+  // This mutation only receives pre-extracted books from CSV or action
+  const books: ParsedBook[] = args.rows ?? [];
   const warnings: string[] = [];
   const errors: ParseError[] = [];
-
-  if (!isCsvSource(args.sourceType)) {
-    const llmResult = await llmExtract(args.rawText ?? "", {
-      tokenCap: LLM_TOKEN_CAP,
-    });
-    books = llmResult.rows;
-    warnings.push(...llmResult.warnings);
-    errors.push(...llmResult.errors);
-  }
 
   const dedupMatches = await dedupHelpers.findMatches(ctx.db, userId, books);
 
@@ -95,6 +177,9 @@ export const preparePreviewHandler = async (
     createdAt: Date.now(),
   });
 
+  // Determine status: failed if errors OR no books extracted
+  const importStatus = errors.length > 0 || books.length === 0 ? "failed" : "previewed";
+
   await upsertImportRun(ctx, {
     userId,
     importRunId: args.importRunId,
@@ -103,6 +188,7 @@ export const preparePreviewHandler = async (
     totalPages: args.totalPages ?? 1,
     rowCount: books.length,
     errors: errors.length,
+    status: importStatus,
   });
 
   return {
@@ -134,6 +220,7 @@ const upsertImportRun = async (
     totalPages: number;
     rowCount: number;
     errors: number;
+    status: "previewed" | "failed" | "committed";
   }
 ) => {
   const existing = await ctx.db
@@ -149,7 +236,7 @@ const upsertImportRun = async (
     await ctx.db.insert("importRuns", {
       userId: params.userId,
       importRunId: params.importRunId,
-      status: "previewed",
+      status: params.status,
       sourceType: params.sourceType,
       page: params.page,
       totalPages: params.totalPages,
@@ -168,7 +255,7 @@ const upsertImportRun = async (
   }
 
   await ctx.db.patch(existing._id, {
-    status: "previewed",
+    status: params.status,
     sourceType: params.sourceType,
     page: params.page,
     totalPages: params.totalPages,
@@ -182,9 +269,19 @@ const upsertImportRun = async (
   });
 };
 
-export type CommitImportArgs = Parameters<typeof commitImport>[0]["args"];
-
-export const commitImportHandler = async (ctx: any, args: CommitImportArgs) => {
+export const commitImportHandler = async (
+  ctx: any,
+  args: {
+    importRunId: string;
+    page: number;
+    decisions: Array<{
+      tempId: string;
+      action: "skip" | "merge" | "create";
+      fieldsToMerge?: string[];
+      existingBookId?: Id<"books">;
+    }>;
+  }
+) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
 
   await enforceRateLimits(ctx, userId);
@@ -312,10 +409,23 @@ const loadPreviewRows = async (
 };
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const PREVIEW_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 const DAILY_LIMIT = 5;
-const CONCURRENT_LIMIT = 2;
+const CONCURRENT_LIMIT = 1;
 
 const enforceRateLimits = async (ctx: any, userId: Id<"users">) => {
+  // Skip rate limiting in development
+  const nodeEnv = process.env.NODE_ENV;
+  const isDev = nodeEnv === "development";
+
+  console.log(`[enforceRateLimits] NODE_ENV="${nodeEnv}", isDev=${isDev}`);
+
+  if (isDev) {
+    console.log("[Dev] ✅ Skipping rate limits (NODE_ENV=development)");
+    return;
+  }
+
+  console.log("[enforceRateLimits] ⚠️  Enforcing rate limits in production");
   const now = Date.now();
   const runs = await ctx.db
     .query("importRuns")
@@ -327,7 +437,12 @@ const enforceRateLimits = async (ctx: any, userId: Id<"users">) => {
     throw new Error("Too many imports today. Please try again tomorrow.");
   }
 
-  const inFlight = recent.filter((r: any) => r.status === "previewed");
+  // Only count "previewed" runs that are still fresh (< 15 min old)
+  // Ignore "failed" runs and expired previews
+  const inFlight = recent.filter(
+    (r: any) =>
+      r.status === "previewed" && now - r.updatedAt < PREVIEW_TIMEOUT_MS
+  );
   if (inFlight.length >= CONCURRENT_LIMIT) {
     throw new Error("Too many concurrent imports. Finish existing imports before starting another.");
   }

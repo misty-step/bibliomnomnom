@@ -16,7 +16,17 @@ describe("llmExtract", () => {
   it("returns parsed rows from provider payload", async () => {
     const provider = makeStaticProvider({ books: sampleBooks });
 
+    // Mock server environment
+    const windowBackup = global.window;
+    // @ts-expect-error - Deleting window to simulate server environment
+    delete global.window;
+
     const result = await llmExtract("text", { provider });
+
+    // Restore window
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
 
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].title).toBe("The Hobbit");
@@ -27,7 +37,17 @@ describe("llmExtract", () => {
     const provider = makeStaticProvider({ books: sampleBooks });
     const bigText = "x".repeat(300_000); // ~75k tokens with divisor heuristic
 
+    // Mock server environment
+    const windowBackup = global.window;
+    // @ts-expect-error - Deleting window to simulate server environment
+    delete global.window;
+
     const result = await llmExtract(bigText, { provider, tokenCap: 60_000 });
+
+    // Restore window
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors[0].message).toContain("Token budget exceeded");
@@ -42,7 +62,17 @@ describe("llmExtract", () => {
     };
     const fallback = makeStaticProvider({ books: sampleBooks });
 
+    // Mock server environment
+    const windowBackup = global.window;
+    // @ts-expect-error - Deleting window to simulate server environment
+    delete global.window;
+
     const result = await llmExtract("text", { provider: failingProvider, fallbackProvider: fallback });
+
+    // Restore window
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
 
     expect(result.rows).toHaveLength(1);
     expect(result.errors).toHaveLength(0);
@@ -51,7 +81,17 @@ describe("llmExtract", () => {
   it("flags rows missing required fields", async () => {
     const provider = makeStaticProvider({ books: [{ author: "No Title" }] });
 
+    // Mock server environment
+    const windowBackup = global.window;
+    // @ts-expect-error - Deleting window to simulate server environment
+    delete global.window;
+
     const result = await llmExtract("text", { provider });
+
+    // Restore window
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors[0].message).toContain("Row missing required title or author");

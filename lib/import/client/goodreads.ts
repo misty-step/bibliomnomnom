@@ -44,7 +44,7 @@ const buildHeaderLookup = (headers: string[]): HeaderLookup => {
 const getValue = (
   row: string[],
   lookup: HeaderLookup,
-  keys: string[]
+  keys: readonly string[]
 ): string | undefined => {
   for (const key of keys) {
     const column = lookup[key];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type ChangeEvent } from "react";
+import { useState, useEffect, useCallback, type ChangeEvent } from "react";
 import { useMutation } from "convex/react";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
@@ -16,10 +16,31 @@ import { cn } from "@/lib/utils";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
 
+// Curated list of exemplary books for form placeholders
+const EXAMPLE_BOOKS = [
+  { title: "The Divine Comedy", author: "Dante Alighieri" },
+  { title: "The Fellowship of the Ring", author: "J.R.R. Tolkien" },
+  { title: "No Country for Old Men", author: "Cormac McCarthy" },
+  { title: "Tao Te Ching", author: "Lao-Tzu" },
+  { title: "The Book of Five Rings", author: "Miyamoto Musashi" },
+  { title: "The Imitation of Christ", author: "Thomas à Kempis" },
+  { title: "Hyperion", author: "Dan Simmons" },
+  { title: "Project Hail Mary", author: "Andy Weir" },
+  { title: "A Philosophy of Software Design", author: "John Ousterhout" },
+  { title: "Musashi", author: "Eiji Yoshikawa" },
+  { title: "The Tempest", author: "William Shakespeare" },
+  { title: "Dominion", author: "Tom Holland" },
+  { title: "The Road", author: "Cormac McCarthy" },
+  { title: "The Great Divorce", author: "C.S. Lewis" },
+];
+
 type AddBookSheetProps = {
   triggerLabel?: string;
   triggerClassName?: string;
   triggerVariant?: "primary" | "ghost";
+  // Controlled mode
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 // Helper to get today's date in YYYY-MM-DD format
@@ -27,8 +48,24 @@ function getTodayString(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, triggerVariant }: AddBookSheetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function AddBookSheet({
+  triggerLabel = "Add Book",
+  triggerClassName,
+  triggerVariant,
+  isOpen: controlledIsOpen,
+  onOpenChange: controlledOnOpenChange,
+}: AddBookSheetProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+
+  // Use controlled state if provided, otherwise use internal state
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const setIsOpen = (open: boolean) => {
+    if (controlledOnOpenChange) {
+      controlledOnOpenChange(open);
+    } else {
+      setInternalIsOpen(open);
+    }
+  };
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [status, setStatus] = useState<BookStatus>("currently-reading");
@@ -39,25 +76,18 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, trig
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAudiobook, setIsAudiobook] = useState(false);
   const [dateFinished, setDateFinished] = useState("");
+  const [exampleBook, setExampleBook] = useState(() =>
+    EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)]
+  );
 
   const createBook = useMutation(api.books.create);
   const { toast } = useToast();
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        handleClose();
-      }
-    };
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen]);
 
   const handleOpen = () => {
     setIsOpen(true);
   };
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsOpen(false);
     // Reset form
     setTitle("");
@@ -69,7 +99,25 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, trig
     setIsFavorite(false);
     setIsAudiobook(false);
     setDateFinished("");
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        handleClose();
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [isOpen, handleClose]);
+
+  // Pick new random example book when form opens
+  useEffect(() => {
+    if (isOpen) {
+      setExampleBook(EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)]);
+    }
+  }, [isOpen]);
 
   const handleStatusChange = (newStatus: BookStatus) => {
     setStatus(newStatus);
@@ -168,18 +216,21 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, trig
 
   return (
     <>
-      {triggerVariant === "primary" ? (
-         <Button onClick={handleOpen} className={triggerClassName}>
-            {triggerLabel}
-         </Button>
-      ) : (
-        <button
-            type="button"
-            onClick={handleOpen}
-            className={triggerClassName || "relative group cursor-pointer font-sans text-sm text-ink hover:text-inkMuted"}
-        >
-            {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
-        </button>
+      {/* Only render trigger when not in controlled mode */}
+      {controlledIsOpen === undefined && (
+        triggerVariant === "primary" ? (
+           <Button onClick={handleOpen} className={triggerClassName}>
+              {triggerLabel}
+           </Button>
+        ) : (
+          <button
+              type="button"
+              onClick={handleOpen}
+              className={triggerClassName || "relative group cursor-pointer font-sans text-sm text-ink hover:text-inkMuted"}
+          >
+              {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
+          </button>
+        )
       )}
 
       <SideSheet open={isOpen} onOpenChange={setIsOpen} title="Add Book">
@@ -258,7 +309,7 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, trig
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="The Name of the Wind"
+              placeholder={exampleBook.title}
               disabled={isSubmitting}
               className="text-lg font-display"
             />
@@ -273,7 +324,7 @@ export function AddBookSheet({ triggerLabel = "Add Book", triggerClassName, trig
               type="text"
               value={author}
               onChange={(e) => setAuthor(e.target.value)}
-              placeholder="Patrick Rothfuss"
+              placeholder={exampleBook.author}
               disabled={isSubmitting}
             />
           </div>

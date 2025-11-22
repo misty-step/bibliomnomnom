@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,9 @@ import { logImportEvent } from "@/lib/import/metrics";
 const IMPORT_ENABLED = process.env.NEXT_PUBLIC_IMPORT_ENABLED !== "false";
 
 export function ImportFlow() {
+  const router = useRouter();
   const { toast } = useToast();
+  const extractBooks = useAction(api.imports.extractBooks);
   const preparePreview = useMutation(api.imports.preparePreview);
   const commitImport = useMutation(api.imports.commitImport);
 
@@ -26,6 +29,7 @@ export function ImportFlow() {
   const prevStatus = useRef<string>("idle");
 
   const job = useImportJob({
+    extractBooks: async (params) => await extractBooks(params),
     preparePreview: async (params) => await preparePreview(params),
     commitImport: async (params) => await commitImport(params),
   });
@@ -117,6 +121,7 @@ export function ImportFlow() {
         <CommitSummary
           counts={job.state.summary}
           onRetry={job.reset}
+          onClose={() => router.push("/library")}
         />
       ) : (
         <Surface className="p-4 space-y-4">
@@ -125,7 +130,51 @@ export function ImportFlow() {
             disabled={isWorking}
           />
 
-          {job.state.pages.length > 0 && job.state.status !== "idle" && (
+          {/* Loading state */}
+          {isWorking && (
+            <div className="py-12 space-y-4 text-center motion-fade-in">
+              <Loader2 className="h-6 w-6 animate-spin mx-auto text-text-ink" />
+              <div>
+                <p className="font-display text-lg text-text-ink">
+                  {job.state.status === "parsing" && "Analyzing your file"}
+                  {job.state.status === "previewing" && "Extracting books"}
+                  {job.state.status === "committing" && "Importing books"}
+                </p>
+                <p className="text-sm text-text-inkMuted mt-1">
+                  {job.state.status === "parsing" && "Reading and parsing content..."}
+                  {job.state.status === "previewing" && "Using GPT-5.1-mini for extraction and Gemini 2.5 Flash for verification..."}
+                  {job.state.status === "committing" && "Adding to your library..."}
+                </p>
+              </div>
+              {job.state.pages.length > 0 && job.state.status === "previewing" && (
+                <p className="text-xs text-status-positive">
+                  {job.state.pages.flat().length} books found
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Empty state: no books extracted */}
+          {!isWorking && job.state.status === "ready" && job.state.pages.length === 0 && (
+            <div className="py-8 text-center">
+              <p className="text-sm text-text-inkMuted">
+                No books could be extracted from this file. Please check the format and try again.
+              </p>
+              {job.state.errors.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {job.state.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-red-600">{err}</p>
+                  ))}
+                </div>
+              )}
+              <Button variant="ghost" size="sm" onClick={job.reset} className="mt-4">
+                Try another file
+              </Button>
+            </div>
+          )}
+
+          {/* Preview table */}
+          {job.state.pages.length > 0 && job.state.status !== "idle" && !isWorking && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium text-text-ink">Preview (page {job.state.page + 1} of {job.state.totalPages})</p>

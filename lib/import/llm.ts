@@ -47,9 +47,18 @@ const splitIntoChunks = (text: string, maxTokens: number): string[] => {
 };
 
 const buildPrompt = (chunk: string) => `You are a strict data extractor. Parse books from the provided text.
+
+CRITICAL: You MUST extract EVERY SINGLE BOOK from the text. Do not stop early. Extract ALL books completely before finishing.
+
 Return JSON array under key "books". Each book must include:
 title, author, status (want-to-read|currently-reading|read), isbn?, edition?, publishedYear?, pageCount?, isAudiobook?, isFavorite?, dateStarted?, dateFinished?, coverUrl?, apiSource?, apiId?, privacy? (private by default).
-Rules: never hallucinate; omit fields you cannot justify; default status to want-to-read when uncertain; include tempId from the source if provided.
+
+Rules:
+- Extract EVERY book in the text - do not stop until you've processed the entire input
+- Never hallucinate; omit fields you cannot justify
+- Default status to want-to-read when uncertain
+- Include tempId from the source if provided
+
 Input:
 """
 ${chunk}
@@ -124,6 +133,56 @@ const runProvider = async (provider: LlmProvider, prompt: string): Promise<Parse
   return parseModelJson(content);
 };
 
+const buildVerificationPrompt = (originalText: string, extractedBooks: ParsedBook[]) => `You are a verification assistant. Review the extraction results for completeness and accuracy.
+
+Original text contains book information. Extracted ${extractedBooks.length} books.
+
+Check:
+1. Are ALL books from the original text extracted?
+2. Are the titles and authors accurate?
+3. Is any book listed multiple times?
+
+Original text:
+"""
+${originalText}
+"""
+
+Extracted books:
+${extractedBooks.map((b, i) => `${i + 1}. "${b.title}" by ${b.author}`).join("\n")}
+
+Return JSON with:
+{
+  "complete": true/false,
+  "estimatedTotal": <number>,
+  "missingBooks": [{ "title": "...", "author": "..." }],
+  "issues": ["..."]
+}`;
+
+const verifyExtraction = async (
+  verifier: LlmProvider | undefined,
+  chunk: string,
+  extracted: ParsedBook[]
+): Promise<{ complete: boolean; estimatedTotal: number; issues: string[] }> => {
+  if (!verifier || !extracted.length) {
+    return { complete: true, estimatedTotal: extracted.length, issues: [] };
+  }
+
+  try {
+    const prompt = buildVerificationPrompt(chunk, extracted);
+    const content = await verifier.call(prompt);
+    const result = JSON.parse(content);
+
+    return {
+      complete: result.complete ?? true,
+      estimatedTotal: result.estimatedTotal ?? extracted.length,
+      issues: result.issues ?? [],
+    };
+  } catch (err: any) {
+    // Verification failed, assume extraction is complete
+    return { complete: true, estimatedTotal: extracted.length, issues: [] };
+  }
+};
+
 export const llmExtract = async (
   rawText: string,
   opts: LlmExtractOptions = {}
@@ -187,6 +246,21 @@ export const llmExtract = async (
       continue;
     }
 
+    // Phase 2: Verify extraction completeness using fallback provider (if available)
+    if (fallback && parsed.length > 0) {
+      const verification = await verifyExtraction(fallback, chunk, parsed);
+
+      if (!verification.complete) {
+        warnings.push(
+          `Chunk verification: Extracted ${parsed.length} books, but verifier estimates ${verification.estimatedTotal} total`
+        );
+      }
+
+      if (verification.issues.length > 0) {
+        warnings.push(...verification.issues.map((issue) => `Verification: ${issue}`));
+      }
+    }
+
     const { rows, warnings: rowWarnings, errors: rowErrors } = validateAndCollect(parsed);
     warnings.push(...rowWarnings.map((w) => `Chunk: ${w}`));
     errors.push(...rowErrors.map((e) => ({ ...e, message: `Chunk row error: ${e.message}` })));
@@ -200,4 +274,60 @@ export const llmExtract = async (
 export const makeStaticProvider = (payload: any): LlmProvider => ({
   name: "openai",
   call: async () => JSON.stringify(payload),
+});
+
+// OpenAI provider using REST API
+export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
+  name: "openai",
+  call: async (prompt: string) => {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-5.1-mini",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} ${error}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0]?.message?.content ?? "{}";
+  },
+});
+
+// Gemini provider using REST API
+export const createGeminiProvider = (apiKey: string): LlmProvider => ({
+  name: "gemini",
+  call: async (prompt: string) => {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Gemini API error: ${response.status} ${error}`);
+    }
+
+    const data = await response.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+  },
 });

@@ -120,7 +120,6 @@ export const applyDecision = (
     const hasIncoming = candidate !== undefined && candidate !== null;
 
     if (isEmpty && hasIncoming) {
-      // @ts-expect-error indexed assign
       patch[field] = candidate as any;
     }
   });
@@ -131,7 +130,7 @@ export const applyDecision = (
 export const buildNewBook = (
   incoming: ParsedBook,
   userId: Id<"users">
-): Omit<Doc<"books">, "_id"> => {
+): Omit<Doc<"books">, "_id" | "_creationTime"> => {
   return {
     userId,
     title: incoming.title,

@@ -16,14 +16,14 @@ export function CommitSummary({ counts, onRetry, onClose }: CommitSummaryProps) 
         </div>
       </div>
       <div className="flex gap-2">
+        {onClose && (
+          <Button size="sm" onClick={onClose}>
+            Back to Library
+          </Button>
+        )}
         {onRetry && (
           <Button variant="secondary" size="sm" onClick={onRetry}>
             Import another file
-          </Button>
-        )}
-        {onClose && (
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Close
           </Button>
         )}
       </div>

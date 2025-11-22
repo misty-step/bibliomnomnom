@@ -243,7 +243,7 @@ export const inferGenericCsv = (fileText: string): InferCsvResult => {
     const isFavorite = toBoolean(getValue(row, favoriteCol));
 
     const privacy = (normalizeOptionalText(getValue(row, privacyCol)) ??
-      "private") satisfies "private" | "public";
+      "private") as "private" | "public";
 
     books.push({
       tempId: makeTempId("csv"),
