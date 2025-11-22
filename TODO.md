@@ -65,7 +65,7 @@
   Estimate: 45m
   ```
 
-- [ ] Show title + author for books without covers
+- [x] Show title + author for books without covers
   ```
   Files:
   - components/book/BookTile.tsx:67-71 (replace single letter with title/author)

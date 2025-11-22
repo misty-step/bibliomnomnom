@@ -263,8 +263,22 @@ export function BookDetail({ bookId }: BookDetailProps) {
                   priority
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-canvas-boneMuted to-canvas-bone">
-                  <span className="font-display text-8xl text-text-ink/10">{book.title[0]}</span>
+                <div className="flex h-full w-full flex-col justify-between rounded-sm border border-line-ghost/50 bg-canvas-bone p-8">
+                  <div className="space-y-3">
+                    <h2 className="font-display text-2xl leading-tight text-text-ink line-clamp-5">
+                      {book.title}
+                    </h2>
+                    {book.author ? (
+                      <p className="font-mono text-sm uppercase tracking-wider text-text-inkMuted line-clamp-2">
+                        {book.author}
+                      </p>
+                    ) : null}
+                  </div>
+                  {book.publishedYear ? (
+                    <span className="font-mono text-xs text-text-inkSubtle">
+                      {book.publishedYear}
+                    </span>
+                  ) : null}
                 </div>
               )}
 
