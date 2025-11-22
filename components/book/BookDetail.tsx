@@ -2,10 +2,11 @@
 
 import { useEffect, useState, type ChangeEvent } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
 import { upload } from "@vercel/blob/client";
-import { Star, Pencil, Lock, Globe, Headphones } from "lucide-react";
+import { Globe, Headphones, Lock, Pencil, Star, Trash2 } from "lucide-react";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,17 @@ import { CreateNote } from "@/components/notes/CreateNote";
 import { NoteList } from "@/components/notes/NoteList";
 import { BOOK_STATUS_OPTIONS } from "./constants";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { BookForm, type SanitizedBookFormValues } from "./BookForm";
 import { SideSheet } from "@/components/ui/SideSheet";
@@ -27,10 +39,13 @@ type BookDetailProps = {
 
 export function BookDetail({ bookId }: BookDetailProps) {
   const book = useAuthedQuery(api.books.get, { id: bookId });
+  const notes = useAuthedQuery(api.notes.list, { bookId });
   const updateStatus = useMutation(api.books.updateStatus);
   const toggleFavorite = useMutation(api.books.toggleFavorite);
   const updatePrivacy = useMutation(api.books.updatePrivacy);
   const updateBook = useMutation(api.books.update);
+  const removeBook = useMutation(api.books.remove);
+  const router = useRouter();
   const { toast } = useToast();
 
   const [localStatus, setLocalStatus] = useState<Doc<"books">["status"]>("want-to-read");
@@ -40,6 +55,8 @@ export function BookDetail({ bookId }: BookDetailProps) {
   const [localPrivacy, setLocalPrivacy] = useState<"private" | "public">("private");
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [coverHovered, setCoverHovered] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const currentStatus = book?.status;
   const currentPrivacy = book?.privacy;
@@ -178,6 +195,28 @@ export function BookDetail({ bookId }: BookDetailProps) {
     }
   };
 
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await removeBook({ id: book._id });
+      toast({
+        title: "Book deleted",
+        description: `"${book.title}" has been removed from your library`,
+      });
+      setShowDeleteDialog(false);
+      router.push("/library");
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Delete failed",
+        description: "We couldn't delete this book. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Helper to format date
   const formatDate = (timestamp: number | undefined) => {
     if (!timestamp) return null;
@@ -195,6 +234,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
       ? `Started ${formatDate(book.dateStarted)}`
       : null;
 
+  const noteCount = notes?.length ?? 0;
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
 
   return (
@@ -357,6 +397,39 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 <Globe className="h-4 w-4" />
               )}
             </button>
+
+            {/* Delete Book */}
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+              <AlertDialogTrigger asChild>
+                <button
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full text-accent-ember transition hover:bg-accent-ember/10 hover:text-accent-ember",
+                    isDeleting && "pointer-events-none opacity-60"
+                  )}
+                  title="Delete book"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Delete {book.title}?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {`This will delete this book and its ${noteCount} ${noteCount === 1 ? "note" : "notes"}.`}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isDeleting}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+                    {isDeleting ? "Deleting…" : "Delete Forever"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
