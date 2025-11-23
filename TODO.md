@@ -516,7 +516,7 @@
   Estimate: 2h
   ```
 
-- [ ] Implement in-memory repository for tests
+- [x] Implement in-memory repository for tests
   ```
   Files:
   - lib/import/repository/memory.ts (NEW FILE - in-memory implementations)
