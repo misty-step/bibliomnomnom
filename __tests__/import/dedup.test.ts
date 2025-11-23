@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { dedupHelpers, applyDecision } from "../../lib/import/dedup";
+import { applyDecision } from "../../lib/import/dedup";
+import { matchBooks } from "../../lib/import/dedup/core";
 import { normalizeTitleAuthorKey } from "../../lib/import/normalize";
 import type { ParsedBook } from "../../lib/import/types";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
@@ -58,46 +59,40 @@ describe("normalizeTitleAuthorKey", () => {
   });
 });
 
-describe("findMatches", () => {
-  const userId = "user_1" as Id<"users">;
-
-  const makeDb = (docs: Doc<"books">[]): any => ({
-    query: () => ({
-      withIndex: (_: string, fn: any) => (
-        fn({ eq: (_field: string, value: Id<"users">) => value === userId }),
-        {
-          collect: async () => docs,
-        }
-      ),
-    }),
-    get: async () => undefined,
-  });
-
-  it("prefers isbn over title-author", async () => {
-    const docs = [book({ _id: "b1", isbn: "123", apiId: "api-1", userId })];
+describe("matchBooks", () => {
+  it("prefers isbn over title-author", () => {
+    const docs = [book({ _id: "b1", isbn: "123", apiId: "api-1", userId: fakeId("user_1") })];
     const rows: ParsedBook[] = [incoming({ tempId: "r1", isbn: "123", author: "Frank Herbert" })];
 
-    const matches = await dedupHelpers.findMatches(makeDb(docs), userId, rows);
+    const matches = matchBooks(docs, rows);
 
     expect(matches[0].matchType).toBe("isbn");
     expect(matches[0].existingBookId).toBe("b1" as Id<"books">);
   });
 
-  it("falls back to title-author when isbn missing", async () => {
-    const docs = [book({ _id: "b2", isbn: undefined, userId })];
+  it("falls back to title-author when isbn missing", () => {
+    const docs = [book({ _id: "b2", isbn: undefined, userId: fakeId("user_1") })];
     const rows: ParsedBook[] = [incoming({ tempId: "r2", isbn: undefined })];
 
-    const matches = await dedupHelpers.findMatches(makeDb(docs), userId, rows);
+    const matches = matchBooks(docs, rows);
 
     expect(matches[0].matchType).toBe("title-author");
     expect(matches[0].existingBookId).toBe("b2" as Id<"books">);
   });
 
-  it("uses apiId when provided", async () => {
-    const docs = [book({ _id: "b3", isbn: undefined, userId, apiId: "gb:dune" })];
+  it("uses apiId when provided", () => {
+    const docs = [
+      book({
+        _id: "b3",
+        isbn: undefined,
+        userId: fakeId("user_1"),
+        apiId: "gb:dune",
+        author: "Different Author",
+      }),
+    ];
     const rows: ParsedBook[] = [incoming({ tempId: "r3", isbn: undefined, apiId: "gb:dune" })];
 
-    const matches = await dedupHelpers.findMatches(makeDb(docs), userId, rows);
+    const matches = matchBooks(docs, rows);
 
     expect(matches[0].matchType).toBe("apiId");
     expect(matches[0].existingBookId).toBe("b3" as Id<"books">);

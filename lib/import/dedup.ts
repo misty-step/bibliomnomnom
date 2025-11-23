@@ -1,19 +1,13 @@
-import type { ActionCtx, DatabaseReader } from "../../convex/_generated/server";
+import type { DatabaseReader } from "../../convex/_generated/server";
 import type { Doc, Id } from "../../convex/_generated/dataModel";
 
 import type { DedupDecision, DedupMatch, DedupDecisionAction, ParsedBook } from "./types";
-import { normalizeIsbn } from "./types";
-import { normalizeApiId, normalizeTitleAuthorKey } from "./normalize";
+import { matchBooks } from "./dedup/core";
+import { fetchUserBooks } from "./dedup/repository";
 
-type DbReader = Pick<DatabaseReader, "query" | "get">;
+type DbReader = Pick<DatabaseReader, "query">;
 
 export type Match = DedupMatch;
-
-const MATCH_CONFIDENCE: Record<NonNullable<Match["matchType"]>, number> = {
-  isbn: 1,
-  "title-author": 0.8,
-  apiId: 0.6,
-};
 
 const MERGEABLE_FIELDS: (keyof Doc<"books">)[] = [
   "isbn",
@@ -32,72 +26,8 @@ export const findMatches = async (
   userId: Id<"users">,
   rows: ParsedBook[]
 ): Promise<Match[]> => {
-  const existing = await db
-    .query("books")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .collect();
-
-  const isbnMap = new Map<string, Doc<"books">>();
-  const titleAuthorMap = new Map<string, Doc<"books">>();
-  const apiIdMap = new Map<string, Doc<"books">>();
-
-  existing.forEach((book) => {
-    const isbn = normalizeIsbn(book.isbn);
-    if (isbn && !isbnMap.has(isbn)) {
-      isbnMap.set(isbn, book);
-    }
-
-    const key = normalizeTitleAuthorKey(book.title, book.author);
-    if (key && !titleAuthorMap.has(key)) {
-      titleAuthorMap.set(key, book);
-    }
-
-    const apiId = normalizeApiId(book.apiId);
-    if (apiId && !apiIdMap.has(apiId)) {
-      apiIdMap.set(apiId, book);
-    }
-  });
-
-  const matches: Match[] = [];
-
-  rows.forEach((row) => {
-    const isbn = normalizeIsbn(row.isbn);
-    if (isbn && isbnMap.has(isbn)) {
-      const match = isbnMap.get(isbn)!;
-      matches.push({
-        tempId: row.tempId,
-        existingBookId: match._id,
-        matchType: "isbn",
-        confidence: MATCH_CONFIDENCE.isbn,
-      });
-      return;
-    }
-
-    const key = normalizeTitleAuthorKey(row.title, row.author);
-    if (key && titleAuthorMap.has(key)) {
-      const match = titleAuthorMap.get(key)!;
-      matches.push({
-        tempId: row.tempId,
-        existingBookId: match._id,
-        matchType: "title-author",
-        confidence: MATCH_CONFIDENCE["title-author"],
-      });
-      return;
-    }
-
-    const apiId = normalizeApiId(row.apiId);
-    if (apiId && apiIdMap.has(apiId)) {
-      const match = apiIdMap.get(apiId)!;
-      matches.push({
-        tempId: row.tempId,
-        existingBookId: match._id,
-        matchType: "apiId",
-        confidence: MATCH_CONFIDENCE.apiId,
-      });
-    }
-  });
-
-  return matches;
+  const existing = await fetchUserBooks(db, userId);
+  return matchBooks(existing, rows);
 };
 
 export type BookPatch = Partial<Doc<"books">>;
