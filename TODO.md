@@ -39,12 +39,12 @@
      - Cancel button to close without deleting
 
   Success Criteria:
-  - [ ] Delete button appears in BookDetail action row
-  - [ ] Clicking delete shows AlertDialog with book title and note count
-  - [ ] Confirming delete removes book and redirects to /library
-  - [ ] Toast notification confirms deletion
-  - [ ] Canceling closes dialog without deleting
-  - [ ] Error handling shows toast on failure
+  - [x] Delete button appears in BookDetail action row
+  - [x] Clicking delete shows AlertDialog with book title and note count
+  - [x] Confirming delete removes book and redirects to /library
+  - [x] Toast notification confirms deletion
+  - [x] Canceling closes dialog without deleting
+  - [x] Error handling shows toast on failure
 
   Edge Cases:
   - Book with 0 notes → "permanently delete this book"
@@ -92,12 +92,12 @@
      - Same structure: title > author > year (optional)
 
   Success Criteria:
-  - [ ] Books without covers show title + author instead of single letter
-  - [ ] Text is readable and properly sized (lg for tiles, 2xl for detail)
-  - [ ] Layout matches bibliophile aesthetic (serif title, mono author)
-  - [ ] Published year shows at bottom if available
-  - [ ] Hover state still works on tiles (index card overlay)
-  - [ ] Visual hierarchy clear: title > author > year
+  - [x] Books without covers show title + author instead of single letter
+  - [x] Text is readable and properly sized (lg for tiles, 2xl for detail)
+  - [x] Layout matches bibliophile aesthetic (serif title, mono author)
+  - [x] Published year shows at bottom if available
+  - [x] Hover state still works on tiles (index card overlay)
+  - [x] Visual hierarchy clear: title > author > year
 
   Edge Cases:
   - Very long titles (100+ chars) → line-clamp-5 truncation
