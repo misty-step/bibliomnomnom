@@ -418,7 +418,7 @@
   Estimate: 45m
   ```
 
-- [ ] Implement Convex repository adapters
+- [x] Implement Convex repository adapters
   ```
   Files:
   - lib/import/repository/convex.ts (NEW FILE - Convex implementations)
