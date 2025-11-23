@@ -215,7 +215,7 @@
   Estimate: 2.5h
   ```
 
-- [ ] Inject LLM providers at action boundary
+- [x] Inject LLM providers at action boundary
   ```
   Files:
   - convex/imports.ts:114-145 (UPDATE extractBooks action)

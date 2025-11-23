@@ -194,6 +194,15 @@ export const llmExtract = async (
   const tokenCap = opts.tokenCap ?? LLM_TOKEN_CAP;
   const chunkSize = opts.chunkTokenSize ?? DEFAULT_CHUNK_TOKEN_SIZE;
 
+  if (!opts.provider && !opts.fallbackProvider) {
+    return {
+      rows: [],
+      warnings: [],
+      errors: [{ message: "No LLM provider supplied" }],
+      tokenUsage: 0,
+    };
+  }
+
   const totalTokens = estimateTokens(rawText);
   if (totalTokens > tokenCap) {
     return {

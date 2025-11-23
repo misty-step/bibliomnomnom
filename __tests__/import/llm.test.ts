@@ -33,6 +33,21 @@ describe("llmExtract", () => {
     expect(result.errors).toHaveLength(0);
   });
 
+  it("returns error when no provider is supplied", async () => {
+    const windowBackup = global.window;
+    // @ts-expect-error - simulate server environment
+    delete global.window;
+
+    const result = await llmExtract("text without provider", {});
+
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
+
+    expect(result.rows).toHaveLength(0);
+    expect(result.errors[0].message).toContain("No LLM provider supplied");
+  });
+
   it("enforces token cap", async () => {
     const provider = makeStaticProvider({ books: sampleBooks });
     const bigText = "x".repeat(300_000); // ~75k tokens with divisor heuristic
