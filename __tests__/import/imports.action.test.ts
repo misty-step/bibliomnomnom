@@ -16,7 +16,7 @@ const makeCtx = (opts: { books?: any[]; run?: any }) => {
     db: {
       query: (table: string) => ({
         withIndex: (index: string, fn: any) => {
-          const matcher = { eq: (_field: string, value: any) => value };
+          const matcher: any = { eq: (_field: string, _value: any) => matcher };
           fn(matcher);
           return {
             collect: async () => (table === "books" ? books : []),
@@ -67,26 +67,21 @@ describe("preparePreviewHandler", () => {
     vi.restoreAllMocks();
   });
 
-  it("invokes llm path for non-csv sources and patches existing run", async () => {
+  it("uses provided rows for non-csv sources and patches existing run", async () => {
     vi.spyOn(authModule, "requireAuth").mockResolvedValue(userId);
 
-    const llmSpy = vi
-      .spyOn(llmModule, "llmExtract")
-      .mockResolvedValue({ rows: [{ tempId: "t2", title: "Book", author: "A" } as any], warnings: [], errors: [], tokenUsage: 10 });
-
     const existing = { _id: "runDoc" } as any;
-    const { ctx, getPatched, run } = makeCtx({ run: { value: existing } });
+    const { ctx, getPatched } = makeCtx({ run: { value: existing } });
 
     const result = await preparePreviewHandler(ctx, {
       importRunId: "run2",
       sourceType: "txt",
-      rawText: "some text",
+      rows: [{ tempId: "t2", title: "Book", author: "A" } as any],
       page: 0,
       totalPages: 2,
     } as any);
 
     expect(result.books).toHaveLength(1);
-    expect(llmSpy).toHaveBeenCalled();
 
     const patched = getPatched();
     expect(patched?.status).toBe("previewed");

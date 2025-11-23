@@ -22,7 +22,7 @@ const makeCtx = (opts: { books?: any[]; previews?: any[]; run?: any }) => {
       query: (table: string) => ({
         withIndex: (index: string, fn: any) => {
           const matcher = {
-            eq: (_field: string, value: any) => value,
+            eq: (_field: string, _value: any) => matcher,
           };
           fn(matcher);
           return {

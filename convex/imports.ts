@@ -11,6 +11,8 @@ import {
 } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
 import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../lib/import/llm";
+import { ConvexImportRunRepository } from "../lib/import/repository/convex";
+import { checkImportRateLimits, shouldSkipRateLimits } from "../lib/import/rateLimit";
 import type { Doc } from "./_generated/dataModel";
 import { logImportEvent } from "../lib/import/metrics";
 
@@ -157,8 +159,11 @@ export const preparePreviewHandler = async (
   }
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
+  const importRunRepo = new ConvexImportRunRepository(ctx.db as any);
 
-  await enforceRateLimits(ctx, userId);
+  if (!shouldSkipRateLimits()) {
+    await checkImportRateLimits(importRunRepo, userId);
+  }
 
   // Note: LLM extraction now happens in extractBooks action (can use fetch)
   // This mutation only receives pre-extracted books from CSV or action
@@ -283,8 +288,11 @@ export const commitImportHandler = async (
   }
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
+  const importRunRepo = new ConvexImportRunRepository(ctx.db as any);
 
-  await enforceRateLimits(ctx, userId);
+  if (!shouldSkipRateLimits()) {
+    await checkImportRateLimits(importRunRepo, userId);
+  }
 
   const run = await ctx.db
     .query("importRuns")
@@ -406,44 +414,4 @@ const loadPreviewRows = async (
   });
 
   return map;
-};
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-const PREVIEW_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
-const DAILY_LIMIT = 5;
-const CONCURRENT_LIMIT = 1;
-
-const enforceRateLimits = async (ctx: any, userId: Id<"users">) => {
-  // Skip rate limiting in development
-  const nodeEnv = process.env.NODE_ENV;
-  const isDev = nodeEnv === "development";
-
-  console.log(`[enforceRateLimits] NODE_ENV="${nodeEnv}", isDev=${isDev}`);
-
-  if (isDev) {
-    console.log("[Dev] ✅ Skipping rate limits (NODE_ENV=development)");
-    return;
-  }
-
-  console.log("[enforceRateLimits] ⚠️  Enforcing rate limits in production");
-  const now = Date.now();
-  const runs = await ctx.db
-    .query("importRuns")
-    .withIndex("by_user_run", (q: any) => q.eq("userId", userId))
-    .collect();
-
-  const recent = runs.filter((r: any) => now - r.createdAt < ONE_DAY_MS);
-  if (recent.length >= DAILY_LIMIT) {
-    throw new Error("Too many imports today. Please try again tomorrow.");
-  }
-
-  // Only count "previewed" runs that are still fresh (< 15 min old)
-  // Ignore "failed" runs and expired previews
-  const inFlight = recent.filter(
-    (r: any) =>
-      r.status === "previewed" && now - r.updatedAt < PREVIEW_TIMEOUT_MS
-  );
-  if (inFlight.length >= CONCURRENT_LIMIT) {
-    throw new Error("Too many concurrent imports. Finish existing imports before starting another.");
-  }
 };

@@ -621,7 +621,7 @@
   Estimate: 2.5h
   ```
 
-- [ ] Extract rate limiting as middleware
+- [x] Extract rate limiting as middleware
   ```
   Files:
   - lib/import/rateLimit.ts (NEW FILE - pure rate limit logic)
