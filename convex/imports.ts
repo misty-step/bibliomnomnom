@@ -10,9 +10,11 @@ import {
   LLM_TOKEN_CAP,
 } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
+import { matchBooks } from "../lib/import/dedup/core";
 import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../lib/import/llm";
 import { ConvexImportRunRepository } from "../lib/import/repository/convex";
 import { checkImportRateLimits, shouldSkipRateLimits } from "../lib/import/rateLimit";
+import { createConvexRepositories } from "../lib/import/repository/convex";
 import type { Doc } from "./_generated/dataModel";
 import { logImportEvent } from "../lib/import/metrics";
 
@@ -159,7 +161,8 @@ export const preparePreviewHandler = async (
   }
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
-  const importRunRepo = new ConvexImportRunRepository(ctx.db as any);
+  const repos = createConvexRepositories(ctx.db as any);
+  const importRunRepo = repos.importRuns;
 
   if (!shouldSkipRateLimits()) {
     await checkImportRateLimits(importRunRepo, userId);
@@ -171,10 +174,11 @@ export const preparePreviewHandler = async (
   const warnings: string[] = [];
   const errors: ParseError[] = [];
 
-  const dedupMatches = await dedupHelpers.findMatches(ctx.db, userId, books);
+  const existingBooks = await repos.books.findByUser(userId);
+  const dedupMatches = matchBooks(existingBooks, books);
 
   // Store latest preview payload for commit validation/idempotency.
-  await ctx.db.insert("importPreviews", {
+  await repos.importPreviews.create({
     importRunId: args.importRunId,
     userId,
     books,
@@ -185,7 +189,7 @@ export const preparePreviewHandler = async (
   // Determine status: failed if errors OR no books extracted
   const importStatus = errors.length > 0 || books.length === 0 ? "failed" : "previewed";
 
-  await upsertImportRun(ctx, {
+  await upsertImportRun(importRunRepo, {
     userId,
     importRunId: args.importRunId,
     sourceType: args.sourceType,
@@ -216,7 +220,7 @@ export const preparePreviewHandler = async (
 };
 
 const upsertImportRun = async (
-  ctx: any,
+  importRunRepo: ConvexImportRunRepository,
   params: {
     userId: Id<"users">;
     importRunId: string;
@@ -228,17 +232,12 @@ const upsertImportRun = async (
     status: "previewed" | "failed" | "committed";
   }
 ) => {
-  const existing = await ctx.db
-    .query("importRuns")
-    .withIndex("by_user_run", (q: any) =>
-      q.eq("userId", params.userId).eq("importRunId", params.importRunId)
-    )
-    .first();
+  const existing = await importRunRepo.findByUserAndRun(params.userId, params.importRunId);
 
   const now = Date.now();
 
   if (!existing) {
-    await ctx.db.insert("importRuns", {
+    await importRunRepo.create({
       userId: params.userId,
       importRunId: params.importRunId,
       status: params.status,
@@ -259,7 +258,7 @@ const upsertImportRun = async (
     return;
   }
 
-  await ctx.db.patch(existing._id, {
+  await importRunRepo.update(existing._id, {
     status: params.status,
     sourceType: params.sourceType,
     page: params.page,
@@ -288,18 +287,14 @@ export const commitImportHandler = async (
   }
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
-  const importRunRepo = new ConvexImportRunRepository(ctx.db as any);
+  const repos = createConvexRepositories(ctx.db as any);
+  const importRunRepo = repos.importRuns;
 
   if (!shouldSkipRateLimits()) {
     await checkImportRateLimits(importRunRepo, userId);
   }
 
-  const run = await ctx.db
-    .query("importRuns")
-    .withIndex("by_user_run", (q: any) =>
-      q.eq("userId", userId).eq("importRunId", args.importRunId)
-    )
-    .first();
+  const run = await importRunRepo.findByUserAndRun(userId, args.importRunId);
 
   if (!run) {
     throw new Error("Preview required before commit");
@@ -318,7 +313,7 @@ export const commitImportHandler = async (
   const decisionsByTempId = new Map<string, Decision>();
   args.decisions.forEach((d) => decisionsByTempId.set(d.tempId, d));
 
-  const incomingMap = await loadPreviewRows(ctx, userId, args.importRunId, args.page);
+  const incomingMap = await loadPreviewRows(repos.importPreviews, userId, args.importRunId, args.page);
 
   let created = 0;
   let merged = 0;
@@ -340,7 +335,7 @@ export const commitImportHandler = async (
     }
 
     if (decision.action === "create") {
-      await ctx.db.insert("books", dedupHelpers.buildNewBook(incoming, userId));
+      await repos.books.create(dedupHelpers.buildNewBook(incoming, userId));
       created += 1;
       continue;
     }
@@ -350,7 +345,7 @@ export const commitImportHandler = async (
       continue;
     }
 
-    const existing = await ctx.db.get(decision.existingBookId as Id<"books">);
+    const existing = await repos.books.findById(decision.existingBookId as Id<"books">);
     if (!existing || existing.userId !== userId) {
       errors.push({ message: `Book not found for merge ${decision.existingBookId}` });
       continue;
@@ -358,7 +353,7 @@ export const commitImportHandler = async (
 
     const patch = dedupHelpers.applyDecision(existing as Doc<"books">, incoming, "merge");
     if (patch && Object.keys(patch).length) {
-      await ctx.db.patch(existing._id, {
+      await repos.books.update(existing._id, {
         ...patch,
         updatedAt: now,
       });
@@ -392,18 +387,13 @@ export const commitImportHandler = async (
 type Summary = { created: number; merged: number; skipped: number; errors: ParseError[] };
 
 const loadPreviewRows = async (
-  ctx: any,
+  previewRepo: any,
   userId: Id<"users">,
   importRunId: string,
   page: number
 ): Promise<Map<string, ParsedBook>> => {
   const map = new Map<string, ParsedBook>();
-  const preview = await ctx.db
-    .query("importPreviews")
-    .withIndex("by_user_run_page", (q: any) =>
-      q.eq("userId", userId).eq("importRunId", importRunId).eq("page", page)
-    )
-    .first();
+  const preview = await previewRepo.findByUserRunPage(userId, importRunId, page);
 
   if (!preview || !Array.isArray(preview.books)) {
     return map;
