@@ -292,7 +292,7 @@
   Estimate: 1h
   ```
 
-- [ ] Fix empty string ISBN normalization in Goodreads parser
+- [x] Fix empty string ISBN normalization in Goodreads parser
   ```
   Files:
   - lib/import/client/goodreads.ts:175-177 (UPDATE ISBN handling)

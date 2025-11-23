@@ -59,4 +59,20 @@ describe("parseGoodreadsCsv", () => {
     expect(result.rows[0].title).toBe("Title With Spaces");
     expect(result.rows[0].author).toBe("Author");
   });
+
+  it("treats empty ISBN cells as undefined", () => {
+    const csv = CSV_HEADER + "Book,Author,, ,,,,,,,read,read\n";
+
+    const result = parseGoodreadsCsv(csv);
+
+    expect(result.rows[0].isbn).toBeUndefined();
+  });
+
+  it("normalizes valid ISBN with spaces and dashes", () => {
+    const csv = CSV_HEADER + "Book,Author, ,978-0-441-01359-3 ,,,,,,,read,read\n";
+
+    const result = parseGoodreadsCsv(csv);
+
+    expect(result.rows[0].isbn).toBe("9780441013593");
+  });
 });

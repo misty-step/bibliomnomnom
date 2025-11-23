@@ -49,7 +49,10 @@ const getValue = (
   for (const key of keys) {
     const column = lookup[key];
     if (column !== undefined) {
-      return row[column] ?? undefined;
+      const value = row[column];
+      if (value === undefined || value === null) continue;
+      if (typeof value === "string" && value.trim() === "") continue;
+      return value;
     }
   }
   return undefined;
