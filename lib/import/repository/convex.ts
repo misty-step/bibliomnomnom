@@ -1,5 +1,5 @@
-import type { DatabaseReader, DatabaseWriter } from "../../../convex/_generated/server";
-import type { Doc, Id } from "../../../convex/_generated/dataModel";
+import type { DatabaseReader, DatabaseWriter } from "@/convex/_generated/server";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 import type {
   BookRepository,

@@ -1,5 +1,5 @@
-import type { DatabaseReader } from "../../convex/_generated/server";
-import type { Doc, Id } from "../../convex/_generated/dataModel";
+import type { DatabaseReader } from "@/convex/_generated/server";
+import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 type DbReader = Pick<DatabaseReader, "query">;
 
