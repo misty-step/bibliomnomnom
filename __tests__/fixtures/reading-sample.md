@@ -1,6 +1,6 @@
 # Reading Summary Sample
 
-*Generated: November 13, 2025*
+### Generated: November 13, 2025
 
 ## Currently Reading
 

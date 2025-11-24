@@ -190,17 +190,17 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 
 ### Alternative Approaches:
 
-**Option A: Manual Preview Deployment**
+### Option A: Manual Preview Deployment
 - Create dedicated Convex preview deployment manually
 - Set `NEXT_PUBLIC_CONVEX_URL` explicitly for preview
 - Lose branch-based isolation but get working previews
 
-**Option B: Development-Only Workflow**
+### Option B: Development-Only Workflow
 - Skip Vercel preview deployments
 - Test locally before merging to main
 - Only deploy production on merge
 
-**Option C: Different Hosting**
+### Option C: Different Hosting
 - Consider if Convex + Vercel integration issues persist
 - Research alternative hosting (Netlify, Railway, etc.)
 
@@ -215,7 +215,7 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 - Error: `401 Unauthorized: MissingAccessToken`
 
 **Log Excerpt:**
-```
+```bash
 Running "npx convex deploy --cmd 'next build'"
 ✖ Error fetching GET https://api.convex.dev/api/deployment/groovy-roadrunner-224/team_and_project 401 Unauthorized: MissingAccessToken
 Authenticate with `npx convex dev`

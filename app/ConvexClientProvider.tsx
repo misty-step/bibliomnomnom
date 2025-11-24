@@ -1,16 +1,18 @@
 "use client";
 
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient } from "convex/react";
 import { ReactNode, useEffect } from "react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
-  if (!convexUrl) {
+  if (!convexUrl || !convex) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas-bone px-6 text-center">
         <div className="space-y-3 max-w-md">
@@ -24,10 +26,8 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  const convex = new ConvexReactClient(convexUrl);
-
   return (
-    <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
+    <ConvexProviderWithClerk client={convex} useAuth={useClerkAuth}>
       <EnsureUser />
       {children}
     </ConvexProviderWithClerk>
@@ -42,16 +42,16 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
  * "User not found" errors.
  */
 function EnsureUser() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
   const ensureUser = useMutation(api.users.ensureUser);
 
   useEffect(() => {
-    if (isLoaded && isSignedIn) {
+    if (!isLoading && isAuthenticated) {
       ensureUser().catch((error) => {
         console.error("Failed to ensure user exists:", error);
       });
     }
-  }, [isLoaded, isSignedIn, ensureUser]);
+  }, [isLoading, isAuthenticated, ensureUser]);
 
   return null;
 }

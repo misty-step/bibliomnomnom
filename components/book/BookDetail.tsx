@@ -235,6 +235,10 @@ export function BookDetail({ bookId }: BookDetailProps) {
       : null;
 
   const noteCount = notes?.length ?? 0;
+  const noteCountLabel =
+    notes === undefined
+      ? "all associated notes"
+      : `${noteCount} ${noteCount === 1 ? "note" : "notes"}`;
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
 
   return (
@@ -431,7 +435,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                     Delete {book.title}?
                   </AlertDialogTitle>
                   <AlertDialogDescription>
-                    {`This will delete this book and its ${noteCount} ${noteCount === 1 ? "note" : "notes"}.`}
+                    {`This will delete this book and its ${noteCountLabel}.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -473,7 +477,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
           </h2>
           <div className="space-y-6">
             <CreateNote bookId={book._id} />
-            <NoteList bookId={book._id} />
+            <NoteList bookId={book._id} notes={notes} />
           </div>
         </div>
       </div>

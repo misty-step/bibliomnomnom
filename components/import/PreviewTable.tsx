@@ -3,6 +3,7 @@ import { DedupControls } from "./DedupControls";
 import { Button } from "@/components/ui/button";
 
 import type { ParsedBook, DedupMatch } from "@/lib/import/types";
+import { DEFAULT_STATUS } from "@/lib/import/status";
 
 type PreviewTableProps = {
   rows: ParsedBook[];
@@ -21,7 +22,7 @@ export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }
   const getDefaultDecision = (tempId: string): "skip" | "merge" | "create" => {
     const match = matchByTemp.get(tempId);
     if (!match) return "create"; // No match → create new book
-    if (match.confidence > 0.85) return "merge"; // High confidence → merge
+    if (match.confidence >= 0.85) return "merge"; // High confidence → merge
     return "skip"; // Low confidence → needs review
   };
 
@@ -124,7 +125,7 @@ export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }
                 <p className="text-text-ink">{row.author}</p>
                 <p className="text-xs text-text-inkMuted">{row.publishedYear ?? ""}</p>
               </div>
-              <span className="text-xs font-medium text-text-inkMuted">{row.status ?? "want-to-read"}</span>
+              <span className="text-xs font-medium text-text-inkMuted">{row.status ?? DEFAULT_STATUS}</span>
               <DedupControls
                 tempId={row.tempId}
                 decision={decision}

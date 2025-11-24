@@ -7,10 +7,12 @@ import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 
 type NoteListProps = {
   bookId: Id<"books">;
+  notes?: Awaited<ReturnType<typeof useAuthedQuery<typeof api.notes.list>>>;
 };
 
-export function NoteList({ bookId }: NoteListProps) {
-  const notes = useAuthedQuery(api.notes.list, { bookId });
+export function NoteList({ bookId, notes: providedNotes }: NoteListProps) {
+  const queriedNotes = useAuthedQuery(api.notes.list, { bookId });
+  const notes = providedNotes ?? queriedNotes;
 
   if (notes === undefined) {
     return <NoteListSkeleton />;

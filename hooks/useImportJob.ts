@@ -1,13 +1,7 @@
 import { useCallback, useMemo, useReducer } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 
-import type {
-  ParsedBook,
-  PreviewResult,
-  DedupDecisionAction,
-  IMPORT_PAGE_SIZE,
-  ParseError,
-} from "../lib/import/types";
+import type { ParsedBook, PreviewResult, DedupDecisionAction, ParseError } from "../lib/import/types";
 import { IMPORT_PAGE_SIZE as PAGE_SIZE } from "../lib/import/types";
 import { inferGenericCsv } from "../lib/import/client/csvInfer";
 import { parseGoodreadsCsv } from "../lib/import/client/goodreads";
@@ -417,7 +411,7 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
       setPage,
       commitPage,
       reset,
-      pageSize: PAGE_SIZE as typeof IMPORT_PAGE_SIZE,
+      pageSize: PAGE_SIZE,
     }),
     [commitPage, setDecision, setPage, start, state, reset]
   );

@@ -91,6 +91,12 @@ export const cleanupStuckImports = mutation({
 // Admin-only cleanup for all users (use carefully in development)
 export const adminCleanupAllStuckImports = mutation({
   handler: async (ctx) => {
+    // Restrict to authenticated callers and non-production environments to avoid accidental mass deletes.
+    const userId = (await requireAuth(ctx)) as Id<"users">;
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("adminCleanupAllStuckImports is disabled in production");
+    }
+
     const allStuck = await ctx.db
       .query("importRuns")
       .filter((q) => q.eq(q.field("status"), "previewed"))
@@ -100,7 +106,7 @@ export const adminCleanupAllStuckImports = mutation({
       await ctx.db.delete(run._id);
     }
 
-    return { deleted: allStuck.length };
+    return { deleted: allStuck.length, requestedBy: userId };
   },
 });
 
@@ -198,6 +204,15 @@ export const preparePreviewHandler = async (
     rowCount: books.length,
     errors: errors.length,
     status: importStatus,
+  });
+
+  logImportEvent({
+    phase: "preview",
+    importRunId: args.importRunId,
+    sourceType: args.sourceType,
+    counts: { rows: books.length, errors: errors.length },
+    tokenUsage: 0,
+    page: args.page,
   });
 
   return {

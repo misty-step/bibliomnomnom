@@ -28,7 +28,21 @@ export function UploadDropzone({
 }: UploadDropzoneProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const dragDepth = useRef(0);
   const [error, setError] = useState<string | null>(null);
+
+  const acceptsExtension = useCallback(
+    (file: File) => {
+      if (!accept) return true;
+      const allowed = accept
+        .split(",")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+      const name = file.name.toLowerCase();
+      return allowed.some((pattern) => name.endsWith(pattern));
+    },
+    [accept]
+  );
 
   const handleFiles = useCallback(
     (files: FileList | null) => {
@@ -38,16 +52,21 @@ export function UploadDropzone({
         setError(`File too large (${formatBytes(file.size)}). Max ${formatBytes(maxBytes)}.`);
         return;
       }
+      if (!acceptsExtension(file)) {
+        setError(`Unsupported file type. Allowed: ${accept}`);
+        return;
+      }
       setError(null);
       onFileSelected(file);
     },
-    [maxBytes, onFileSelected]
+    [maxBytes, onFileSelected, acceptsExtension, accept]
   );
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     if (disabled) return;
     setDragActive(false);
+    dragDepth.current = 0;
     handleFiles(event.dataTransfer.files);
   };
 
@@ -57,13 +76,27 @@ export function UploadDropzone({
     setDragActive(true);
   };
 
-  const onDragLeave = () => setDragActive(false);
+  const onDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (disabled) return;
+    dragDepth.current += 1;
+    setDragActive(true);
+  };
+
+  const onDragLeave = () => {
+    if (disabled) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) {
+      setDragActive(false);
+    }
+  };
 
   return (
     <Surface
       role="button"
       tabIndex={0}
       aria-label="Upload reading list file"
+      aria-disabled={disabled}
       onClick={() => !disabled && inputRef.current?.click()}
       onKeyDown={(e) => {
         if ((e.key === "Enter" || e.key === " ") && !disabled) {
@@ -73,6 +106,7 @@ export function UploadDropzone({
       }}
       onDrop={onDrop}
       onDragOver={onDragOver}
+      onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       className={cn(
         "border-dashed border-2 border-line-ghost bg-canvas-boneMuted/60 transition-colors",

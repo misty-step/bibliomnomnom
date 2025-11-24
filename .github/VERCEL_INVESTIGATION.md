@@ -54,15 +54,15 @@ Two Vercel projects are integrated with this GitHub repository, causing duplicat
 
 Once single project identified, configure in Vercel Dashboard → Settings → Environment Variables:
 
-**Production Environment**:
+**Production Environment** (all values are placeholders; rotate real keys and keep out of git):
 ```bash
 # Clerk (from .env.production)
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_Y2xlcmsuYmlibGlvbW5vbW5vbS5jb20k
-CLERK_SECRET_KEY=sk_live_MfNtmcVeSs2UIgABme9BBNZ24ZmiHYp72PmVccJ3pL
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_REDACTED
+CLERK_SECRET_KEY=sk_live_REDACTED
 
 # Convex (from .env.production)
-NEXT_PUBLIC_CONVEX_URL=https://doting-spider-972.convex.cloud
-CONVEX_DEPLOY_KEY=prod:doting-spider-972|eyJ2MiI6ImVmZDE1ZmFkODg5NzRlMmNiZWE5YTZmNmQ3OTFhYTkxIn0=
+NEXT_PUBLIC_CONVEX_URL=https://your-prod.convex.cloud
+CONVEX_DEPLOY_KEY=prod:REDACTED
 
 # Vercel Blob (already configured via integration ✅)
 BLOB_READ_WRITE_TOKEN=(auto-configured)
@@ -78,7 +78,7 @@ NEXT_PUBLIC_IMPORT_ENABLED=true
 **Preview Environment**:
 ```bash
 # Convex Preview (from .env.production)
-CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|eyJ2MiI6IjVlNGRlYzY0ZjQ4ZTQ5MDM4MGZlMDFmNjUzOGM5ODAyIn0=
+CONVEX_DEPLOY_KEY=preview:REDACTED
 
 # Clerk (reuse production keys for previews)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=(same as production)
@@ -86,6 +86,8 @@ CLERK_SECRET_KEY=(same as production)
 
 # Other vars same as production
 ```
+
+> Keys rotated on 2025-11-24; update Vercel/Clerk/Convex dashboards with the new values and keep real secrets out of git history. If this repository is made public, run history scrub (e.g., git filter-repo) to remove prior leaked values.
 
 ### 5. Verify Fix
 

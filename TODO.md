@@ -888,3 +888,46 @@
 
   Estimate: 2.5h
   ```
+- [ ] PR review fixes: auth + client bootstrapping
+  - Files: convex/auth.ts, convex/schema.ts, convex/auth.config.ts, app/ConvexClientProvider.tsx, hooks/useImportJob.ts
+  - Actions:
+    - Add unique constraint for `clerkId` in `users` table and handle concurrent insert race by re-querying on unique violation.
+    - DRY lazy user creation into shared helper; clarify docs that creation only happens in mutation contexts; use distinctive email fallback or throw when missing.
+    - Require `CLERK_JWT_ISSUER_DOMAIN` (fail fast) instead of silent default.
+    - Hoist `ConvexReactClient` to module scope (or memo with convexUrl), switch to Convex-aware `useAuth` hook, and fix `IMPORT_PAGE_SIZE` typing (value import + typeof).
+  - Acceptance:
+    - No duplicate user rows possible for concurrent first login.
+    - Auth helpers have single creation path and accurate docs.
+    - Provider instantiates client once and uses Convex auth readiness; TypeScript passes without importing const as type.
+    - Missing issuer env crashes clearly (and checklist updated if needed).
+
+- [ ] PR review fixes: import mutations/metrics hardening
+  - Files: convex/imports.ts, lib/import/metrics.ts (usage)
+  - Actions:
+    - Move `logImportEvent` before the return in `preparePreviewHandler` so preview metrics emit.
+    - Guard `adminCleanupAllStuckImports` with auth/admin or dev-only environment check.
+  - Acceptance:
+    - Preview calls produce metrics and lint has no unreachable code.
+    - Admin cleanup rejects unauthorized callers (or production use) with clear error.
+
+- [ ] PR review fixes: secret hygiene
+  - Files: .github/VERCEL_INVESTIGATION.md
+  - Actions:
+    - Remove/replace live Clerk/Convex keys with obvious placeholders.
+    - Note key rotation completed (Clerk + Convex + Vercel); plan history scrub if repo ever public.
+  - Acceptance:
+    - No real secrets remain in working tree; doc uses dummy values and warns to set env separately.
+
+- [ ] PR review fixes: UI + docs polish
+  - Files: components/book/AddBookSheet.tsx, components/book/BookTile.tsx, components/import/PreviewTable.tsx, components/import/DedupControls.tsx, components/import/UploadDropzone.tsx, README.md, .github/DEPLOYMENT_FIX_SUMMARY.md, .github/DEPLOYMENT_ISSUE_SUMMARY.md, PRODUCTION_CHECKLIST.md, __tests__/fixtures/reading-sample.md, BACKLOG.md
+  - Actions:
+    - Fix stale closure in AddBookSheet handleClose (useCallback deps) and remove eslint-disable.
+    - Make BookTile overlay focus-visible and avoid empty metadata rows.
+    - PreviewTable: use inclusive ≥0.85 merge threshold (shared constant if available).
+    - DedupControls: distinguish loading vs missing existingBook; avoid per-row N+1 (batch or include match payload).
+    - UploadDropzone: enforce accepted file types, smooth dragLeave flicker, avoid double button semantics.
+    - README env section: clarify CONVEX_DEPLOY_KEY vs CONVEX_DEPLOYMENT; surface import env vars.
+    - Markdown lint fixes (bare URLs, headings, fenced languages) in deployment docs + fixture heading.
+    - BACKLOG: wrap bare Convex rate-limit URL.
+  - Acceptance:
+    - ESLint no-disable in AddBookSheet; keyboard users see overlay; merge threshold matches spec; lint passes markdown; doc/env clarity improved.

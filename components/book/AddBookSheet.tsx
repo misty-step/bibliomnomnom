@@ -59,13 +59,16 @@ export function AddBookSheet({
 
   // Use controlled state if provided, otherwise use internal state
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
-  const setIsOpen = (open: boolean) => {
-    if (controlledOnOpenChange) {
-      controlledOnOpenChange(open);
-    } else {
-      setInternalIsOpen(open);
-    }
-  };
+  const setIsOpen = useCallback(
+    (open: boolean) => {
+      if (controlledOnOpenChange) {
+        controlledOnOpenChange(open);
+      } else {
+        setInternalIsOpen(open);
+      }
+    },
+    [controlledOnOpenChange]
+  );
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [status, setStatus] = useState<BookStatus>("currently-reading");
@@ -99,8 +102,7 @@ export function AddBookSheet({
     setIsFavorite(false);
     setIsAudiobook(false);
     setDateFinished("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [setIsOpen]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {

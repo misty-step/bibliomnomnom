@@ -16,6 +16,8 @@ export function DedupControls({ tempId, decision, onChange, match, disabled }: D
     api.books.get,
     match?.existingBookId ? { id: match.existingBookId } : "skip"
   );
+  const isLoading = match?.existingBookId ? existingBook === undefined : false;
+  const isMissing = match?.existingBookId ? existingBook === null : false;
 
   return (
     <div className="space-y-2">
@@ -37,7 +39,11 @@ export function DedupControls({ tempId, decision, onChange, match, disabled }: D
           <summary className="cursor-pointer hover:text-text-ink select-none">
             ↔ Matches existing book (click for details)
           </summary>
-          {existingBook ? (
+          {isLoading ? (
+            <p className="mt-2 text-2xs text-text-inkMuted">Loading book details...</p>
+          ) : isMissing ? (
+            <p className="mt-2 text-2xs text-text-inkMuted">Book no longer exists or is inaccessible.</p>
+          ) : existingBook ? (
             <div className="mt-2 p-2 bg-canvas-boneMuted rounded-md space-y-1">
               <p className="font-medium text-text-ink">{existingBook.title}</p>
               <p className="text-text-ink">by {existingBook.author}</p>

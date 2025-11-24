@@ -51,7 +51,7 @@ export function BookTile({ book }: BookTileProps) {
         {coverSrc ? (
           <>
             {/* Cover image with hover fade */}
-            <div className="absolute inset-0 transition-opacity duration-300 ease-out group-hover:opacity-0">
+            <div className="absolute inset-0 transition-opacity duration-300 ease-out group-hover:opacity-0 group-focus:opacity-0">
               <Image
                 src={coverSrc}
                 alt={`${book.title} cover`}
@@ -62,24 +62,28 @@ export function BookTile({ book }: BookTileProps) {
             </div>
 
             {/* Index card on hover */}
-            <div className="absolute inset-0 m-1.5 flex flex-col justify-between rounded-sm bg-canvas-bone/90 p-5 opacity-0 shadow-sm ring-1 ring-inset ring-black/5 backdrop-blur-sm transition-opacity duration-300 ease-out group-hover:opacity-100">
+            <div className="absolute inset-0 m-1.5 flex flex-col justify-between rounded-sm bg-canvas-bone/90 p-5 opacity-0 shadow-sm ring-1 ring-inset ring-black/5 backdrop-blur-sm transition-opacity duration-300 ease-out group-hover:opacity-100 group-focus:opacity-100">
               <div className="flex w-full flex-col items-start space-y-3">
                 <h3 className="font-display text-lg font-medium leading-snug text-text-ink text-balance text-left line-clamp-5">
                   {book.title}
                 </h3>
-                <p className="font-mono text-xs uppercase tracking-wider text-text-inkMuted text-left line-clamp-2">
-                  {book.author}
-                </p>
+                {book.author ? (
+                  <p className="font-mono text-xs uppercase tracking-wider text-text-inkMuted text-left line-clamp-2">
+                    {book.author}
+                  </p>
+                ) : null}
               </div>
-              <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
-                <span className="font-mono text-xs text-text-inkSubtle">
-                  {book.publishedYear}
-                </span>
-                <div className="flex gap-2">
-                  {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
-                  {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+              {(book.publishedYear || book.isAudiobook || book.isFavorite) && (
+                <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
+                  <span className="font-mono text-xs text-text-inkSubtle">
+                    {book.publishedYear ?? ""}
+                  </span>
+                  <div className="flex gap-2">
+                    {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
+                    {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </>
         ) : (

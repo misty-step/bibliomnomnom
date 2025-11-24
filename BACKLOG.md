@@ -1879,6 +1879,26 @@ LLM_TOKEN_CAP=50000
 
 ---
 
+### [HEALTH] Deep dependency checks in health endpoint
+**Scope**: app/api/health/route.ts
+**Description**: Add “deep health” mode that performs lightweight reachability checks to Convex/Clerk/blob rather than only env presence; mirror no-store headers on error responses.
+**Effort**: 1-2 hours | **When**: After current release once monitoring needs clarity.
+
+### [SECURITY] Tighten CSP once safe
+**Scope**: next.config.ts
+**Description**: Remove `unsafe-inline`/`unsafe-eval` from script-src when tooling allows; track third-party domains as they’re added.
+**Effort**: 1 hour | **When**: After verifying production build compatibility.
+
+### [TESTING] Broaden import test coverage
+**Scope**: __tests__/import/*
+**Description**: Add cases for CSV size/10MB limit, malformed CSV, dedup fuzzy/confidence edges (≥/</0.85), commit skip/error/idempotency, LLM text path in useImportJob.
+**Effort**: 3-4 hours | **When**: Next test pass cycle.
+
+### [QUALITY] Raise docstring coverage toward 80%
+**Scope**: lib/import/*, convex/*
+**Description**: Address bot warning (28.57%); add concise docstrings for exported functions/types most used externally.
+**Effort**: 2 hours | **When**: After functional fixes land.
+
 ### [FEATURE] Batch Import API
 **Scope**: New endpoints, UI
 **Perspectives**: product-visionary

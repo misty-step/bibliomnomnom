@@ -65,13 +65,13 @@ export default {
 
 ## Successful Deployment
 
-**URL**: https://bibliomnomnom-jpjp1oxoy-misty-step.vercel.app
+**URL**: <https://bibliomnomnom-jpjp1oxoy-misty-step.vercel.app>
 **Status**: ● Ready
 **Duration**: 1 minute
-**Convex Backend**: https://festive-dinosaur-434.convex.cloud
+**Convex Backend**: <https://festive-dinosaur-434.convex.cloud>
 
 **Build Log Evidence**:
-```
+```plaintext
 ✔ Deployed Convex functions to https://festive-dinosaur-434.convex.cloud
 ✔ Added table indexes:
   [+] books.by_user
@@ -149,7 +149,7 @@ export default {
 
 ## Next Steps
 
-1. Monitor preview deployment at https://bibliomnomnom-jpjp1oxoy-misty-step.vercel.app
+1. Monitor preview deployment at <https://bibliomnomnom-jpjp1oxoy-misty-step.vercel.app>
 2. Test authentication flow end-to-end
 3. Verify database operations work correctly
 4. Consider if Clerk domain needs to be configurable in the future (currently same for all environments)
