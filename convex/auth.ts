@@ -24,8 +24,10 @@ async function getUserByClerkId(
  * **Required for all mutations** - Call at the start of every mutation handler
  * to ensure only authenticated users can modify data.
  *
+ * Uses lazy user creation: If authenticated user doesn't exist in database,
+ * automatically creates them. No webhook required.
+ *
  * @throws {Error} "Unauthenticated" if no Clerk session present
- * @throws {Error} "User not found" if Clerk user not synced to Convex (webhook issue)
  *
  * @example
  * ```typescript
@@ -45,9 +47,16 @@ export async function requireAuth(
     throw new Error("Unauthenticated: User must be signed in");
   }
 
-  const userId = await getUserByClerkId(ctx, identity.subject);
+  let userId = await getUserByClerkId(ctx, identity.subject);
+
+  // Lazy user creation: Auto-create user on first access
   if (!userId) {
-    throw new Error("User not found in database");
+    userId = await ctx.db.insert("users", {
+      clerkId: identity.subject,
+      email: identity.email ?? identity.emailVerified ?? "unknown@example.com",
+      name: identity.name,
+      imageUrl: identity.pictureUrl ?? identity.picture,
+    });
   }
 
   return userId;
@@ -58,6 +67,9 @@ export async function requireAuth(
  *
  * **Use for optional auth queries** - Returns null if no session instead of throwing.
  * Prefer requireAuth() for mutations (which should always require auth).
+ *
+ * Uses lazy user creation: If authenticated user doesn't exist in database,
+ * automatically creates them. No webhook required.
  *
  * @returns User ID if authenticated, null otherwise
  *
@@ -78,5 +90,17 @@ export async function getAuthOrNull(
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 
-  return getUserByClerkId(ctx, identity.subject);
+  let userId = await getUserByClerkId(ctx, identity.subject);
+
+  // Lazy user creation: Auto-create user on first access
+  if (!userId) {
+    userId = await ctx.db.insert("users", {
+      clerkId: identity.subject,
+      email: identity.email ?? identity.emailVerified ?? "unknown@example.com",
+      name: identity.name,
+      imageUrl: identity.pictureUrl ?? identity.picture,
+    });
+  }
+
+  return userId;
 }

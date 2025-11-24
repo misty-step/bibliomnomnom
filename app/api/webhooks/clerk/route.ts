@@ -1,3 +1,20 @@
+/**
+ * @deprecated This webhook endpoint is no longer used as of 2025-11-24.
+ *
+ * User synchronization now happens automatically via lazy creation in
+ * convex/auth.ts (requireAuth and getAuthOrNull functions). This eliminates
+ * the need for webhook infrastructure and simplifies the authentication flow.
+ *
+ * This endpoint is kept for backwards compatibility in case any external
+ * systems still reference it. It can be safely removed after 2025-12-31.
+ *
+ * Benefits of lazy creation over webhooks:
+ * - No webhook secrets to manage
+ * - No retry logic or error handling needed
+ * - Works automatically across all environments (dev, preview, prod)
+ * - Immediate user availability (no webhook delay)
+ * - One less external dependency
+ */
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import type { WebhookRequiredHeaders } from "svix";
