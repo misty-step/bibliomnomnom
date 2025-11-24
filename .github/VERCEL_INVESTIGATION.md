@@ -129,5 +129,36 @@ This requires:
 
 ---
 
+## Resolution (2025-11-23)
+
+**Root Cause Identified**: Missing `CONVEX_DEPLOY_KEY` environment variable in Preview environment, combined with decoupled build command that skips Convex deployment.
+
+**Solution Implemented**:
+1. ✅ Reverted `vercel.json` buildCommand to official recommended approach:
+   - Changed from: `"buildCommand": "pnpm build:local"`
+   - Changed to: `"buildCommand": "npx convex deploy --cmd 'next build'"`
+2. ⏳ **Manual action required**: Configure `CONVEX_DEPLOY_KEY` in Vercel Dashboard
+   - See: `.github/VERCEL_ENV_SETUP_GUIDE.md` for detailed instructions
+
+**Research conducted**:
+- Official Convex documentation analysis
+- Exa deep research (50+ production examples)
+- Gemini AI synthesis of best practices
+- Convex Discord community discussions (2025)
+
+**Key finding**: Coupled deployment (official approach) is superior to decoupled deployment for:
+- Automatic branch-based preview isolation
+- Zero manual Convex deployment steps
+- Type safety guarantees
+- Automatic cleanup (14-day TTL)
+
+**Next steps**:
+1. Configure environment variables in Vercel Dashboard (see guide)
+2. Push this commit to trigger new preview deployment
+3. Verify preview deployment works
+4. Clean up duplicate Vercel project
+
+---
+
 **Created**: 2025-11-22
-**Status**: Investigation Required
+**Status**: ✅ Resolved - Awaiting manual Vercel configuration
