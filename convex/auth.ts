@@ -52,11 +52,23 @@ export async function requireAuth(
   // Lazy user creation: Only possible in mutation contexts (queries are read-only)
   if (!userId && "insert" in ctx.db) {
     // Type-safe: We know this is a MutationCtx since insert exists
+    const email = typeof identity.email === "string"
+      ? identity.email
+      : typeof identity.emailVerified === "string"
+      ? identity.emailVerified
+      : "unknown@example.com";
+
+    const imageUrl = typeof identity.pictureUrl === "string"
+      ? identity.pictureUrl
+      : typeof identity.picture === "string"
+      ? identity.picture
+      : undefined;
+
     userId = await (ctx as MutationCtx).db.insert("users", {
       clerkId: identity.subject,
-      email: identity.email ?? identity.emailVerified ?? "unknown@example.com",
+      email,
       name: identity.name,
-      imageUrl: identity.pictureUrl ?? identity.picture,
+      imageUrl,
     });
   }
 
@@ -100,11 +112,23 @@ export async function getAuthOrNull(
   // Lazy user creation: Only possible in mutation contexts (queries are read-only)
   if (!userId && "insert" in ctx.db) {
     // Type-safe: We know this is a MutationCtx since insert exists
+    const email = typeof identity.email === "string"
+      ? identity.email
+      : typeof identity.emailVerified === "string"
+      ? identity.emailVerified
+      : "unknown@example.com";
+
+    const imageUrl = typeof identity.pictureUrl === "string"
+      ? identity.pictureUrl
+      : typeof identity.picture === "string"
+      ? identity.picture
+      : undefined;
+
     userId = await (ctx as MutationCtx).db.insert("users", {
       clerkId: identity.subject,
-      email: identity.email ?? identity.emailVerified ?? "unknown@example.com",
+      email,
       name: identity.name,
-      imageUrl: identity.pictureUrl ?? identity.picture,
+      imageUrl,
     });
   }
 
