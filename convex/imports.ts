@@ -208,15 +208,6 @@ export const preparePreviewHandler = async (
     errors,
     importRunId: args.importRunId,
   };
-
-  logImportEvent({
-    phase: "preview",
-    importRunId: args.importRunId,
-    sourceType: args.sourceType,
-    counts: { rows: books.length, errors: errors.length },
-    tokenUsage: 0, // llmExtract returns usage internally if needed later
-    page: args.page,
-  });
 };
 
 const upsertImportRun = async (
