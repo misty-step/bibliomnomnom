@@ -49,14 +49,19 @@ export async function requireAuth(
 
   let userId = await getUserByClerkId(ctx, identity.subject);
 
-  // Lazy user creation: Auto-create user on first access
-  if (!userId) {
-    userId = await ctx.db.insert("users", {
+  // Lazy user creation: Only possible in mutation contexts (queries are read-only)
+  if (!userId && "insert" in ctx.db) {
+    // Type-safe: We know this is a MutationCtx since insert exists
+    userId = await (ctx as MutationCtx).db.insert("users", {
       clerkId: identity.subject,
       email: identity.email ?? identity.emailVerified ?? "unknown@example.com",
       name: identity.name,
       imageUrl: identity.pictureUrl ?? identity.picture,
     });
+  }
+
+  if (!userId) {
+    throw new Error("User not found in database");
   }
 
   return userId;
@@ -92,9 +97,10 @@ export async function getAuthOrNull(
 
   let userId = await getUserByClerkId(ctx, identity.subject);
 
-  // Lazy user creation: Auto-create user on first access
-  if (!userId) {
-    userId = await ctx.db.insert("users", {
+  // Lazy user creation: Only possible in mutation contexts (queries are read-only)
+  if (!userId && "insert" in ctx.db) {
+    // Type-safe: We know this is a MutationCtx since insert exists
+    userId = await (ctx as MutationCtx).db.insert("users", {
       clerkId: identity.subject,
       email: identity.email ?? identity.emailVerified ?? "unknown@example.com",
       name: identity.name,
