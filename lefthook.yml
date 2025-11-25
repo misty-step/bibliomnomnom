@@ -30,7 +30,7 @@ pre-push:
       run: ./scripts/validate-env.sh
 
     test:
-      run: pnpm test --run
+      run: pnpm test
 
     build:
       run: pnpm build:local
