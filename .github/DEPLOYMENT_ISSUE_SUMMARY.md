@@ -25,6 +25,7 @@ Preview deployments show empty page after login. Investigation revealed the root
    - Development environment: 1 variable (CONVEX_DEPLOY_KEY)
 
 3. **Verified configuration**:
+
    ```bash
    vercel env ls
    # Shows 17 environment variables configured correctly
@@ -41,6 +42,7 @@ Preview deployments show empty page after login. Investigation revealed the root
 **Environment variables not being injected into build process.**
 
 **Evidence from build logs:**
+
 ```bash
 # Debug output from build (commit 7a4a2b1):
 CONVEX_DEPLOY_KEY is:
@@ -50,12 +52,14 @@ CONVEX_DEPLOYMENT=dev:groovy-roadrunner-224
 ```
 
 **Expected:**
+
 ```bash
 CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 # Should be present in build environment
 ```
 
 **Actual Result:**
+
 - `CONVEX_DEPLOY_KEY` not found in build environment
 - `npx convex deploy` tries to use dev deployment `groovy-roadrunner-224`
 - Gets 401 Unauthorized: MissingAccessToken error
@@ -68,6 +72,7 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 ### Verified in Vercel Dashboard
 
 **Preview Environment:**
+
 - ✅ `CONVEX_DEPLOY_KEY` = `preview:phaedrus:bibliomnomnom|eyJ2MiI6IjVlNGRlYzY0ZjQ4ZTQ5MDM4MGZlMDFmNjUzOGM5ODAyIn0=`
 - ✅ `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` = `pk_live_...`
 - ✅ `CLERK_SECRET_KEY` = `sk_live_...`
@@ -78,11 +83,13 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 - ✅ `OPENAI_API_KEY` = `sk-proj-...`
 
 **Production Environment:**
+
 - ✅ `CONVEX_DEPLOY_KEY` = `prod:doting-spider-972|eyJ2MiI6ImVmZDE1ZmFkODg5NzRlMmNiZWE5YTZmNmQ3OTFhYTkxIn0=`
 - ✅ `NEXT_PUBLIC_CONVEX_URL` = `https://doting-spider-972.convex.cloud`
 - ✅ All other vars same as Preview
 
 **Development Environment:**
+
 - ✅ `CONVEX_DEPLOY_KEY` = `preview:phaedrus:bibliomnomnom|...` (added as test)
 
 ---
@@ -90,6 +97,7 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 ## Attempted Solutions
 
 ### 1. Reconfigured Environment Variables (3 attempts)
+
 - First attempt: Configured on wrong project (`biblomnomnom` single 'n')
 - Second attempt: Realized only one project exists (`biblomnomnom` single 'n')
 - Third attempt: Removed and re-added to all environments
@@ -97,6 +105,7 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 **Result:** Variables show in `vercel env ls` but NOT in build environment
 
 ### 2. Added Debug Output to Build Command
+
 ```json
 "buildCommand": "echo 'CONVEX_DEPLOY_KEY is:' && env | grep CONVEX && npx convex deploy --cmd 'next build'"
 ```
@@ -104,6 +113,7 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 **Result:** Confirmed `CONVEX_DEPLOY_KEY` is missing from build environment
 
 ### 3. Checked for Conflicting Configuration
+
 - ✅ No `.env` files in git (only `.env.example` tracked)
 - ✅ No `convex.json` config file
 - ✅ No hardcoded deployment URLs in codebase
@@ -115,50 +125,62 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 ## Current Hypotheses
 
 ### Hypothesis 1: Vercel Bug or Cache Issue
+
 **Theory:** Vercel may be caching old environment configuration or have a bug preventing new env vars from being injected
 
 **Evidence:**
+
 - Build environment shows dev deployment vars (`CONVEX_DEPLOYMENT=dev:groovy-roadrunner-224`)
 - These vars are NOT configured in Vercel Dashboard
 - Must be coming from cache or previous configuration
 
 **Next Steps to Test:**
+
 - Clear Vercel build cache manually
 - Contact Vercel support
 - Try creating a fresh deployment from scratch
 
 ### Hypothesis 2: Convex Pro Plan Required
+
 **Theory:** Preview deployments may require Convex Pro plan (mentioned in documentation)
 
 **Evidence from research:**
+
 > "Convex preview deployments require a Convex Pro plan" - Official docs
 
 **Next Steps to Test:**
+
 - Check current Convex plan in dashboard
 - Upgrade to Pro if needed
 - Verify if that's blocking preview deploy key usage
 
 ### Hypothesis 3: Environment Variable Targeting Issue
+
 **Theory:** Vercel preview deployments may not be matching the "Preview" environment targeting
 
 **Evidence:**
+
 - Variables configured for "Preview" environment
 - But build might be using different environment name
 - `vercel env pull` only pulls "development" by default
 
 **Next Steps to Test:**
+
 - Try setting env vars for specific branch patterns
 - Check Vercel documentation for preview environment targeting
 - Try using `development` environment instead of `preview`
 
 ### Hypothesis 4: Missing Vercel Integration
+
 **Theory:** May need to install official Convex integration from Vercel marketplace
 
 **Evidence:**
+
 - Some research mentioned "Vercel's official Convex integration"
 - Might provide automatic env var management
 
 **Next Steps to Test:**
+
 - Check Vercel integrations marketplace
 - Install Convex integration if available
 - Reconfigure after integration installed
@@ -170,6 +192,7 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 ### Immediate Actions:
 
 1. **Clear Vercel Cache:**
+
    ```bash
    # Via Vercel dashboard or CLI
    vercel --force
@@ -191,16 +214,19 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 ### Alternative Approaches:
 
 ### Option A: Manual Preview Deployment
+
 - Create dedicated Convex preview deployment manually
 - Set `NEXT_PUBLIC_CONVEX_URL` explicitly for preview
 - Lose branch-based isolation but get working previews
 
 ### Option B: Development-Only Workflow
+
 - Skip Vercel preview deployments
 - Test locally before merging to main
 - Only deploy production on merge
 
 ### Option C: Different Hosting
+
 - Consider if Convex + Vercel integration issues persist
 - Research alternative hosting (Netlify, Railway, etc.)
 
@@ -209,12 +235,14 @@ CONVEX_DEPLOY_KEY=preview:phaedrus:bibliomnomnom|...
 ## Deployment Logs Reference
 
 **Latest Failed Deployment:**
+
 - URL: `https://bibliomnomnom-u4s3b021s-misty-step.vercel.app`
 - Time: 2025-11-24 13:56:42 UTC
 - Duration: 11 seconds
 - Error: `401 Unauthorized: MissingAccessToken`
 
 **Log Excerpt:**
+
 ```bash
 Running "npx convex deploy --cmd 'next build'"
 ✖ Error fetching GET https://api.convex.dev/api/deployment/groovy-roadrunner-224/team_and_project 401 Unauthorized: MissingAccessToken

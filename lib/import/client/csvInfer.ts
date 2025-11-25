@@ -20,13 +20,7 @@ type HeaderLookup = Record<string, number>;
 const TITLE_ALIASES = ["title", "book title", "book_title", "name"];
 const AUTHOR_ALIASES = ["author", "writer", "authors"];
 const ISBN_ALIASES = ["isbn", "isbn13", "isbn_13"];
-const PAGE_ALIASES = [
-  "pages",
-  "page count",
-  "number of pages",
-  "num pages",
-  "num of pages",
-];
+const PAGE_ALIASES = ["pages", "page count", "number of pages", "num pages", "num of pages"];
 const YEAR_ALIASES = [
   "year",
   "year published",
@@ -37,32 +31,10 @@ const YEAR_ALIASES = [
   "original publication year",
 ];
 const EDITION_ALIASES = ["edition", "edition info"];
-const STATUS_ALIASES = [
-  "status",
-  "shelf",
-  "bookshelf",
-  "bookshelves",
-  "exclusive shelf",
-];
-const AUDIOBOOK_ALIASES = [
-  "audiobook",
-  "is audiobook",
-  "is_audiobook",
-  "format",
-];
-const FAVORITE_ALIASES = [
-  "favorite",
-  "favourite",
-  "is favorite",
-  "is_favorite",
-];
-const COVER_ALIASES = [
-  "cover",
-  "cover url",
-  "cover image url",
-  "image",
-  "image url",
-];
+const STATUS_ALIASES = ["status", "shelf", "bookshelf", "bookshelves", "exclusive shelf"];
+const AUDIOBOOK_ALIASES = ["audiobook", "is audiobook", "is_audiobook", "format"];
+const FAVORITE_ALIASES = ["favorite", "favourite", "is favorite", "is_favorite"];
+const COVER_ALIASES = ["cover", "cover url", "cover image url", "image", "image url"];
 const PRIVACY_ALIASES = ["privacy", "visibility"];
 
 const stripBom = (text: string) => text.replace(/^\uFEFF/, "");
@@ -83,7 +55,7 @@ const findColumn = (lookup: HeaderLookup, aliases: string[]): number => {
 };
 
 const getValue = (row: string[], column: number): string | undefined =>
-  column >= 0 ? row[column] ?? undefined : undefined;
+  column >= 0 ? (row[column] ?? undefined) : undefined;
 
 const toNumber = (value?: string): number | undefined => {
   const cleaned = normalizeOptionalText(value);
@@ -110,13 +82,13 @@ const parseCsv = (text: string): string[][] => {
     const char = text[i];
     const next = text[i + 1];
 
-    if (char === "\"" && inQuote && next === "\"") {
-      current += "\"";
+    if (char === '"' && inQuote && next === '"') {
+      current += '"';
       i += 1;
       continue;
     }
 
-    if (char === "\"") {
+    if (char === '"') {
       inQuote = !inQuote;
       continue;
     }
@@ -199,12 +171,10 @@ export const inferGenericCsv = (fileText: string): InferCsvResult => {
       favoriteCol,
       coverCol,
       privacyCol,
-    ].filter((i) => i >= 0)
+    ].filter((i) => i >= 0),
   );
 
-  const unusedHeaders = headerRow.filter(
-    (_, index) => !usedColumns.has(index)
-  );
+  const unusedHeaders = headerRow.filter((_, index) => !usedColumns.has(index));
   if (unusedHeaders.length) {
     warnings.push(`Ignored columns: ${unusedHeaders.join(", ")}`);
   }
@@ -242,8 +212,9 @@ export const inferGenericCsv = (fileText: string): InferCsvResult => {
     const isAudiobook = toBoolean(getValue(row, audiobookCol));
     const isFavorite = toBoolean(getValue(row, favoriteCol));
 
-    const privacy = (normalizeOptionalText(getValue(row, privacyCol)) ??
-      "private") as "private" | "public";
+    const privacy = (normalizeOptionalText(getValue(row, privacyCol)) ?? "private") as
+      | "private"
+      | "public";
 
     books.push({
       tempId: makeTempId("csv"),

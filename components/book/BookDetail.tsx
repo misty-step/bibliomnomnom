@@ -223,16 +223,14 @@ export function BookDetail({ bookId }: BookDetailProps) {
     return new Date(timestamp).toLocaleDateString(undefined, { month: "long", year: "numeric" });
   };
 
-  const statusLabel = BOOK_STATUS_OPTIONS.find(
-    (option) => option.value === localStatus
-  )?.label;
+  const statusLabel = BOOK_STATUS_OPTIONS.find((option) => option.value === localStatus)?.label;
 
   const statusDate =
     localStatus === "read" && book.dateFinished
       ? `Finished ${formatDate(book.dateFinished)}`
       : localStatus === "currently-reading" && book.dateStarted
-      ? `Started ${formatDate(book.dateStarted)}`
-      : null;
+        ? `Started ${formatDate(book.dateStarted)}`
+        : null;
 
   const noteCount = notes?.length ?? 0;
   const noteCountLabel =
@@ -296,7 +294,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 <label
                   className={cn(
                     "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
-                    isUploadingCover && "pointer-events-none opacity-50"
+                    isUploadingCover && "pointer-events-none opacity-50",
                   )}
                 >
                   <input
@@ -330,9 +328,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
           <h1 className="font-display text-3xl leading-tight text-text-ink md:text-4xl">
             {book.title}
           </h1>
-          <p className="mt-2 text-lg text-text-inkMuted">
-            {book.author}
-          </p>
+          <p className="mt-2 text-lg text-text-inkMuted">{book.author}</p>
         </div>
 
         {/* Status & Actions */}
@@ -352,7 +348,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                     onClick={() => handleStatusChange(option.value)}
                     className={cn(
                       "px-4 py-2 text-left text-sm text-text-ink hover:bg-canvas-boneMuted",
-                      localStatus === option.value && "bg-canvas-boneMuted"
+                      localStatus === option.value && "bg-canvas-boneMuted",
                     )}
                   >
                     {option.label}
@@ -372,7 +368,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 "flex h-8 w-8 items-center justify-center rounded-full transition",
                 book.isFavorite
                   ? "bg-amber-100 text-amber-600"
-                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink",
               )}
               title={book.isFavorite ? "Remove from favorites" : "Add to favorites"}
             >
@@ -387,7 +383,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 "flex h-8 w-8 items-center justify-center rounded-full transition",
                 book.isAudiobook
                   ? "bg-purple-100 text-purple-600"
-                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink",
               )}
               title={book.isAudiobook ? "Mark as physical book" : "Mark as audiobook"}
             >
@@ -405,7 +401,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 "flex h-8 w-8 items-center justify-center rounded-full transition",
                 localPrivacy === "public"
                   ? "bg-blue-100 text-blue-600"
-                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+                  : "text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink",
               )}
               title={localPrivacy === "private" ? "Make public" : "Make private"}
             >
@@ -422,7 +418,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 <button
                   className={cn(
                     "flex h-8 w-8 items-center justify-center rounded-full text-accent-ember transition hover:bg-accent-ember/10 hover:text-accent-ember",
-                    isDeleting && "pointer-events-none opacity-60"
+                    isDeleting && "pointer-events-none opacity-60",
                   )}
                   title="Delete book"
                 >
@@ -431,17 +427,13 @@ export function BookDetail({ bookId }: BookDetailProps) {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    Delete {book.title}?
-                  </AlertDialogTitle>
+                  <AlertDialogTitle>Delete {book.title}?</AlertDialogTitle>
                   <AlertDialogDescription>
                     {`This will delete this book and its ${noteCountLabel}.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel disabled={isDeleting}>
-                    Cancel
-                  </AlertDialogCancel>
+                  <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
                     {isDeleting ? "Deleting…" : "Delete Forever"}
                   </AlertDialogAction>
@@ -452,15 +444,11 @@ export function BookDetail({ bookId }: BookDetailProps) {
         </div>
 
         {/* Status Date */}
-        {statusDate && (
-          <p className="text-sm text-text-inkSubtle">{statusDate}</p>
-        )}
+        {statusDate && <p className="text-sm text-text-inkSubtle">{statusDate}</p>}
 
         {/* Description */}
         {book.description && (
-          <p className="text-sm leading-relaxed text-text-inkMuted">
-            {book.description}
-          </p>
+          <p className="text-sm leading-relaxed text-text-inkMuted">{book.description}</p>
         )}
 
         {/* Metadata Details */}

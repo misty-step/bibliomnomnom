@@ -67,7 +67,7 @@ describe("BookForm component", () => {
         showFavoriteToggle
         submitLabel="Save Book"
         onSubmit={onSubmit}
-      />
+      />,
     );
 
     await user.type(screen.getByLabelText(/Title/i), "  Dune ");
@@ -132,7 +132,7 @@ describe("BookForm component", () => {
           dateStarted: "",
           dateFinished: "",
         }}
-      />
+      />,
     );
 
     expect(screen.getByRole("button", { name: "Save Changes" })).toBeDisabled();

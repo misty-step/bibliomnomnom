@@ -12,8 +12,8 @@ export function Masthead() {
       </div>
 
       {/* Center: Brand */}
-      <Link 
-        href="/library" 
+      <Link
+        href="/library"
         className="font-display text-3xl font-medium tracking-tight text-text-ink hover:opacity-80 transition-opacity"
       >
         bibliomnomnom
@@ -21,12 +21,12 @@ export function Masthead() {
 
       {/* Right: User Actions */}
       <div className="flex w-12 justify-end">
-        <UserButton 
-          afterSignOutUrl="/" 
+        <UserButton
+          afterSignOutUrl="/"
           appearance={{
             elements: {
-              avatarBox: "h-8 w-8 ring-2 ring-canvas-bone hover:ring-text-ink/10 transition-all"
-            }
+              avatarBox: "h-8 w-8 ring-2 ring-canvas-bone hover:ring-text-ink/10 transition-all",
+            },
           }}
         />
       </div>

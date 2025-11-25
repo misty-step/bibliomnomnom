@@ -17,11 +17,7 @@ export default defineSchema({
     edition: v.optional(v.string()),
     publishedYear: v.optional(v.number()),
     pageCount: v.optional(v.number()),
-    status: v.union(
-      v.literal("want-to-read"),
-      v.literal("currently-reading"),
-      v.literal("read")
-    ),
+    status: v.union(v.literal("want-to-read"), v.literal("currently-reading"), v.literal("read")),
     isFavorite: v.boolean(),
     isAudiobook: v.boolean(),
     privacy: v.union(v.literal("private"), v.literal("public")),
@@ -32,11 +28,7 @@ export default defineSchema({
     apiCoverUrl: v.optional(v.string()),
     apiId: v.optional(v.string()),
     apiSource: v.optional(
-      v.union(
-        v.literal("google-books"),
-        v.literal("open-library"),
-        v.literal("manual")
-      )
+      v.union(v.literal("google-books"), v.literal("open-library"), v.literal("manual")),
     ),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -47,11 +39,7 @@ export default defineSchema({
   notes: defineTable({
     bookId: v.id("books"),
     userId: v.id("users"),
-    type: v.union(
-      v.literal("note"),
-      v.literal("quote"),
-      v.literal("reflection")
-    ),
+    type: v.union(v.literal("note"), v.literal("quote"), v.literal("reflection")),
     content: v.string(),
     page: v.optional(v.string()),
     createdAt: v.number(),
@@ -62,11 +50,7 @@ export default defineSchema({
   importRuns: defineTable({
     userId: v.id("users"),
     importRunId: v.string(),
-    status: v.union(
-      v.literal("previewed"),
-      v.literal("committed"),
-      v.literal("failed")
-    ),
+    status: v.union(v.literal("previewed"), v.literal("committed"), v.literal("failed")),
     sourceType: v.string(),
     page: v.number(),
     totalPages: v.number(),
@@ -91,11 +75,7 @@ export default defineSchema({
         title: v.string(),
         author: v.string(),
         status: v.optional(
-          v.union(
-            v.literal("want-to-read"),
-            v.literal("currently-reading"),
-            v.literal("read")
-          )
+          v.union(v.literal("want-to-read"), v.literal("currently-reading"), v.literal("read")),
         ),
         isbn: v.optional(v.string()),
         edition: v.optional(v.string()),
@@ -107,15 +87,11 @@ export default defineSchema({
         dateFinished: v.optional(v.number()),
         coverUrl: v.optional(v.string()),
         apiSource: v.optional(
-          v.union(
-            v.literal("google-books"),
-            v.literal("open-library"),
-            v.literal("manual")
-          )
+          v.union(v.literal("google-books"), v.literal("open-library"), v.literal("manual")),
         ),
         apiId: v.optional(v.string()),
         privacy: v.optional(v.union(v.literal("private"), v.literal("public"))),
-      })
+      }),
     ),
     createdAt: v.number(),
   })

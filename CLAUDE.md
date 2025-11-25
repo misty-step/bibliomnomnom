@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Essential Commands
 
 ### Development
+
 ```bash
 # Start Next.js dev server (with Turbopack)
 pnpm dev
@@ -30,6 +31,7 @@ pnpm lint
 ```
 
 ### Package Manager Enforcement
+
 - **MUST use pnpm** - enforced via preinstall hook and .npmrc
 - npm/yarn/bun are blocked
 - pnpm >=9.0.0 required
@@ -37,6 +39,7 @@ pnpm lint
 ## Architecture Overview
 
 ### Core Principles (from DESIGN.md)
+
 1. **Convex as Single Source of Truth** - All data operations flow through Convex for consistency and real-time updates
 2. **Queries for Reads, Mutations for Writes, Actions for External** - Clear separation based on operation type
 3. **Row-Level Security in Queries** - Privacy enforced at query level via ownership checks
@@ -46,27 +49,32 @@ pnpm lint
 ### 5 Core Modules
 
 **Module 1: Authentication & User Management** (`convex/auth.ts`, `convex/users.ts`)
+
 - Hides Clerk JWT validation complexity behind `requireAuth()` and `getAuthOrNull()`
 - Webhook handler syncs Clerk users to Convex database
 - Public interface: Simple auth helpers that return user ID or null
 
 **Module 2: Books Data Layer** (`convex/books.ts`)
+
 - Hides database queries, privacy filtering, ownership validation
 - Public interface: `list`, `get`, `getPublic`, `create`, `update`, `remove`, `updateStatus`, `toggleFavorite`, `updatePrivacy`
 - Automatic date tracking: `dateStarted` set on "currently-reading", `dateFinished` and `timesRead` increment on "read"
 - Privacy model: Books can be `private` (owner only) or `public` (sanitized fields for all)
 
 **Module 3: External Book Search** (Deferred for MVP)
+
 - Originally designed for Google Books API integration
 - MVP ships with manual entry only
 - Architecture preserved in DESIGN.md for future implementation
 
 **Module 4: Notes & Content** (`convex/notes.ts`)
+
 - Hides note CRUD complexity and ownership validation via book relationship
 - Supports three types: note, quote, reflection
 - Markdown content storage with rich text editor (Tiptap) on frontend
 
 **Module 5: File Upload** (`app/api/blob/upload/route.ts`)
+
 - Hides Vercel Blob complexity behind presigned URL pattern
 - Client uploads directly to blob storage (not through Next.js server)
 - API route only validates auth and generates upload token
@@ -75,6 +83,7 @@ pnpm lint
 ## Tech Stack
 
 ### Frontend
+
 - **Framework**: Next.js 15.1.0 with App Router and Turbopack
 - **React**: 19.0.0
 - **Language**: TypeScript 5 (strict mode)
@@ -85,12 +94,14 @@ pnpm lint
 - **Icons**: Lucide React
 
 ### Backend
+
 - **Database/API**: Convex 1.28.2
 - **Authentication**: Clerk 6.34.5
 - **File Storage**: Vercel Blob
 - **Deployment**: Vercel
 
 ### Design System
+
 - **Colors**: Paper (cream #FDFBF7), Ink (dark #1A1A1A), Leather (brown #8B4513), Border
 - **Fonts**: Crimson Text (serif for headers), Inter (sans for body), JetBrains Mono (code)
 - **Philosophy**: Warm, sepia aesthetic inspired by physical books and reading rooms
@@ -166,6 +177,7 @@ bibliomnomnom/
 ## Key Patterns & Conventions
 
 ### Authentication Flow
+
 1. User visits protected route (e.g., `/library`)
 2. Next.js middleware checks Clerk session → redirects to `/sign-in` if absent
 3. Clerk provides JWT in cookie/header
@@ -174,6 +186,7 @@ bibliomnomnom/
 6. All queries filter by `userId`, all mutations validate ownership
 
 ### Privacy Model
+
 - Books have `privacy` field: `"private"` or `"public"`
 - **Private books**: Only owner can access via `books.get` query
 - **Public books**: Anyone can access via `books.getPublic` query (sanitized fields only)
@@ -181,13 +194,17 @@ bibliomnomnom/
 - Private route `/library/books/[id]` uses `get` query (requires ownership)
 
 ### Status Tracking with Auto-Dating
+
 When book status changes via `updateStatus` mutation:
+
 - **"currently-reading"**: Sets `dateStarted` if not already set
 - **"read"**: Sets `dateFinished`, increments `timesRead`
 - **"want-to-read"**: No date changes
 
 ### Ownership Validation Pattern
+
 All mutations follow this pattern:
+
 ```typescript
 const userId = await requireAuth(ctx);
 const book = await ctx.db.get(args.id);
@@ -198,12 +215,15 @@ if (!book || book.userId !== userId) {
 ```
 
 ### Optimistic Updates
+
 UI updates instantly before server confirmation:
+
 - Toggle favorite → UI updates immediately, mutation runs in background
 - Change status → Badge updates instantly, auto-dating happens server-side
 - If mutation fails, Convex automatically rolls back optimistic update
 
 ### Error Handling
+
 - **Authentication errors**: Redirect to `/sign-in`
 - **Authorization errors**: Show toast with "Access denied"
 - **Not found**: Return `null` in queries, show `EmptyState` component
@@ -213,6 +233,7 @@ UI updates instantly before server confirmation:
 ## Development Workflow
 
 ### Adding a New Feature
+
 1. **Define schema** in `convex/schema.ts` with indexes
 2. **Create queries/mutations** in `convex/*.ts` with ownership validation
 3. **Build UI components** in `components/` directory
@@ -220,24 +241,29 @@ UI updates instantly before server confirmation:
 5. **Test manually** in dev mode (no automated tests yet)
 
 ### Modifying Convex Schema
+
 1. Edit `convex/schema.ts`
 2. Run `pnpm convex:push` to sync to dev deployment
 3. Verify in Convex dashboard that schema updated
 4. Restart `pnpm dev` if needed for type updates
 
 ### Adding Shadcn/UI Components
+
 ```bash
 npx shadcn@latest add [component-name]
 ```
+
 Components added to `components/ui/` and auto-configured for bibliophile theme.
 
 ### Working with Environment Variables
+
 1. Copy `.env.example` to `.env.local`
 2. Fill in secrets (Clerk, Convex, Vercel Blob)
 3. Restart dev server to pick up changes
 4. Never commit `.env.local`
 
 **Required variables:**
+
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - `CLERK_SECRET_KEY`
 - `CLERK_WEBHOOK_SECRET`
@@ -248,29 +274,35 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 ## Common Issues & Solutions
 
 ### "Could not find public function" error
+
 **Cause**: Convex schema not synced to deployment
 **Fix**: Run `pnpm convex:push` to sync schema
 
 ### Clerk returns 404 for `/tokens/convex`
+
 **Cause**: Missing JWT template in Clerk dashboard
 **Fix**: Create JWT template named `convex` with `convex` in metadata
 
 ### Cover upload fails
+
 **Cause**: Missing `BLOB_READ_WRITE_TOKEN` env var
 **Fix**: Add token from Vercel dashboard to `.env.local`
 
 ### Build fails with type errors
+
 **Cause**: Convex types out of sync
 **Fix**: Run `pnpm convex:push` to regenerate types
 
 ## Testing Strategy
 
 ### Current State (MVP)
+
 - **Manual testing** of critical paths during development
 - **No automated tests** yet (planned for post-MVP)
 - **Visual QA** for UI components and responsive design
 
 ### Future Testing (Post-MVP)
+
 - **Unit tests**: Convex functions with `convex-test` library
 - **E2E tests**: Playwright for critical user flows
 - **Visual regression**: Chromatic for component library

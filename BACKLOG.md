@@ -1,29 +1,72 @@
 # BACKLOG.md
 
-Last groomed: 2025-11-20 (quality infrastructure audit)
+Last groomed: 2025-11-24 (quality infrastructure implementation)
 Analyzed by: 8 specialized perspectives (complexity, architecture, security, performance, maintainability, UX, product, design)
+
+---
+
+## 🚧 In Progress (Active Development)
+
+### [CRITICAL INFRASTRUCTURE] Complete Quality Infrastructure Stack
+
+**Status**: Specification complete, ready for implementation (see TASK.md)
+**Estimated**: 6-8 hours initial setup + 2-4 weeks incremental coverage improvements
+**Priority**: BLOCKING - Enables "supremely confident pipeline" for production deployments
+
+**What's Being Implemented NOW:**
+
+- ✅ GitHub Actions CI/CD (lint, typecheck, test, gitleaks, build in parallel)
+- ✅ Lefthook git hooks (pre-commit: gitleaks, lint, format, typecheck; pre-push: test, build)
+- ✅ Prettier auto-formatting (consistent style across AI agents)
+- ✅ Commitlint (conventional commits for changelog automation)
+- ✅ Vitest coverage tracking (50% → 75% over 4 weeks)
+- ✅ Gitleaks secret detection (pre-commit + CI)
+- ✅ Environment validation script
+
+**Success Criteria**: "Friday afternoon deploy confidence" - all checks green = production ready, zero manual verification
+
+**Deferred to Post-MVP** (tracked below in "Post-MVP Quality Enhancements"):
+
+- Codecov PR comments with coverage diff
+- Branch protection rules enforcement
+- Storybook CI builds
+- E2E testing with Playwright
+- Release automation (release-please)
+- Performance budgets (Lighthouse CI)
+- Dependency updates (Dependabot)
+
+See full PRD in TASK.md. Run `/architect` when ready to break down into implementation tasks.
 
 ---
 
 ## Now (Sprint-Ready, <2 weeks)
 
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
+
 **File**: New feature - export module
 **Perspectives**: product-visionary, security-sentinel (data portability)
 **Business Case**:
+
 - **Trust signal**: "Your data, your control" → removes "what if it shuts down" objection
 - **Try-before-commit**: "I can always leave" paradoxically increases retention
 - **Data portability**: GDPR/CCPA compliance, ethical table stakes
 - **Integration ecosystem**: Export JSON → Notion/Obsidian/Roam workflows
 
 **Implementation**:
+
 ```typescript
 // convex/books.ts - New query
 export const exportAllData = query({
   handler: async (ctx) => {
     const userId = await requireAuth(ctx);
-    const books = await ctx.db.query("books").withIndex("by_user", q => q.eq("userId", userId)).collect();
-    const notes = await ctx.db.query("notes").withIndex("by_user", q => q.eq("userId", userId)).collect();
+    const books = await ctx.db
+      .query("books")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
 
     return {
       version: "1.0",
@@ -38,6 +81,7 @@ export const exportAllData = query({
 ```
 
 **Acceptance Criteria**:
+
 - "Export Library" button in settings
 - Choose format: JSON (complete), CSV (Goodreads-compatible), Markdown (human-readable)
 - Downloads file immediately
@@ -50,25 +94,30 @@ export const exportAllData = query({
 ---
 
 ### [ADOPTION BLOCKER] External Book Search (Google Books API)
+
 **File**: New feature - search modal (deferred from MVP)
 **Perspectives**: product-visionary, user-experience-advocate
 **Architecture**: Already designed in DESIGN.md Module 3
 **Business Case**:
+
 - **Universal expectation**: Every book app has search (Goodreads, StoryGraph, Literal, Oku)
 - **3-second add vs. 2-minute add**: Search title → select → done (vs. type 10 fields manually)
 - **Data quality**: Auto-filled covers, ISBNs, descriptions, page counts
 - **Velocity multiplier**: Users add 5-10x more books when it's easy
 
 **Implementation**:
+
 ```typescript
 // convex/actions/googleBooks.ts
 export const searchBooks = action({
   args: { query: v.string() },
   handler: async (ctx, { query }) => {
-    const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`);
+    const response = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=10`,
+    );
     const data = await response.json();
 
-    return data.items.map(item => ({
+    return data.items.map((item) => ({
       title: item.volumeInfo.title,
       author: item.volumeInfo.authors?.join(", "),
       coverUrl: item.volumeInfo.imageLinks?.thumbnail,
@@ -86,6 +135,7 @@ export const searchBooks = action({
 ```
 
 **Acceptance Criteria**:
+
 - "Search for book" button in add book flow
 - Type "Dune" → see 10 results with covers
 - Click result → form auto-filled (title, author, ISBN, cover, page count, year)
@@ -99,9 +149,11 @@ export const searchBooks = action({
 ---
 
 ### [CRITICAL UX] Toast Notifications for Silent Failures
+
 **Files**: CreateNote.tsx:59, NoteCard.tsx:60,72, BookDetail.tsx:78,88,99,113
 **Perspectives**: user-experience-advocate, maintainability-maven
 **Problem**:
+
 - Note creation fails → user sees nothing, content lost
 - Book toggle fails → optimistic update reverts silently, user confused
 - Update/delete fails → no feedback, user assumes success
@@ -109,6 +161,7 @@ export const searchBooks = action({
 **Impact**: Users lose work, lose trust, abandon app
 
 **Fix**:
+
 ```typescript
 // components/notes/CreateNote.tsx:59
 } catch (err) {
@@ -125,6 +178,7 @@ export const searchBooks = action({
 ```
 
 **Acceptance Criteria**:
+
 - Any mutation failure shows toast with clear message
 - Toast explains what went wrong (connection, server error, etc.)
 - User can retry action (content preserved in forms)
@@ -136,11 +190,13 @@ export const searchBooks = action({
 ---
 
 ### [CRITICAL REFACTOR] Extract Ownership Validation Helpers
+
 **Files**: convex/books.ts (6 occurrences), convex/notes.ts (4 occurrences)
 **Perspectives**: complexity-archaeologist, architecture-guardian, maintainability-maven
 **Violation**: Change amplification - ownership validation duplicated 10 times across 2 modules
 
 **Problem**:
+
 ```typescript
 // Repeated 10 times:
 const book = await ctx.db.get(args.id);
@@ -152,11 +208,12 @@ if (!book || book.userId !== userId) {
 **Change amplification**: Adding team access, shared libraries, or admin override requires editing 10 locations
 
 **Fix**:
+
 ```typescript
 // convex/auth.ts - Centralize ownership validation
 export async function requireBookOwnership(
   ctx: QueryCtx | MutationCtx,
-  bookId: Id<"books">
+  bookId: Id<"books">,
 ): Promise<Doc<"books">> {
   const userId = await requireAuth(ctx);
   const book = await ctx.db.get(bookId);
@@ -170,7 +227,7 @@ export async function requireBookOwnership(
 
 export async function requireNoteOwnership(
   ctx: QueryCtx | MutationCtx,
-  noteId: Id<"notes">
+  noteId: Id<"notes">,
 ): Promise<Doc<"notes">> {
   const userId = await requireAuth(ctx);
   const note = await ctx.db.get(noteId);
@@ -193,6 +250,7 @@ export const remove = mutation({
 ```
 
 **Acceptance Criteria**:
+
 - All 10 ownership checks use new helpers
 - Tests verify helpers work (ownership validation, error messages)
 - Future ownership changes require single edit
@@ -202,112 +260,16 @@ export const remove = mutation({
 
 ---
 
-### [CRITICAL INFRASTRUCTURE] GitHub Actions CI/CD Pipeline
-**File**: .github/workflows/ci.yml, .github/workflows/deploy.yml (NEW FILES)
-**Perspectives**: architecture-guardian, security-sentinel, maintainability-maven
-**Gap**: No CI/CD → type errors, build failures, lint violations discovered only locally (if at all)
-
-**Business Case**:
-- **Quality gate before merge**: Catch issues in PR review, not production
-- **Team confidence**: Every push verified by automated checks
-- **Deployment safety**: Build succeeds before reaching Vercel
-- **Stack-specific critical**: Convex deploy MUST happen before Next.js build
-
-**Implementation**:
-```yaml
-# .github/workflows/ci.yml
-name: CI
-on: [pull_request, push]
-jobs:
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-      - name: Install
-        run: pnpm install
-      - name: Lint
-        run: pnpm lint
-      - name: Type check
-        run: pnpm tsc --noEmit
-      - name: Test
-        run: pnpm test
-      - name: Build validation
-        run: npx convex deploy && pnpm build  # CRITICAL ORDER
-```
-
-**Acceptance Criteria**:
-- ✅ PR checks run on every pull request
-- ✅ All 4 checks (lint, type, test, build) run in parallel
-- ✅ Build command includes `npx convex deploy && pnpm build`
-- ✅ Failed checks block merge
-- ✅ Checks complete in <5 minutes
-
-**Effort**: 2h (create workflows + test + configure branch protection) | **Impact**: Prevents broken code merging
-**ROI**: First prevented production bug saves 2+ hours debugging. Critical foundation for team scaling.
-
----
-
-### [CRITICAL INFRASTRUCTURE] Enhanced Lefthook with Gitleaks
-**File**: .lefthook.yml, .gitleaks.toml (NEW FILES)
-**Perspectives**: architecture-guardian, security-sentinel, maintainability-maven
-**Gap**: No local quality gates → type errors committed, no secrets protection
-
-**Current State**: Basic Lefthook exists but incomplete (only lint/type-check/test)
-
-**Enhancement**:
-```yaml
-# .lefthook.yml (enhance existing)
-pre-commit:
-  parallel: true
-  commands:
-    format:
-      glob: "*.{ts,tsx,js,jsx,json,md}"
-      run: pnpm prettier --write {staged_files}
-    lint:
-      glob: "*.{ts,tsx}"
-      run: pnpm eslint --fix --cache {staged_files}
-    secrets:
-      run: gitleaks protect --staged --no-banner
-
-pre-push:
-  commands:
-    type-check:
-      run: pnpm tsc --noEmit --incremental
-    test:
-      run: pnpm test --run
-    env-check:
-      run: ./scripts/validate-env.sh
-    build:
-      run: pnpm build
-```
-
-**Setup**:
-```bash
-pnpm add -D lefthook lint-staged gitleaks
-pnpm lefthook install
-```
-
-**Acceptance Criteria**:
-- ✅ Pre-commit blocks commits with secrets (.env values, API keys)
-- ✅ Pre-commit auto-fixes lint/format issues
-- ✅ Pre-push blocks broken TypeScript/tests/builds
-- ✅ Hooks run <5s (pre-commit), <15s (pre-push)
-- ✅ Documented escape hatch (`--no-verify` for emergencies)
-
-**Effort**: 3h (install gitleaks + enhance config + test all hooks) | **Impact**: Prevents broken commits, secrets leaks
-**ROI**: First prevented secret commit = avoided security incident. Saves team hours catching issues locally vs. CI.
-
----
-
 ### [CRITICAL INFRASTRUCTURE] Fix Build Command for Convex Deployment
-**File**: package.json:16, vercel.json (NEW), .github/workflows/*.yml
+
+**File**: package.json:16, vercel.json (NEW), .github/workflows/\*.yml
 **Perspectives**: architecture-guardian, security-sentinel
 **Gap**: Build command is `next build` (missing Convex deploy) → production failures inevitable
 
 **Critical Issue**: Convex schema/functions MUST deploy before Next.js build (types depend on Convex)
 
 **Fix**:
+
 ```json
 // package.json
 {
@@ -325,6 +287,7 @@ pnpm lefthook install
 ```
 
 **Acceptance Criteria**:
+
 - ✅ `pnpm build` runs Convex deploy first
 - ✅ Vercel deployments use correct build command
 - ✅ Preview deploys work (Convex preview env configured)
@@ -336,13 +299,15 @@ pnpm lefthook install
 ---
 
 ### [CRITICAL INFRASTRUCTURE] Backend Test Coverage (Convex Functions)
-**Files**: convex/__tests__/books.test.ts, convex/__tests__/auth.test.ts, convex/__tests__/notes.test.ts (NEW)
+
+**Files**: convex/**tests**/books.test.ts, convex/**tests**/auth.test.ts, convex/**tests**/notes.test.ts (NEW)
 **Perspectives**: maintainability-maven, security-sentinel, architecture-guardian
 **Gap**: 0% coverage on backend → privacy bugs, data corruption, auth bypasses possible
 
 **Current State**: 10 tests total, all UI components. Zero backend tests.
 
 **Critical Paths Untested**:
+
 - Book privacy enforcement (private vs. public access)
 - Ownership validation (can user A edit user B's book?)
 - Status auto-dating (dateStarted, dateFinished, timesRead increment)
@@ -350,6 +315,7 @@ pnpm lefthook install
 - File upload presigned URL security
 
 **Implementation**:
+
 ```typescript
 // convex/__tests__/books.test.ts
 import { convexTest } from "convex-test";
@@ -377,6 +343,7 @@ describe("books privacy", () => {
 ```
 
 **Acceptance Criteria**:
+
 - ✅ Tests for all privacy enforcement logic (books.get, books.update, books.remove)
 - ✅ Tests for ownership validation (all mutations)
 - ✅ Tests for status auto-dating (updateStatus sets dateStarted, dateFinished, increments timesRead)
@@ -389,6 +356,7 @@ describe("books privacy", () => {
 ---
 
 ### [CRITICAL INFRASTRUCTURE] Vitest Coverage for Critical Paths Only
+
 **File**: vitest.config.ts:12-17
 **Perspectives**: maintainability-maven, architecture-guardian
 **Gap**: No coverage tracking → can't measure test quality, regressions invisible
@@ -396,6 +364,7 @@ describe("books privacy", () => {
 **Philosophy**: Coverage for **confidence**, not **vanity metrics**. Only track critical modules.
 
 **Implementation**:
+
 ```typescript
 // vitest.config.ts (enhance existing)
 export default defineConfig({
@@ -408,18 +377,13 @@ export default defineConfig({
 
     // Add coverage config (CRITICAL PATHS ONLY)
     coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      include: [
-        'convex/books.ts',
-        'convex/auth.ts',
-        'convex/notes.ts',
-        'app/api/blob/upload/**',
-      ],
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      include: ["convex/books.ts", "convex/auth.ts", "convex/notes.ts", "app/api/blob/upload/**"],
       exclude: [
-        'convex/_generated/**',
-        '**/*.test.{ts,tsx}',
-        'components/ui/**', // shadcn components (tested by shadcn team)
+        "convex/_generated/**",
+        "**/*.test.{ts,tsx}",
+        "components/ui/**", // shadcn components (tested by shadcn team)
       ],
       thresholds: {
         lines: 75,
@@ -433,6 +397,7 @@ export default defineConfig({
 ```
 
 **Acceptance Criteria**:
+
 - ✅ Coverage tracked only for critical modules (not arbitrary 100% everywhere)
 - ✅ CI fails if critical path coverage drops below 75%
 - ✅ Coverage report generated on every PR (visible in CI logs)
@@ -444,21 +409,26 @@ export default defineConfig({
 ---
 
 ### [CRITICAL INFRASTRUCTURE] Structured Logging with Pino
+
 **Files**: 16 console.log/error calls across components + API routes
 **Perspectives**: architecture-guardian, security-sentinel
 **Gap**: No log levels, no structured JSON, no correlation IDs → production debugging impossible
 
 **Implementation**:
+
 ```typescript
 // lib/logger.ts
-import pino from 'pino';
+import pino from "pino";
 
 export const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  transport: process.env.NODE_ENV === 'development' ? {
-    target: 'pino-pretty',
-    options: { colorize: true }
-  } : undefined,
+  level: process.env.LOG_LEVEL || "info",
+  transport:
+    process.env.NODE_ENV === "development"
+      ? {
+          target: "pino-pretty",
+          options: { colorize: true },
+        }
+      : undefined,
 });
 
 // Usage (replace all console.error)
@@ -467,6 +437,7 @@ export const logger = pino({
 ```
 
 **Acceptance Criteria**:
+
 - All console.log/error replaced with logger
 - Production logs are JSON (searchable in logging service)
 - Dev logs are pretty-printed (human-readable)
@@ -478,6 +449,7 @@ export const logger = pino({
 ---
 
 ### [CRITICAL INFRASTRUCTURE] Sentry Error Tracking + PII Redaction
+
 **File**: New - sentry.client.config.ts, sentry.server.config.ts, instrumentation.ts
 **Perspectives**: architecture-guardian, security-sentinel
 **Gap**: Production errors invisible, no stack traces, no user context
@@ -485,6 +457,7 @@ export const logger = pino({
 **CRITICAL**: Must use Vercel Integration (not manual tokens) to avoid preview deploy breakage
 
 **Implementation**:
+
 ```bash
 # Step 1: Install via Sentry wizard (auto-creates configs)
 npx @sentry/wizard@latest -i nextjs
@@ -495,7 +468,7 @@ npx @sentry/wizard@latest -i nextjs
 
 ```typescript
 // sentry.client.config.ts
-import * as Sentry from '@sentry/nextjs';
+import * as Sentry from "@sentry/nextjs";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -507,14 +480,17 @@ Sentry.init({
   beforeSend(event) {
     // Redact email addresses
     if (event.user?.email) {
-      event.user.email = '[EMAIL_REDACTED]';
+      event.user.email = "[EMAIL_REDACTED]";
     }
 
     // Scrub emails from exception messages
     if (event.exception?.values) {
-      event.exception.values.forEach(ex => {
+      event.exception.values.forEach((ex) => {
         if (ex.value) {
-          ex.value = ex.value.replace(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, '[EMAIL_REDACTED]');
+          ex.value = ex.value.replace(
+            /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+            "[EMAIL_REDACTED]",
+          );
         }
       });
     }
@@ -526,11 +502,11 @@ Sentry.init({
 // sentry.server.config.ts (same structure, server-side DSN)
 // instrumentation.ts (Next.js 15 - registers Sentry)
 export async function register() {
-  if (process.env.NEXT_RUNTIME === 'nodejs') {
-    await import('./sentry.server.config');
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    await import("./sentry.server.config");
   }
-  if (process.env.NEXT_RUNTIME === 'edge') {
-    await import('./sentry.edge.config');
+  if (process.env.NEXT_RUNTIME === "edge") {
+    await import("./sentry.edge.config");
   }
 }
 ```
@@ -559,6 +535,7 @@ try {
 ```
 
 **Acceptance Criteria**:
+
 - ✅ Vercel Integration configured (not manual DSN)
 - ✅ PII redaction active (emails scrubbed from all errors)
 - ✅ Source maps uploaded automatically on deploy
@@ -573,11 +550,13 @@ try {
 ---
 
 ### [CRITICAL INFRASTRUCTURE] Vercel Analytics + Speed Insights (QUICK WIN)
+
 **File**: app/layout.tsx, package.json
 **Perspectives**: product-visionary, user-experience-advocate
 **Gap**: Zero visibility into user behavior, feature usage, performance metrics → can't make data-driven product decisions
 
 **Why This Is Critical**:
+
 - **Free & native**: Built into Vercel, zero config after install
 - **Privacy-first**: GDPR compliant, no cookies, respects DNT
 - **Real user metrics**: Actual user behavior, not synthetic tests
@@ -585,6 +564,7 @@ try {
 - **5 minute setup**: Fastest observability win possible
 
 **Implementation**:
+
 ```bash
 # Install packages
 pnpm add @vercel/analytics @vercel/speed-insights
@@ -614,11 +594,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ```
 
 **Enable in Vercel Dashboard**:
+
 1. Go to Project Settings → Analytics → Enable
 2. Go to Project Settings → Speed Insights → Enable
 3. View metrics at https://vercel.com/[team]/[project]/analytics
 
 **What You Get**:
+
 - **Page views**: Which routes users visit most
 - **User engagement**: Time on page, bounce rate
 - **Conversion funnels**: Sign-up → Library → Add Book flows
@@ -627,6 +609,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 - **Geographic distribution**: Where users are located
 
 **Acceptance Criteria**:
+
 - ✅ Analytics package installed and component added to layout
 - ✅ Speed Insights package installed and component added
 - ✅ Enabled in Vercel dashboard (both Analytics and Speed Insights)
@@ -639,19 +622,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 ---
 
 ### [CRITICAL INFRASTRUCTURE] Health Check Endpoint
+
 **File**: app/api/health/route.ts
 **Perspectives**: architecture-guardian, security-sentinel
 **Gap**: No uptime monitoring, downtime detection delayed, can't correlate errors with service health
 
 **Implementation**:
+
 ```typescript
 // app/api/health/route.ts (NEW FILE)
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 export async function GET() {
   // Basic health check
   const health = {
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     environment: process.env.VERCEL_ENV || process.env.NODE_ENV,
@@ -662,15 +647,16 @@ export async function GET() {
   // if (!convexHealth.ok) health.status = 'degraded';
 
   return NextResponse.json(health, {
-    status: health.status === 'ok' ? 200 : 503,
+    status: health.status === "ok" ? 200 : 503,
     headers: {
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      "Cache-Control": "no-cache, no-store, must-revalidate",
     },
   });
 }
 ```
 
 **Setup External Monitoring** (Optional):
+
 ```bash
 # BetterUptime (free tier: 1 monitor, 30s checks)
 # Or UptimeRobot (free tier: 50 monitors, 5min checks)
@@ -678,6 +664,7 @@ export async function GET() {
 ```
 
 **Acceptance Criteria**:
+
 - ✅ `/api/health` endpoint returns 200 OK with JSON health status
 - ✅ Endpoint excluded from analytics/error tracking (health checks are noise)
 - ✅ Response includes timestamp, environment, uptime
@@ -689,11 +676,13 @@ export async function GET() {
 ---
 
 ### [DESIGN SYSTEM] Fix Hallucinated CSS Class Names
+
 **Files**: LoadingSkeleton.tsx:13, ErrorState.tsx:16, StatusBadge.tsx:9-18
 **Perspectives**: design-systems-architect
 **Problem**: Legacy class names from old design system (paper, leather) → styling missing
 
 **Fix**:
+
 ```typescript
 // LoadingSkeleton.tsx:13
 - className="h-4 animate-pulse rounded bg-paper-secondary/80"
@@ -718,16 +707,19 @@ export async function GET() {
 ---
 
 ### [DESIGN SYSTEM] Remove FadeInContent Shallow Module
+
 **File**: components/layout/FadeInContent.tsx
 **Perspectives**: complexity-archaeologist, design-systems-architect
 **Violation**: Shallow module (interface ≈ implementation)
 
 **Analysis**:
+
 - Interface complexity: 1 prop (children)
 - Implementation: 3 motion props
 - Module value = 0 (just wrapping motion.div with fixed values)
 
 **Fix**: Delete file, replace usage with direct motion.div
+
 ```typescript
 // Before
 <FadeInContent><BookDetail /></FadeInContent>
@@ -748,6 +740,7 @@ export async function GET() {
 ---
 
 ### [INFRASTRUCTURE] Release Automation with release-please
+
 **File**: .github/workflows/release.yml (NEW)
 **Perspectives**: architecture-guardian, maintainability-maven
 **Gap**: No changelogs, no version tags, no release history → users don't know what changed
@@ -755,12 +748,14 @@ export async function GET() {
 **Current State**: Version stuck at 0.1.0, no git tags, manual release notes
 
 **Why release-please** (vs. Changesets/semantic-release):
+
 - **PR-based review**: Human approves before release
 - **Conventional commits**: Analyzes commits for automatic versioning
 - **GitHub releases**: Auto-creates with changelog
 - **Zero maintenance**: Fully automated after setup
 
 **Implementation**:
+
 ```yaml
 # .github/workflows/release.yml
 name: Release Please
@@ -780,12 +775,14 @@ jobs:
 ```
 
 **What You Get**:
+
 - Auto-generated CHANGELOG.md from conventional commits
 - Version bumps based on commit types (feat → minor, fix → patch, BREAKING → major)
 - GitHub releases with tags
 - Release PR for review before publishing
 
 **Acceptance Criteria**:
+
 - ✅ Release Please workflow runs on every main push
 - ✅ Release PR created automatically when commits accumulate
 - ✅ CHANGELOG.md generated from commits
@@ -798,11 +795,13 @@ jobs:
 ---
 
 ### [INFRASTRUCTURE] Environment Variable Validation Script
+
 **File**: scripts/validate-env.sh (NEW)
 **Perspectives**: security-sentinel, architecture-guardian
 **Gap**: Missing env vars discovered at runtime (or worse, in production)
 
 **Implementation**:
+
 ```bash
 #!/usr/bin/env bash
 # scripts/validate-env.sh
@@ -841,6 +840,7 @@ echo "✅ All required environment variables are set"
 **Usage**: Called by pre-push hook (prevents pushing broken env config)
 
 **Acceptance Criteria**:
+
 - ✅ Script validates all required env vars exist
 - ✅ Clear error messages with instructions
 - ✅ Runs in pre-push hook (optional - can skip with --no-verify)
@@ -852,16 +852,19 @@ echo "✅ All required environment variables are set"
 ---
 
 ### [INFRASTRUCTURE] Dependabot Automated Dependency Updates
+
 **File**: .github/dependabot.yml (NEW)
 **Perspectives**: security-sentinel, maintainability-maven
 **Gap**: Security vulnerabilities (esbuild, js-yaml, glob) sit unfixed → growing attack surface
 
 **Current Vulnerabilities** (from pnpm audit):
+
 - esbuild 0.21.5 (moderate - CORS issue in dev server)
 - js-yaml 4.1.0 (moderate - transitive dep)
 - glob <10.5.0 (moderate - transitive dep)
 
 **Implementation**:
+
 ```yaml
 # .github/dependabot.yml
 version: 2
@@ -890,6 +893,7 @@ updates:
 ```
 
 **Acceptance Criteria**:
+
 - ✅ Dependabot PRs created weekly
 - ✅ Security updates prioritized (separate PRs)
 - ✅ Minor/patch updates grouped (reduces PR noise)
@@ -905,20 +909,29 @@ updates:
 ## Next (This Quarter, <3 months)
 
 ### [BUNDLE OPTIMIZATION] Replace Framer Motion with CSS Animations
+
 **Scope**: BookTile, BookDetail, StatusBadge, FadeInContent
 **Perspectives**: performance-pathfinder, design-systems-architect
 **Why**: Framer Motion is 120KB minified+gzipped for simple fade/hover animations (overkill)
 **Impact**:
+
 - Current bundle: ~300KB chunk includes Framer Motion
 - After removal: 120KB reduction → 500ms-1s faster First Contentful Paint
 - Animations use native browser performance (60fps guaranteed)
 
 **Approach**:
+
 ```css
 /* globals.css - Add native CSS animations */
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .animate-fade-in {
   animation: fade-in 0.3s ease-out;
@@ -938,23 +951,23 @@ updates:
 ---
 
 ### [BUNDLE OPTIMIZATION] Replace Markdown Libraries with Lighter Alternative
+
 **Scope**: Editor.tsx, NoteCard.tsx
 **Perspectives**: performance-pathfinder
 **Why**: Marked (47KB) + Turndown (18KB) + DOMPurify (23KB) = 88KB for basic markdown
 **Impact**: Notes only use basic markdown (bold, italic, lists, links) - no code blocks, tables
 
 **Approach**:
+
 ```typescript
 // Replace: marked + turndown + DOMPurify (~88KB)
 // With: remark-react (~35KB, 60% reduction)
 
-import { unified } from 'unified';
-import remarkParse from 'remark-parse';
-import remarkReact from 'remark-react';
+import { unified } from "unified";
+import remarkParse from "remark-parse";
+import remarkReact from "remark-react";
 
-const processor = unified()
-  .use(remarkParse)
-  .use(remarkReact);
+const processor = unified().use(remarkParse).use(remarkReact);
 ```
 
 **Effort**: 2h (migration + testing) | **Impact**: 88KB → 35KB bundle (60% reduction)
@@ -962,12 +975,14 @@ const processor = unified()
 ---
 
 ### [PERFORMANCE] Consolidate Book Filtering to Single Pass
+
 **Files**: BookGrid.tsx:20-44, StatsBar.tsx:7-22
 **Perspectives**: performance-pathfinder, complexity-archaeologist
 **Why**: Both components call `api.books.list` and filter independently (7 total array iterations)
 **Impact**: With 200 books, 1,400 iterations on every library page render → 50-100ms jank
 
 **Approach**:
+
 ```typescript
 // lib/hooks/useBookCategories.ts - Shared hook with single-pass reduce
 export function useBookCategories() {
@@ -977,28 +992,34 @@ export function useBookCategories() {
     if (!allBooks) return null;
 
     // Single pass: O(n) instead of O(7n)
-    return allBooks.reduce((acc, book) => {
-      if (book.status === "read") {
-        acc.finished.push(book);
-        acc.counts.booksRead++;
-      } else if (book.status === "currently-reading") {
-        acc.reading.push(book);
-        acc.counts.currentlyReading++;
-      } else if (book.status === "want-to-read") {
-        acc.toRead.push(book);
-      }
+    return allBooks.reduce(
+      (acc, book) => {
+        if (book.status === "read") {
+          acc.finished.push(book);
+          acc.counts.booksRead++;
+        } else if (book.status === "currently-reading") {
+          acc.reading.push(book);
+          acc.counts.currentlyReading++;
+        } else if (book.status === "want-to-read") {
+          acc.toRead.push(book);
+        }
 
-      if (book.isFavorite) {
-        acc.favorites.push(book);
-        acc.counts.favorites++;
-      }
+        if (book.isFavorite) {
+          acc.favorites.push(book);
+          acc.counts.favorites++;
+        }
 
-      acc.counts.total++;
-      return acc;
-    }, {
-      reading: [], finished: [], toRead: [], favorites: [],
-      counts: { booksRead: 0, currentlyReading: 0, favorites: 0, total: 0 }
-    });
+        acc.counts.total++;
+        return acc;
+      },
+      {
+        reading: [],
+        finished: [],
+        toRead: [],
+        favorites: [],
+        counts: { booksRead: 0, currentlyReading: 0, favorites: 0, total: 0 },
+      },
+    );
   }, [allBooks]);
 }
 ```
@@ -1008,12 +1029,14 @@ export function useBookCategories() {
 ---
 
 ### [UX CRITICAL] Delete Confirmations for Books & Notes
+
 **Files**: BookDetail.tsx (book delete), NoteCard.tsx:68 (note delete)
 **Perspectives**: user-experience-advocate
 **Why**: Accidental delete = permanent data loss, hours of work gone, user rage-quits
 **Current State**: Note delete uses native browser `confirm()` (jarring), book delete has NO confirmation
 
 **Approach**:
+
 ```typescript
 // Replace native confirm with custom AlertDialog matching design system
 const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -1040,11 +1063,13 @@ const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 ---
 
 ### [UX ENHANCEMENT] Improve Backend Error Messages
+
 **Files**: convex/books.ts (5 mutations), convex/notes.ts (3 mutations)
 **Perspectives**: user-experience-advocate, security-sentinel
 **Why**: Generic "Access denied" messages confuse users - no context about what went wrong or how to fix
 
 **Approach**:
+
 ```typescript
 // Before:
 throw new Error("Access denied");
@@ -1063,11 +1088,13 @@ if (book.userId !== userId) {
 ---
 
 ### [UX ENHANCEMENT] Input Validation with User Feedback
+
 **File**: BookForm.tsx:324-329
 **Perspectives**: user-experience-advocate, maintainability-maven
 **Why**: Invalid year/page count silently becomes `null` with no error message - user confused
 
 **Approach**:
+
 ```typescript
 // Add validation with feedback
 const [yearError, setYearError] = useState("");
@@ -1093,15 +1120,18 @@ const handleYearChange = (value: string) => {
 ---
 
 ### [DIFFERENTIATION] Reading Analytics Dashboard
+
 **Scope**: New page - /analytics
 **Perspectives**: product-visionary, user-experience-advocate
 **Business Case**:
+
 - **Shareable content**: "My 2025 Reading Wrapped" → viral growth (Spotify Wrapped proves demand)
 - **Self-insight**: "I didn't realize I read mostly male authors" → behavior change
 - **Retention hook**: Users return monthly to see updated stats
 - **Monetization**: Premium tier unlocks advanced analytics, shareable reports
 
 **Features**:
+
 ```typescript
 // Phase 1: Enhanced Dashboard (3d)
 - Books per month (line chart)
@@ -1118,6 +1148,7 @@ const handleYearChange = (value: string) => {
 ```
 
 **Competitive Gap**:
+
 - Goodreads: Basic stats, ugly UI
 - StoryGraph: Good stats but cluttered
 - Literal: Beautiful but basic
@@ -1129,15 +1160,18 @@ const handleYearChange = (value: string) => {
 ---
 
 ### [DIFFERENTIATION] Collections & Tags System
+
 **Scope**: New tables, CRUD, UI
 **Perspectives**: product-visionary, user-experience-advocate
 **Business Case**:
+
 - **Power user retention**: Researchers, writers, educators need organization at scale
 - **Thematic discovery**: "Show me all books about grief"
 - **Sharing**: "My favorite sci-fi books" public list → viral sharing
 - **Scalability**: Current flat library breaks at 200+ books
 
 **Schema**:
+
 ```typescript
 collections: defineTable({
   userId: v.id("users"),
@@ -1145,15 +1179,16 @@ collections: defineTable({
   description: v.optional(v.string()),
   isPublic: v.boolean(),
   createdAt: v.number(),
-})
+});
 
 bookCollections: defineTable({
   bookId: v.id("books"),
   collectionId: v.id("collections"),
-})
+});
 ```
 
 **Features**:
+
 - Collection CRUD (create, rename, delete)
 - Add/remove books to collections
 - Filter library by collection
@@ -1165,25 +1200,29 @@ bookCollections: defineTable({
 ---
 
 ### [DIFFERENTIATION] Public User Profiles
+
 **Scope**: New routes, privacy controls
 **Perspectives**: product-visionary
 **Business Case**:
+
 - **Viral growth**: Every profile is a landing page
 - **Social proof**: See real readers, not anonymous reviews
 - **Network effects**: Each public profile drives 2-3 signups
 - **Privacy-first social**: Opt-in, curated, thoughtful (not toxic social feed)
 
 **Schema**:
+
 ```typescript
 users: defineTable({
   ...existing,
   username: v.optional(v.string()), // unique
   bio: v.optional(v.string()),
   profilePrivacy: v.union("private", "public"), // default: private
-})
+});
 ```
 
 **Routes**:
+
 - /users/[username] - Public profile page
 - Shows public books, stats (if enabled), collections
 - Privacy controls (profile visibility, per-book privacy)
@@ -1194,11 +1233,13 @@ users: defineTable({
 ---
 
 ### [FEATURE] Search Within Library (CMD+K Power User Feature)
+
 **Scope**: Command palette
 **Perspectives**: product-visionary, user-experience-advocate
 **Why**: Users with 300+ books need fast navigation (scrolling or Cmd+F browser search is painful)
 
 **Implementation**:
+
 ```typescript
 // Frontend: Command palette (CMD+K)
 - Search by title, author, notes content
@@ -1219,11 +1260,13 @@ users: defineTable({
 ---
 
 ### [REFACTOR] Extract BookDetail into Focused Components
+
 **File**: BookDetail.tsx (520 lines → 5 components of ~100 lines each)
 **Perspectives**: complexity-archaeologist, maintainability-maven
 **Why**: God component with 9 responsibilities → hard to test, modify, reuse
 
 **Approach**:
+
 ```
 BookDetail.tsx (container) → 150 lines
   → BookCoverManager.tsx (upload/hover logic) → 80 lines
@@ -1239,11 +1282,13 @@ BookDetail.tsx (container) → 150 lines
 ---
 
 ### [REFACTOR] Standardize Error Handling Pattern
+
 **Scope**: Multiple files (books.ts, notes.ts, components)
 **Perspectives**: maintainability-maven, security-sentinel
 **Why**: Three different error patterns (throw Error, silent failure, console only) → inconsistent UX
 
 **Approach**:
+
 ```typescript
 // convex/errors.ts
 import { ConvexError } from "convex/values";
@@ -1271,17 +1316,20 @@ if (!book || book.userId !== userId) {
 ---
 
 ### [INFRASTRUCTURE] Performance Monitoring with Sentry Performance
+
 **File**: sentry.client.config.ts, sentry.server.config.ts
 **Perspectives**: performance-pathfinder, architecture-guardian
 **Gap**: Can't identify slow Convex queries, frontend bottlenecks, or database performance issues
 
 **Why Sentry Performance (vs. OpenTelemetry)**:
+
 - **Unified platform**: Errors + Performance in one dashboard (correlation)
 - **Vercel Integration**: Auto-configured, no manual setup
 - **Free tier**: 10k transactions/month (plenty for MVP)
 - **Zero code changes**: Automatic instrumentation for Next.js, fetch, React
 
 **Implementation**:
+
 ```typescript
 // sentry.client.config.ts (enhance existing config)
 Sentry.init({
@@ -1294,11 +1342,11 @@ Sentry.init({
   // Intelligent sampling: capture all errors, sample successes
   tracesSampler: (samplingContext) => {
     // Always trace errors
-    if (samplingContext.transactionContext.name.includes('error')) {
+    if (samplingContext.transactionContext.name.includes("error")) {
       return 1.0;
     }
     // Sample high-value routes more
-    if (samplingContext.transactionContext.name.includes('/library')) {
+    if (samplingContext.transactionContext.name.includes("/library")) {
       return 0.2; // 20% sampling
     }
     // Default sampling
@@ -1309,7 +1357,7 @@ Sentry.init({
   integrations: [
     new Sentry.BrowserTracing({
       tracePropagationTargets: [
-        'localhost',
+        "localhost",
         /^https:\/\/bibliomnomnom\.vercel\.app/,
         /^https:\/\/.*\.convex\.cloud/, // Trace Convex API calls
       ],
@@ -1319,6 +1367,7 @@ Sentry.init({
 ```
 
 **What You Get**:
+
 - **Route performance**: P50, P95, P99 latency for every page
 - **Convex query performance**: Time spent in `api.books.list`, `api.notes.create`
 - **Frontend bottlenecks**: React render time, component slowness
@@ -1326,6 +1375,7 @@ Sentry.init({
 - **Trace context**: See full request flow (frontend → Convex → return)
 
 **Acceptance Criteria**:
+
 - ✅ Sentry Performance enabled (tracesSampleRate > 0)
 - ✅ Intelligent sampling configured (errors 100%, high-value routes 20%, default 10%)
 - ✅ Convex API calls traced (fetch instrumentation)
@@ -1338,11 +1388,13 @@ Sentry.init({
 ---
 
 ### [INFRASTRUCTURE] Convex Backend Observability via Axiom
+
 **File**: Convex dashboard integration
 **Perspectives**: architecture-guardian, performance-pathfinder
 **Gap**: Convex logs disappear after 7 days, no queryable history, can't analyze function performance trends
 
 **Why Axiom**:
+
 - **Convex native integration**: One-click setup in Convex dashboard
 - **Free tier**: 500MB/month logs, 30-day retention (plenty for MVP)
 - **Prebuilt dashboard**: Function execution times, error rates, database usage
@@ -1350,6 +1402,7 @@ Sentry.init({
 - **Real-time streaming**: Logs appear in <1 second
 
 **Setup**:
+
 ```bash
 # 1. Go to Convex Dashboard → Settings → Integrations → Axiom
 # 2. Connect Axiom account (free tier)
@@ -1358,6 +1411,7 @@ Sentry.init({
 ```
 
 **What You Get**:
+
 ```apl
 # Find slowest Convex functions
 ['convex']
@@ -1386,6 +1440,7 @@ Sentry.init({
 ```
 
 **Acceptance Criteria**:
+
 - ✅ Axiom integration enabled in Convex dashboard
 - ✅ Logs streaming in real-time (<1s latency)
 - ✅ Prebuilt dashboard showing function performance
@@ -1398,11 +1453,13 @@ Sentry.init({
 ---
 
 ### [INFRASTRUCTURE] Deployment Tracking & Release Automation
+
 **File**: .github/workflows/deploy.yml
 **Perspectives**: architecture-guardian, security-sentinel
 **Gap**: Can't correlate errors with deployments, no deployment history, manual release notes
 
 **Implementation**:
+
 ```yaml
 # .github/workflows/deploy.yml (NEW FILE)
 name: Deploy & Track Releases
@@ -1454,11 +1511,13 @@ jobs:
 ```
 
 **Secrets to Add** (GitHub repo settings):
+
 - `SENTRY_AUTH_TOKEN` (from Sentry account settings)
 - `SENTRY_ORG` (your Sentry org slug)
 - `SENTRY_PROJECT` (your Sentry project slug)
 
 **What You Get**:
+
 - **Error correlation**: See which deploy introduced each error
 - **Deployment timeline**: Full history of what shipped when
 - **Commit attribution**: See who changed what in each release
@@ -1466,6 +1525,7 @@ jobs:
 - **Rollback clarity**: Know which version to rollback to
 
 **Acceptance Criteria**:
+
 - ✅ GitHub Action runs on every push to main
 - ✅ Sentry release created with git SHA as version
 - ✅ Commits associated with each release
@@ -1478,11 +1538,13 @@ jobs:
 ---
 
 ### [INFRASTRUCTURE] Add Analytics Tracking (PostHog)
+
 **Scope**: Event tracking
 **Perspectives**: architecture-guardian, product-visionary
 **Why**: No visibility into feature usage, conversion funnels, user journeys → can't make data-driven decisions
 
 **Events to Track**:
+
 - `book_added`, `book_status_changed`, `note_created`
 - `privacy_toggled`, `cover_uploaded`
 - `import_started`, `import_completed`
@@ -1493,17 +1555,20 @@ jobs:
 ---
 
 ### [INFRASTRUCTURE] Changelog Automation (Changesets)
+
 **Scope**: Release notes
 **Perspectives**: architecture-guardian
 **Why**: Manual release notes, inconsistent versioning → hard to communicate updates to users
 
 **Setup**:
+
 ```bash
 pnpm add -D @changesets/cli
 pnpm changeset init
 ```
 
 **Workflow**:
+
 - Developer runs `pnpm changeset` when making changes
 - Describes change in markdown (user-facing summary)
 - On release, automatically generates CHANGELOG.md + bumps version
@@ -1517,18 +1582,20 @@ pnpm changeset init
 ## Soon (Exploring, 3-6 months)
 
 ### [INFRASTRUCTURE] Bundle Size Tracking with @next/bundle-analyzer
+
 **File**: next.config.ts
 **Perspectives**: performance-pathfinder, maintainability-maven
 **Gap**: No bundle size visibility → performance regressions invisible
 
 **Implementation**:
+
 ```typescript
 // next.config.ts (enhance existing)
 import type { NextConfig } from "next";
-import bundleAnalyzer from '@next/bundle-analyzer';
+import bundleAnalyzer from "@next/bundle-analyzer";
 
 const withBundleAnalyzer = bundleAnalyzer({
-  enabled: process.env.ANALYZE === 'true',
+  enabled: process.env.ANALYZE === "true",
 });
 
 const nextConfig: NextConfig = {
@@ -1541,6 +1608,7 @@ export default withBundleAnalyzer(nextConfig);
 **Usage**: `ANALYZE=true pnpm build` → opens bundle visualization
 
 **Acceptance Criteria**:
+
 - ✅ Bundle analyzer available on demand
 - ✅ Documented in README ("Analyze Bundle" section)
 - ✅ CI tracks bundle size trends (optional - via bundlewatch)
@@ -1551,6 +1619,7 @@ export default withBundleAnalyzer(nextConfig);
 ---
 
 ### [INFRASTRUCTURE] Commitlint for Conventional Commits
+
 **File**: .commitlintrc.json (NEW), package.json
 **Perspectives**: maintainability-maven, architecture-guardian
 **Gap**: Inconsistent commit messages → release-please can't auto-generate good changelogs
@@ -1558,6 +1627,7 @@ export default withBundleAnalyzer(nextConfig);
 **Why**: Conventional commits enable automated versioning and changelog generation
 
 **Implementation**:
+
 ```bash
 pnpm add -D @commitlint/cli @commitlint/config-conventional
 ```
@@ -1567,10 +1637,11 @@ pnpm add -D @commitlint/cli @commitlint/config-conventional
 {
   "extends": ["@commitlint/config-conventional"],
   "rules": {
-    "type-enum": [2, "always", [
-      "feat", "fix", "docs", "style", "refactor",
-      "perf", "test", "chore"
-    ]],
+    "type-enum": [
+      2,
+      "always",
+      ["feat", "fix", "docs", "style", "refactor", "perf", "test", "chore"]
+    ],
     "subject-case": [0]
   }
 }
@@ -1585,6 +1656,7 @@ commit-msg:
 ```
 
 **Acceptance Criteria**:
+
 - ✅ Invalid commit messages blocked (must follow conventional format)
 - ✅ Examples documented in CONTRIBUTING.md
 - ✅ Team onboarded (clear error messages)
@@ -1607,6 +1679,7 @@ commit-msg:
 - **[Infrastructure] Rate Limiting** - Upstash Redis rate limits on API routes + Convex mutations (3h effort, abuse prevention)
 
 ### [TESTABILITY] Value Objects for Import Match Keys
+
 **Scope**: lib/import/dedup/matchKeys.ts (NEW)
 **Perspectives**: complexity-archaeologist, architecture-guardian
 **Context**: Phase 3 of import testability refactoring (optional polish)
@@ -1614,12 +1687,14 @@ commit-msg:
 **Description**: Encapsulate ISBN, Title-Author, and ApiId matching logic in value object classes with built-in normalization, equality checking, and priority.
 
 **Value**:
+
 - Type safety for matching (compiler catches misuse)
 - Normalization + equality + priority in single cohesive unit
 - Self-documenting code (IsbnKey.equals(other) clearer than string comparison)
 - Easier to add new match types (SeriesKey, PublisherKey, etc.)
 
 **Implementation**:
+
 ```typescript
 // lib/import/dedup/matchKeys.ts
 class IsbnKey {
@@ -1630,12 +1705,15 @@ class IsbnKey {
   }
 
   equals(other: IsbnKey): boolean {
-    return this.normalized !== undefined &&
-           this.normalized === other.normalized;
+    return this.normalized !== undefined && this.normalized === other.normalized;
   }
 
-  get priority(): number { return 1.0; }
-  get isValid(): boolean { return this.normalized !== undefined; }
+  get priority(): number {
+    return 1.0;
+  }
+  get isValid(): boolean {
+    return this.normalized !== undefined;
+  }
 }
 
 class TitleAuthorKey {
@@ -1649,7 +1727,9 @@ class TitleAuthorKey {
     return this.key === other.key;
   }
 
-  get priority(): number { return 0.8; }
+  get priority(): number {
+    return 0.8;
+  }
 }
 
 class ApiIdKey {
@@ -1660,23 +1740,28 @@ class ApiIdKey {
   }
 
   equals(other: ApiIdKey): boolean {
-    return this.normalized !== undefined &&
-           this.normalized === other.normalized;
+    return this.normalized !== undefined && this.normalized === other.normalized;
   }
 
-  get priority(): number { return 0.6; }
-  get isValid(): boolean { return this.normalized !== undefined; }
+  get priority(): number {
+    return 0.6;
+  }
+  get isValid(): boolean {
+    return this.normalized !== undefined;
+  }
 }
 ```
 
 **Effort**: 2-3 hours | **Impact**: Better encapsulation, type safety, clearer intent
 
 **Trade-offs**:
+
 - ✅ Pros: Better encapsulation, type safety, clearer intent
 - ❌ Cons: More classes, indirection, possible over-engineering for current scale
 - ⚖️ Decision: Wait until adding 3+ new match types to justify abstraction
 
 **When to Implement**:
+
 - When adding SeriesKey, PublisherKey, or other match types
 - When matching logic becomes complex (fuzzy matching, weighted combinations)
 - When tests need to verify normalization + equality together
@@ -1684,19 +1769,22 @@ class ApiIdKey {
 ---
 
 ### [TESTABILITY] Comprehensive Import Integration Tests
-**Scope**: __tests__/import/integration.test.ts (NEW)
+
+**Scope**: **tests**/import/integration.test.ts (NEW)
 **Perspectives**: maintainability-maven, architecture-guardian
 **Context**: Post-Phase 2 validation tests
 
 **Description**: Full workflow tests using in-memory repositories to verify import flows end-to-end (CSV upload → preview → dedup → commit → verify books created).
 
 **Value**:
+
 - Catch integration bugs between layers (repository + service + handler)
 - Verify complete user workflows (not just unit behavior)
 - Regression protection for multi-step operations
 - Documentation through executable tests
 
 **Implementation**:
+
 ```typescript
 describe("Import workflow integration", () => {
   it("imports Goodreads CSV with deduplication", async () => {
@@ -1704,9 +1792,7 @@ describe("Import workflow integration", () => {
     const userId = "user_1" as Id<"users">;
 
     // Seed existing books
-    repos.books.seed([
-      book({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" })
-    ]);
+    repos.books.seed([book({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" })]);
 
     // Parse CSV
     const csvText = `Title,Author,ISBN\nDune,Frank Herbert,9780441013593\nFoundation,Isaac Asimov,`;
@@ -1739,7 +1825,7 @@ describe("Import workflow integration", () => {
     // Verify final state
     const books = await repos.books.findByUser(userId);
     expect(books).toHaveLength(2); // Original + Foundation
-    expect(books.find(b => b.title === "Foundation")).toBeDefined();
+    expect(books.find((b) => b.title === "Foundation")).toBeDefined();
   });
 
   it("handles LLM extraction with fallback provider", async () => {
@@ -1755,6 +1841,7 @@ describe("Import workflow integration", () => {
 **Effort**: 3-4 hours | **Impact**: Catch integration bugs, regression protection
 
 **When to Implement**:
+
 - After Phase 2 repository refactoring completes
 - When adding new import sources (Storygraph, LibraryThing)
 - Before major refactoring (regression safety net)
@@ -1762,6 +1849,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [TESTABILITY] Repository Transaction Support
+
 **Scope**: lib/import/repository interfaces
 **Perspectives**: architecture-guardian, maintainability-maven
 
@@ -1776,6 +1864,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [PERFORMANCE] Repository Query Result Caching
+
 **Scope**: lib/import/repository
 **Perspectives**: performance-pathfinder
 
@@ -1790,6 +1879,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [RELIABILITY] LLM Provider Retry Logic
+
 **Scope**: lib/import/llm.ts
 **Perspectives**: architecture-guardian
 
@@ -1802,6 +1892,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [FEATURE] Fuzzy Title Matching for Deduplication
+
 **Scope**: lib/import/dedup
 **Perspectives**: product-visionary, user-experience-advocate
 
@@ -1816,6 +1907,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [ARCHITECTURE] Extract Books Module Repository Pattern
+
 **Scope**: convex/books.ts, convex/notes.ts
 **Perspectives**: architecture-guardian, maintainability-maven
 
@@ -1830,6 +1922,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [INFRASTRUCTURE] Migrate Rate Limiting to Convex Rate Limiter
+
 **Scope**: lib/import/rateLimit.ts
 **Perspectives**: architecture-guardian
 
@@ -1844,6 +1937,7 @@ describe("Import workflow integration", () => {
 ---
 
 ### [CONFIGURATION] LLM Provider Configuration Externalization
+
 **Scope**: lib/import/llm.ts, convex/imports.ts
 **Perspectives**: architecture-guardian
 
@@ -1854,6 +1948,7 @@ describe("Import workflow integration", () => {
 **Effort**: 1 hour
 
 **Example**:
+
 ```bash
 # .env.local
 OPENAI_MODEL=gpt-5.1-mini
@@ -1866,7 +1961,8 @@ LLM_TOKEN_CAP=50000
 ---
 
 ### [PERFORMANCE] Import Preview Pagination
-**Scope**: convex/imports.ts, components/import/*
+
+**Scope**: convex/imports.ts, components/import/\*
 **Perspectives**: performance-pathfinder
 
 **Description**: Current implementation loads all books into memory (300/page). Add true cursor-based pagination for previews with >300 books.
@@ -1880,26 +1976,31 @@ LLM_TOKEN_CAP=50000
 ---
 
 ### [HEALTH] Deep dependency checks in health endpoint
+
 **Scope**: app/api/health/route.ts
 **Description**: Add “deep health” mode that performs lightweight reachability checks to Convex/Clerk/blob rather than only env presence; mirror no-store headers on error responses.
 **Effort**: 1-2 hours | **When**: After current release once monitoring needs clarity.
 
 ### [SECURITY] Tighten CSP once safe
+
 **Scope**: next.config.ts
 **Description**: Remove `unsafe-inline`/`unsafe-eval` from script-src when tooling allows; track third-party domains as they’re added.
 **Effort**: 1 hour | **When**: After verifying production build compatibility.
 
 ### [TESTING] Broaden import test coverage
-**Scope**: __tests__/import/*
+
+**Scope**: **tests**/import/\*
 **Description**: Add cases for CSV size/10MB limit, malformed CSV, dedup fuzzy/confidence edges (≥/</0.85), commit skip/error/idempotency, LLM text path in useImportJob.
 **Effort**: 3-4 hours | **When**: Next test pass cycle.
 
 ### [QUALITY] Raise docstring coverage toward 80%
-**Scope**: lib/import/*, convex/*
+
+**Scope**: lib/import/_, convex/_
 **Description**: Address bot warning (28.57%); add concise docstrings for exported functions/types most used externally.
 **Effort**: 2 hours | **When**: After functional fixes land.
 
 ### [FEATURE] Batch Import API
+
 **Scope**: New endpoints, UI
 **Perspectives**: product-visionary
 
@@ -1912,6 +2013,7 @@ LLM_TOKEN_CAP=50000
 ---
 
 ### [FEATURE] Import Templates
+
 **Scope**: New schema tables, UI
 **Perspectives**: product-visionary, user-experience-advocate
 
@@ -1924,6 +2026,7 @@ LLM_TOKEN_CAP=50000
 ---
 
 ### [FEATURE] Undo Import
+
 **Scope**: Audit log, version tracking
 **Perspectives**: user-experience-advocate
 

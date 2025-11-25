@@ -32,6 +32,7 @@ Sign up for all three before proceeding with installation.
 ## Environment Setup
 
 1. **Copy environment template**:
+
    ```bash
    cp .env.example .env.local
    ```
@@ -107,12 +108,14 @@ pnpm dev
 ```
 
 This runs two servers concurrently:
+
 - **Next.js**: http://localhost:3000 (frontend)
 - **Convex**: Live backend with real-time logs
 
 ### Verify Your Setup
 
 After running `pnpm dev`, you should see:
+
 - ✅ Next.js running at http://localhost:3000
 - ✅ Convex dev server logs showing function calls
 - ✅ No errors in either terminal
@@ -154,6 +157,7 @@ Before deploying to production, you MUST:
 ### Environment Variables Required
 
 **Production Environment:**
+
 ```bash
 # Clerk (production)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
@@ -175,6 +179,7 @@ NEXT_PUBLIC_IMPORT_ENABLED=true
 ```
 
 **Preview Environment:**
+
 ```bash
 # Convex (preview - creates isolated deployments per branch)
 CONVEX_DEPLOY_KEY=preview:username:project|token
@@ -196,6 +201,7 @@ curl https://your-domain.com/api/health
 ```
 
 Test critical flows:
+
 - Sign up → creates user in Convex (tests Clerk webhook)
 - Add book → saves to Convex (tests mutations + auth)
 - Upload cover → uploads to Blob (tests file storage)
@@ -203,6 +209,7 @@ Test critical flows:
 ### Complete Guide
 
 For detailed deployment instructions, see **[DEPLOYMENT.md](./DEPLOYMENT.md)** which covers:
+
 - Convex production setup
 - Clerk production configuration
 - Vercel environment variables
@@ -224,12 +231,14 @@ For detailed deployment instructions, see **[DEPLOYMENT.md](./DEPLOYMENT.md)** w
 ### Adding Books
 
 **Manual entry** (MVP):
+
 1. Click "Add Book" in library header
 2. Fill in title, author, and optional fields
 3. Select reading status (want-to-read, currently-reading, read)
 4. Click "Add Book"
 
 **Book covers**:
+
 - Upload custom covers via "Upload Cover" button on book detail page
 - Supports JPEG, PNG, WebP (max 5MB)
 - Requires `BLOB_READ_WRITE_TOKEN` configured
@@ -237,6 +246,7 @@ For detailed deployment instructions, see **[DEPLOYMENT.md](./DEPLOYMENT.md)** w
 ### Privacy Model
 
 Books can be **private** (default) or **public**:
+
 - **Private**: Only you can view and edit
 - **Public**: Anyone with the link can view (sanitized data, no personal dates)
 
@@ -255,7 +265,7 @@ const books = useAuthedQuery(api.books.list, {});
 
 // Filter by status
 const currentlyReading = useAuthedQuery(api.books.list, {
-  status: "currently-reading"
+  status: "currently-reading",
 });
 
 // Add a book
@@ -263,7 +273,7 @@ const addBook = useMutation(api.books.create);
 await addBook({
   title: "The Hobbit",
   author: "J.R.R. Tolkien",
-  status: "want-to-read"
+  status: "want-to-read",
 });
 
 // Update book status (auto-sets dateStarted/dateFinished)
@@ -299,20 +309,21 @@ This project **exclusively uses pnpm**. Attempts to use npm, yarn, or bun will b
 
 ## Common Commands
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start dev servers (Next.js + Convex concurrently) |
-| `pnpm convex:push` | Sync schema to Convex (run once after pull/schema changes) |
-| `pnpm convex:dev` | Run Convex dev server standalone (for live logs) |
-| `pnpm build` | Production build |
-| `pnpm start` | Start production server (after build) |
-| `pnpm lint` | Run ESLint |
-| `pnpm typecheck` | Run TypeScript compiler check |
-| `pnpm tokens:build` | Regenerate design tokens from source |
+| Command             | Description                                                |
+| ------------------- | ---------------------------------------------------------- |
+| `pnpm dev`          | Start dev servers (Next.js + Convex concurrently)          |
+| `pnpm convex:push`  | Sync schema to Convex (run once after pull/schema changes) |
+| `pnpm convex:dev`   | Run Convex dev server standalone (for live logs)           |
+| `pnpm build`        | Production build                                           |
+| `pnpm start`        | Start production server (after build)                      |
+| `pnpm lint`         | Run ESLint                                                 |
+| `pnpm typecheck`    | Run TypeScript compiler check                              |
+| `pnpm tokens:build` | Regenerate design tokens from source                       |
 
 ## Tech Stack
 
 ### Frontend
+
 - **Framework**: Next.js 15.1 (App Router, Turbopack)
 - **React**: 19.0 (with Server Components)
 - **Language**: TypeScript 5 (strict mode)
@@ -322,12 +333,14 @@ This project **exclusively uses pnpm**. Attempts to use npm, yarn, or bun will b
 - **Icons**: Lucide React
 
 ### Backend
+
 - **Database**: Convex 1.28 (real-time backend with type-safe queries)
 - **Auth**: Clerk 6.34 (authentication + user management)
 - **File Storage**: Vercel Blob (book cover uploads)
 - **Deployment**: Vercel
 
 ### Design System
+
 - **Colors**: Paper (cream), Ink (dark), Leather (brown), Border
 - **Fonts**: Crimson Text (serif), Inter (sans), JetBrains Mono (code)
 - **Philosophy**: Warm, sepia aesthetic inspired by physical books

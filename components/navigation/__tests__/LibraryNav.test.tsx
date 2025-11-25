@@ -8,9 +8,7 @@ vi.mock("next/navigation", () => ({
 import { BookOpen } from "lucide-react";
 import { LibraryNav, type LibraryNavLink } from "../LibraryNav";
 
-const links: LibraryNavLink[] = [
-  { href: "/library", label: "Library", icon: "book" },
-];
+const links: LibraryNavLink[] = [{ href: "/library", label: "Library", icon: "book" }];
 
 beforeEach(() => {
   localStorage.clear();

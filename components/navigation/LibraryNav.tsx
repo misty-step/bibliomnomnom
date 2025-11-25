@@ -24,14 +24,20 @@ type LibraryNavProps = {
 
 const DEFAULT_STORAGE_KEY = "library-nav-collapsed";
 
-export function LibraryNav({ links, storageKey = DEFAULT_STORAGE_KEY, layout = "rail" }: LibraryNavProps) {
+export function LibraryNav({
+  links,
+  storageKey = DEFAULT_STORAGE_KEY,
+  layout = "rail",
+}: LibraryNavProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useCollapsePreference(storageKey, layout === "rail");
   const linkRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
   const activeIndex = useMemo(() => {
     if (!pathname) return -1;
-    return links.findIndex((link) => pathname === link.href || pathname.startsWith(`${link.href}/`));
+    return links.findIndex(
+      (link) => pathname === link.href || pathname.startsWith(`${link.href}/`),
+    );
   }, [links, pathname]);
 
   if (layout === "bar") {
@@ -45,7 +51,9 @@ export function LibraryNav({ links, storageKey = DEFAULT_STORAGE_KEY, layout = "
               href={link.href}
               className={cn(
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition",
-                isActive ? "bg-action-electric text-surface-dawn" : "bg-paper text-text-ink/70 hover:text-text-ink"
+                isActive
+                  ? "bg-action-electric text-surface-dawn"
+                  : "bg-paper text-text-ink/70 hover:text-text-ink",
               )}
             >
               <Icon name={link.icon} className="h-4 w-4" />
@@ -82,16 +90,14 @@ export function LibraryNav({ links, storageKey = DEFAULT_STORAGE_KEY, layout = "
                 "group flex items-center gap-3 rounded-[var(--radius-md)] px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-ink/20",
                 collapsed ? "justify-center" : "justify-start",
                 "motion-hover-lift",
-                isActive ? "bg-text-ink text-surface-dawn" : "text-text-ink/70 hover:text-text-ink"
+                isActive ? "bg-text-ink text-surface-dawn" : "text-text-ink/70 hover:text-text-ink",
               )}
               aria-current={isActive ? "page" : undefined}
               onKeyDown={(event) => handleArrowNavigation(event, index, linkRefs.current)}
             >
               <Icon name={link.icon} className="h-4 w-4" aria-hidden="true" />
               {!collapsed && (
-                <span className="font-mono uppercase tracking-[0.2em]">
-                  {link.label}
-                </span>
+                <span className="font-mono uppercase tracking-[0.2em]">{link.label}</span>
               )}
             </Link>
           );
@@ -112,7 +118,7 @@ function Icon({ name, className, ...props }: { name: LibraryNavIcon; className?:
 function handleArrowNavigation(
   event: React.KeyboardEvent,
   currentIndex: number,
-  refs: Array<HTMLAnchorElement | null>
+  refs: Array<HTMLAnchorElement | null>,
 ) {
   if (event.key !== "ArrowDown" && event.key !== "ArrowUp") {
     return;

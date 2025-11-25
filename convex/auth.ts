@@ -8,7 +8,7 @@ import type { Id } from "./_generated/dataModel";
  */
 async function getUserByClerkId(
   ctx: QueryCtx | MutationCtx,
-  clerkId: string
+  clerkId: string,
 ): Promise<Id<"users"> | null> {
   const user = await ctx.db
     .query("users")
@@ -21,7 +21,7 @@ async function getUserByClerkId(
 async function ensureUserExists(
   ctx: QueryCtx | MutationCtx,
   identity: NonNullable<Awaited<ReturnType<QueryCtx["auth"]["getUserIdentity"]>>>,
-  existingUserId: Id<"users"> | null
+  existingUserId: Id<"users"> | null,
 ): Promise<Id<"users"> | null> {
   if (existingUserId || !("insert" in ctx.db)) {
     // Already exists or read-only context (queries cannot create users)
@@ -32,15 +32,15 @@ async function ensureUserExists(
     typeof identity.email === "string"
       ? identity.email
       : typeof identity.emailVerified === "string"
-      ? identity.emailVerified
-      : `no-email-${identity.subject}@placeholder.local`;
+        ? identity.emailVerified
+        : `no-email-${identity.subject}@placeholder.local`;
 
   const imageUrl =
     typeof identity.pictureUrl === "string"
       ? identity.pictureUrl
       : typeof identity.picture === "string"
-      ? identity.picture
-      : undefined;
+        ? identity.picture
+        : undefined;
 
   let insertError: unknown;
   try {
@@ -100,9 +100,7 @@ async function ensureUserExists(
  * });
  * ```
  */
-export async function requireAuth(
-  ctx: QueryCtx | MutationCtx
-): Promise<Id<"users">> {
+export async function requireAuth(ctx: QueryCtx | MutationCtx): Promise<Id<"users">> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
     throw new Error("Unauthenticated: User must be signed in");
@@ -140,9 +138,7 @@ export async function requireAuth(
  * });
  * ```
  */
-export async function getAuthOrNull(
-  ctx: QueryCtx | MutationCtx
-): Promise<Id<"users"> | null> {
+export async function getAuthOrNull(ctx: QueryCtx | MutationCtx): Promise<Id<"users"> | null> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 

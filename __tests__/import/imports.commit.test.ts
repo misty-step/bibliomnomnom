@@ -125,9 +125,7 @@ describe("commitImportHandler", () => {
     const result = await commitImportHandler(ctx, {
       importRunId: "run1",
       page: 0,
-      decisions: [
-        { tempId: "t2", action: "merge", existingBookId: "book1" as any },
-      ],
+      decisions: [{ tempId: "t2", action: "merge", existingBookId: "book1" as any }],
     } as any);
 
     expect(result.merged).toBe(1);

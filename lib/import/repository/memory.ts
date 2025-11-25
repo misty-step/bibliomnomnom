@@ -1,10 +1,6 @@
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
-import type {
-  BookRepository,
-  ImportPreviewRepository,
-  ImportRunRepository,
-} from "./interfaces";
+import type { BookRepository, ImportPreviewRepository, ImportRunRepository } from "./interfaces";
 
 const now = () => Date.now();
 
@@ -60,7 +56,7 @@ export class InMemoryImportRunRepository implements ImportRunRepository {
   async findByUserAndRun(userId: Id<"users">, runId: string): Promise<Doc<"importRuns"> | null> {
     return (
       Array.from(this.runs.values()).find(
-        (run) => run.userId === userId && run.importRunId === runId
+        (run) => run.userId === userId && run.importRunId === runId,
       ) ?? null
     );
   }
@@ -68,7 +64,7 @@ export class InMemoryImportRunRepository implements ImportRunRepository {
   async findRecentByUser(userId: Id<"users">, sinceMs: number): Promise<Doc<"importRuns">[]> {
     const cutoff = now() - sinceMs;
     return Array.from(this.runs.values()).filter(
-      (run) => run.userId === userId && (run.createdAt ?? run._creationTime) >= cutoff
+      (run) => run.userId === userId && (run.createdAt ?? run._creationTime) >= cutoff,
     );
   }
 
@@ -105,12 +101,14 @@ export class InMemoryImportPreviewRepository implements ImportPreviewRepository 
   async findByUserRunPage(
     userId: Id<"users">,
     runId: string,
-    page: number
+    page: number,
   ): Promise<Doc<"importPreviews"> | null> {
     return this.previews.get(this.key(userId, runId, page)) ?? null;
   }
 
-  async create(preview: Omit<Doc<"importPreviews">, "_id" | "_creationTime">): Promise<Id<"importPreviews">> {
+  async create(
+    preview: Omit<Doc<"importPreviews">, "_id" | "_creationTime">,
+  ): Promise<Id<"importPreviews">> {
     const _id = makeId("importPreview", this.next) as Id<"importPreviews">;
     const doc: Doc<"importPreviews"> = { ...preview, _id, _creationTime: now() };
     this.previews.set(this.key(preview.userId, preview.importRunId, preview.page), doc);

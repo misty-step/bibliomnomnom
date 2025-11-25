@@ -21,8 +21,7 @@ const surfaceVariants = cva(
       },
       interactive: {
         false: "",
-        true:
-          "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-ink/20 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-bone hover:shadow-[var(--elevation-raised)] active:scale-[0.99]",
+        true: "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-ink/20 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-bone hover:shadow-[var(--elevation-raised)] active:scale-[0.99]",
       },
     },
     defaultVariants: {
@@ -30,7 +29,7 @@ const surfaceVariants = cva(
       padding: "md",
       interactive: false,
     },
-  }
+  },
 );
 
 type SurfaceVariants = VariantProps<typeof surfaceVariants>;
@@ -57,7 +56,7 @@ export type SurfaceProps<T extends React.ElementType = "div"> = SurfaceOwnProps 
 
 type SurfaceComponent = {
   <T extends React.ElementType = "div">(
-    props: SurfaceProps<T> & { ref?: React.Ref<any> }
+    props: SurfaceProps<T> & { ref?: React.Ref<any> },
   ): React.ReactElement | null;
   displayName?: string;
 };
@@ -72,7 +71,7 @@ export const Surface = React.forwardRef(
       className,
       ...rest
     }: SurfaceProps<T>,
-    ref?: React.Ref<any>
+    ref?: React.Ref<any>,
   ) => {
     const Component = (as ?? "div") as React.ElementType;
 
@@ -81,14 +80,11 @@ export const Surface = React.forwardRef(
         ref={ref}
         data-surface-elevation={elevation}
         data-surface-interactive={interactive ? "true" : undefined}
-        className={cn(
-          surfaceVariants({ elevation, padding, interactive }),
-          className
-        )}
+        className={cn(surfaceVariants({ elevation, padding, interactive }), className)}
         {...rest}
       />
     );
-  }
+  },
 ) as SurfaceComponent;
 
 Surface.displayName = "Surface";

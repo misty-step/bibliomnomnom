@@ -73,7 +73,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for gitleaks
+          fetch-depth: 0 # Full history for gitleaks
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:

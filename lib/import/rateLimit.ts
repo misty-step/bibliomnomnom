@@ -19,7 +19,7 @@ export const shouldSkipRateLimits = (): boolean => process.env.NODE_ENV === "dev
 export const checkImportRateLimits = async (
   repository: ImportRunRepository,
   userId: Id<"users">,
-  config: RateLimitConfig = DEFAULT_RATE_LIMITS
+  config: RateLimitConfig = DEFAULT_RATE_LIMITS,
 ): Promise<void> => {
   const now = Date.now();
   const runs = await repository.findRecentByUser(userId, 24 * 60 * 60 * 1000);
@@ -31,10 +31,12 @@ export const checkImportRateLimits = async (
   const inFlight = runs.filter(
     (run) =>
       run.status === "previewed" &&
-      now - (run.updatedAt ?? run._creationTime ?? 0) < config.previewTimeoutMs
+      now - (run.updatedAt ?? run._creationTime ?? 0) < config.previewTimeoutMs,
   );
 
   if (inFlight.length >= config.concurrentLimit) {
-    throw new Error("Too many concurrent imports. Finish existing imports before starting another.");
+    throw new Error(
+      "Too many concurrent imports. Finish existing imports before starting another.",
+    );
   }
 };

@@ -3,12 +3,7 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
 import { requireAuth } from "./auth";
-import {
-  parsedBookSchema,
-  ParseError,
-  ParsedBook,
-  LLM_TOKEN_CAP,
-} from "../lib/import/types";
+import { parsedBookSchema, ParseError, ParsedBook, LLM_TOKEN_CAP } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
 import { matchBooks } from "../lib/import/dedup/core";
 import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../lib/import/llm";
@@ -24,8 +19,7 @@ type Decision = {
   fieldsToMerge?: string[];
 };
 
-const isCsvSource = (source: string) =>
-  source === "goodreads-csv" || source === "csv";
+const isCsvSource = (source: string) => source === "goodreads-csv" || source === "csv";
 
 const preparePreviewArgs = {
   importRunId: v.string(),
@@ -34,7 +28,7 @@ const preparePreviewArgs = {
     v.literal("csv"),
     v.literal("txt"),
     v.literal("md"),
-    v.literal("unknown")
+    v.literal("unknown"),
   ),
   rows: v.optional(v.array(parsedBookSchema)),
   rawText: v.optional(v.string()),
@@ -53,14 +47,10 @@ const commitImportArgs = {
   decisions: v.array(
     v.object({
       tempId: v.string(),
-      action: v.union(
-        v.literal("skip"),
-        v.literal("merge"),
-        v.literal("create")
-      ),
+      action: v.union(v.literal("skip"), v.literal("merge"), v.literal("create")),
       fieldsToMerge: v.optional(v.array(v.string())),
       existingBookId: v.optional(v.id("books")),
-    })
+    }),
   ),
 };
 
@@ -114,11 +104,7 @@ export const adminCleanupAllStuckImports = mutation({
 export const extractBooks = action({
   args: {
     rawText: v.string(),
-    sourceType: v.union(
-      v.literal("txt"),
-      v.literal("md"),
-      v.literal("unknown")
-    ),
+    sourceType: v.union(v.literal("txt"), v.literal("md"), v.literal("unknown")),
     importRunId: v.string(),
   },
   handler: async (ctx, args) => {
@@ -164,7 +150,7 @@ export const preparePreviewHandler = async (
     rawText?: string;
     page: number;
     totalPages?: number;
-  }
+  },
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
   const repos = createConvexRepositories(ctx.db as any);
@@ -236,7 +222,7 @@ const upsertImportRun = async (
     rowCount: number;
     errors: number;
     status: "previewed" | "failed" | "committed";
-  }
+  },
 ) => {
   const existing = await importRunRepo.findByUserAndRun(params.userId, params.importRunId);
 
@@ -290,7 +276,7 @@ export const commitImportHandler = async (
       fieldsToMerge?: string[];
       existingBookId?: Id<"books">;
     }>;
-  }
+  },
 ) => {
   const userId = (await requireAuth(ctx)) as Id<"users">;
   const repos = createConvexRepositories(ctx.db as any);
@@ -319,7 +305,12 @@ export const commitImportHandler = async (
   const decisionsByTempId = new Map<string, Decision>();
   args.decisions.forEach((d) => decisionsByTempId.set(d.tempId, d));
 
-  const incomingMap = await loadPreviewRows(repos.importPreviews, userId, args.importRunId, args.page);
+  const incomingMap = await loadPreviewRows(
+    repos.importPreviews,
+    userId,
+    args.importRunId,
+    args.page,
+  );
 
   let created = 0;
   let merged = 0;
@@ -396,7 +387,7 @@ const loadPreviewRows = async (
   previewRepo: any,
   userId: Id<"users">,
   importRunId: string,
-  page: number
+  page: number,
 ): Promise<Map<string, ParsedBook>> => {
   const map = new Map<string, ParsedBook>();
   const preview = await previewRepo.findByUserRunPage(userId, importRunId, page);

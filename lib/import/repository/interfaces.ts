@@ -19,7 +19,9 @@ export interface ImportPreviewRepository {
   findByUserRunPage(
     userId: Id<"users">,
     runId: string,
-    page: number
+    page: number,
   ): Promise<Doc<"importPreviews"> | null>;
-  create(preview: Omit<Doc<"importPreviews">, "_id" | "_creationTime">): Promise<Id<"importPreviews">>;
+  create(
+    preview: Omit<Doc<"importPreviews">, "_id" | "_creationTime">,
+  ): Promise<Id<"importPreviews">>;
 }

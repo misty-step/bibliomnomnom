@@ -12,7 +12,12 @@ type PreviewTableProps = {
   onDecisionChange: (tempId: string, action: "skip" | "merge" | "create") => void;
 };
 
-export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }: PreviewTableProps) {
+export function PreviewTable({
+  rows,
+  dedupMatches,
+  decisions,
+  onDecisionChange,
+}: PreviewTableProps) {
   const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
 
   const matchByTemp = new Map<string, DedupMatch>();
@@ -26,14 +31,14 @@ export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }
     return "skip"; // Low confidence → needs review
   };
 
-  const allSelected = rows.length > 0 && rows.every(r => selectedRows.has(r.tempId));
-  const someSelected = rows.some(r => selectedRows.has(r.tempId));
+  const allSelected = rows.length > 0 && rows.every((r) => selectedRows.has(r.tempId));
+  const someSelected = rows.some((r) => selectedRows.has(r.tempId));
 
   const handleSelectAll = () => {
     if (allSelected) {
       setSelectedRows(new Set());
     } else {
-      setSelectedRows(new Set(rows.map(r => r.tempId)));
+      setSelectedRows(new Set(rows.map((r) => r.tempId)));
     }
   };
 
@@ -48,7 +53,7 @@ export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }
   };
 
   const handleBatchAction = (action: "skip" | "merge" | "create") => {
-    selectedRows.forEach(tempId => {
+    selectedRows.forEach((tempId) => {
       onDecisionChange(tempId, action);
     });
     setSelectedRows(new Set()); // Clear selection after batch action
@@ -59,9 +64,7 @@ export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }
       {/* Batch action bar - only show when rows are selected */}
       {someSelected && (
         <div className="sticky top-0 z-10 flex items-center gap-3 rounded-lg border border-line-ember bg-surface-dawn px-3 py-2 shadow-soft">
-          <span className="text-sm font-medium text-text-ink">
-            {selectedRows.size} selected
-          </span>
+          <span className="text-sm font-medium text-text-ink">{selectedRows.size} selected</span>
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => handleBatchAction("create")}>
               Create All
@@ -96,49 +99,54 @@ export function PreviewTable({ rows, dedupMatches, decisions, onDecisionChange }
           <span className="min-w-32">Status</span>
           <span className="min-w-32">Decision</span>
         </div>
-      <div className="divide-y divide-line-ghost bg-canvas-bone">
-        {rows.map((row) => {
-          const match = matchByTemp.get(row.tempId);
-          const decision = decisions[row.tempId]?.action ?? getDefaultDecision(row.tempId);
-          const isSelected = selectedRows.has(row.tempId);
-          return (
-            <div key={row.tempId} className="grid grid-cols-[auto,1fr,1fr,auto,auto] items-center gap-2 px-3 py-3 text-sm">
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => handleToggleRow(row.tempId)}
-                className="mr-3"
-                aria-label={`Select ${row.title}`}
-              />
-              <div className="space-y-0.5">
-                <p className="font-medium text-text-ink">{row.title}</p>
-                <p className="text-xs text-text-inkMuted">ISBN {row.isbn ?? "—"}</p>
-                {(row.dateStarted || row.dateFinished) && (
-                  <p className="text-xs text-status-positive">
-                    {row.dateStarted && `Started ${new Date(row.dateStarted).toLocaleDateString()}`}
-                    {row.dateStarted && row.dateFinished && " • "}
-                    {row.dateFinished && `Finished ${new Date(row.dateFinished).toLocaleDateString()}`}
-                  </p>
-                )}
+        <div className="divide-y divide-line-ghost bg-canvas-bone">
+          {rows.map((row) => {
+            const match = matchByTemp.get(row.tempId);
+            const decision = decisions[row.tempId]?.action ?? getDefaultDecision(row.tempId);
+            const isSelected = selectedRows.has(row.tempId);
+            return (
+              <div
+                key={row.tempId}
+                className="grid grid-cols-[auto,1fr,1fr,auto,auto] items-center gap-2 px-3 py-3 text-sm"
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => handleToggleRow(row.tempId)}
+                  className="mr-3"
+                  aria-label={`Select ${row.title}`}
+                />
+                <div className="space-y-0.5">
+                  <p className="font-medium text-text-ink">{row.title}</p>
+                  <p className="text-xs text-text-inkMuted">ISBN {row.isbn ?? "—"}</p>
+                  {(row.dateStarted || row.dateFinished) && (
+                    <p className="text-xs text-status-positive">
+                      {row.dateStarted &&
+                        `Started ${new Date(row.dateStarted).toLocaleDateString()}`}
+                      {row.dateStarted && row.dateFinished && " • "}
+                      {row.dateFinished &&
+                        `Finished ${new Date(row.dateFinished).toLocaleDateString()}`}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-text-ink">{row.author}</p>
+                  <p className="text-xs text-text-inkMuted">{row.publishedYear ?? ""}</p>
+                </div>
+                <span className="text-xs font-medium text-text-inkMuted">
+                  {row.status ?? DEFAULT_STATUS}
+                </span>
+                <DedupControls
+                  tempId={row.tempId}
+                  decision={decision}
+                  match={match}
+                  onChange={onDecisionChange}
+                />
               </div>
-              <div className="space-y-0.5">
-                <p className="text-text-ink">{row.author}</p>
-                <p className="text-xs text-text-inkMuted">{row.publishedYear ?? ""}</p>
-              </div>
-              <span className="text-xs font-medium text-text-inkMuted">{row.status ?? DEFAULT_STATUS}</span>
-              <DedupControls
-                tempId={row.tempId}
-                decision={decision}
-                match={match}
-                onChange={onDecisionChange}
-              />
-            </div>
-          );
-        })}
-        {rows.length === 0 && (
-          <p className="p-3 text-sm text-text-inkMuted">No rows.</p>
-        )}
-      </div>
+            );
+          })}
+          {rows.length === 0 && <p className="p-3 text-sm text-text-inkMuted">No rows.</p>}
+        </div>
       </div>
     </div>
   );

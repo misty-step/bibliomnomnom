@@ -2,12 +2,7 @@ const HEX_REGEX = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})(?![0-9a-fA-F])/;
 const RGB_REGEX = /\brgba?\s*\(/i;
 const PX_REGEX = /\b\d+(?:\.\d+)?px\b/i;
 
-const DEFAULT_ALLOW = [
-  /node_modules/,
-  /\.next\//,
-  /design-tokens/i,
-  /tokens\.generated/i
-];
+const DEFAULT_ALLOW = [/node_modules/, /\.next\//, /design-tokens/i, /tokens\.generated/i];
 
 const toRegex = (pattern) => {
   if (pattern instanceof RegExp) {
@@ -51,7 +46,7 @@ const inspectValue = (value, context, node, messageSuffix) => {
     context.report({
       node,
       messageId: "hex",
-      data: { suffix: messageSuffix }
+      data: { suffix: messageSuffix },
     });
     return;
   }
@@ -59,7 +54,7 @@ const inspectValue = (value, context, node, messageSuffix) => {
     context.report({
       node,
       messageId: "rgb",
-      data: { suffix: messageSuffix }
+      data: { suffix: messageSuffix },
     });
     return;
   }
@@ -67,7 +62,7 @@ const inspectValue = (value, context, node, messageSuffix) => {
     context.report({
       node,
       messageId: "px",
-      data: { suffix: messageSuffix }
+      data: { suffix: messageSuffix },
     });
   }
 };
@@ -79,7 +74,7 @@ const designTokensPlugin = {
         type: "problem",
         docs: {
           description: "Disallow raw color/spacing declarations outside of the design token system",
-          recommended: true
+          recommended: true,
         },
         schema: [
           {
@@ -87,20 +82,20 @@ const designTokensPlugin = {
             properties: {
               allow: {
                 type: "array",
-                items: { type: "string" }
+                items: { type: "string" },
               },
               messageSuffix: {
-                type: "string"
-              }
+                type: "string",
+              },
             },
-            additionalProperties: false
-          }
+            additionalProperties: false,
+          },
         ],
         messages: {
           hex: "Avoid raw hex colors. {{suffix}}",
           rgb: "Avoid raw rgb/rgba colors. {{suffix}}",
-          px: "Avoid hard-coded pixel values. {{suffix}}"
-        }
+          px: "Avoid hard-coded pixel values. {{suffix}}",
+        },
       },
       create(context) {
         const filename = context.getFilename();
@@ -120,11 +115,11 @@ const designTokensPlugin = {
           },
           TemplateElement(node) {
             inspectValue(node.value.raw, context, node, messageSuffix);
-          }
+          },
         };
-      }
-    }
-  }
+      },
+    },
+  },
 };
 
 export default designTokensPlugin;

@@ -3,74 +3,75 @@
  */
 
 export const designTokens = {
-  "colors": {
-    "canvas": {
-      "bone": "#FAF8F5",
-      "boneMuted": "#F2EDE5"
+  colors: {
+    canvas: {
+      bone: "#FAF8F5",
+      boneMuted: "#F2EDE5",
     },
-    "text": {
-      "ink": "#1C1917",
-      "inkMuted": "#78716C",
-      "inkSubtle": "#A8A29E"
+    text: {
+      ink: "#1C1917",
+      inkMuted: "#78716C",
+      inkSubtle: "#A8A29E",
     },
-    "surface": {
-      "dawn": "#FEFDFB"
+    surface: {
+      dawn: "#FEFDFB",
     },
-    "line": {
-      "ghost": "rgba(28,25,23,0.08)",
-      "ember": "rgba(28,25,23,0.15)"
+    line: {
+      ghost: "rgba(28,25,23,0.08)",
+      ember: "rgba(28,25,23,0.15)",
     },
-    "accent": {
-      "ember": "#DC2626"
+    accent: {
+      ember: "#DC2626",
     },
-    "status": {
-      "positive": "#46D549",
-      "warning": "#FFB347",
-      "danger": "#FF4D4F"
-    }
+    status: {
+      positive: "#46D549",
+      warning: "#FFB347",
+      danger: "#FF4D4F",
+    },
   },
-  "typography": {
-    "display": "\"Playfair Display\", \"Times New Roman\", serif",
-    "sans": "\"Geist\", \"Söhne\", \"Neue Montreal\", system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
-    "mono": "\"JetBrains Mono\", \"IBM Plex Mono\", monospace"
+  typography: {
+    display: '"Playfair Display", "Times New Roman", serif',
+    sans: '"Geist", "Söhne", "Neue Montreal", system-ui, -apple-system, BlinkMacSystemFont, sans-serif',
+    mono: '"JetBrains Mono", "IBM Plex Mono", monospace',
   },
-  "spacing": {
+  spacing: {
     "3xs": "0.25rem",
     "2xs": "0.375rem",
-    "xs": "0.5rem",
-    "sm": "0.75rem",
-    "md": "1rem",
-    "lg": "1.5rem",
-    "xl": "2rem",
+    xs: "0.5rem",
+    sm: "0.75rem",
+    md: "1rem",
+    lg: "1.5rem",
+    xl: "2rem",
     "2xl": "3rem",
-    "3xl": "4rem"
+    "3xl": "4rem",
   },
-  "layout": {
-    "spine": "12.5rem"
+  layout: {
+    spine: "12.5rem",
   },
-  "radii": {
-    "sm": "0.5rem",
-    "md": "0.75rem",
-    "lg": "1rem"
+  radii: {
+    sm: "0.5rem",
+    md: "0.75rem",
+    lg: "1rem",
   },
-  "elevation": {
-    "flat": "none",
-    "soft": "0 4px 16px rgba(12,22,38,0.06)",
-    "raised": "0 8px 24px rgba(5,8,16,0.12)"
+  elevation: {
+    flat: "none",
+    soft: "0 4px 16px rgba(12,22,38,0.06)",
+    raised: "0 8px 24px rgba(5,8,16,0.12)",
   },
-  "textures": {
-    "noise": "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E\")"
+  textures: {
+    noise:
+      "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E\")",
   },
-  "motion": {
-    "fast": {
-      "duration": "200ms",
-      "easing": "cubic-bezier(0.2, 0, 0, 1)"
+  motion: {
+    fast: {
+      duration: "200ms",
+      easing: "cubic-bezier(0.2, 0, 0, 1)",
     },
-    "base": {
-      "duration": "400ms",
-      "easing": "cubic-bezier(0.25, 1, 0.35, 1)"
-    }
-  }
+    base: {
+      duration: "400ms",
+      easing: "cubic-bezier(0.25, 1, 0.35, 1)",
+    },
+  },
 } as const;
 
 export type DesignTokens = typeof designTokens;
@@ -80,74 +81,74 @@ type TokenVars<T> = {
 };
 
 export const tokenVars = {
-  "colors": {
-    "accent": {
-      "ember": "var(--color-accent-ember)"
+  colors: {
+    accent: {
+      ember: "var(--color-accent-ember)",
     },
-    "canvas": {
-      "bone": "var(--color-canvas-bone)",
-      "boneMuted": "var(--color-canvas-bone-muted)"
+    canvas: {
+      bone: "var(--color-canvas-bone)",
+      boneMuted: "var(--color-canvas-bone-muted)",
     },
-    "line": {
-      "ember": "var(--color-line-ember)",
-      "ghost": "var(--color-line-ghost)"
+    line: {
+      ember: "var(--color-line-ember)",
+      ghost: "var(--color-line-ghost)",
     },
-    "status": {
-      "danger": "var(--color-status-danger)",
-      "positive": "var(--color-status-positive)",
-      "warning": "var(--color-status-warning)"
+    status: {
+      danger: "var(--color-status-danger)",
+      positive: "var(--color-status-positive)",
+      warning: "var(--color-status-warning)",
     },
-    "surface": {
-      "dawn": "var(--color-surface-dawn)"
+    surface: {
+      dawn: "var(--color-surface-dawn)",
     },
-    "text": {
-      "ink": "var(--color-text-ink)",
-      "inkMuted": "var(--color-text-ink-muted)",
-      "inkSubtle": "var(--color-text-ink-subtle)"
-    }
+    text: {
+      ink: "var(--color-text-ink)",
+      inkMuted: "var(--color-text-ink-muted)",
+      inkSubtle: "var(--color-text-ink-subtle)",
+    },
   },
-  "typography": {
-    "display": "var(--font-display)",
-    "mono": "var(--font-mono)",
-    "sans": "var(--font-sans)"
+  typography: {
+    display: "var(--font-display)",
+    mono: "var(--font-mono)",
+    sans: "var(--font-sans)",
   },
-  "spacing": {
+  spacing: {
     "2xl": "var(--space-2xl)",
     "2xs": "var(--space-2xs)",
     "3xl": "var(--space-3xl)",
     "3xs": "var(--space-3xs)",
-    "lg": "var(--space-lg)",
-    "md": "var(--space-md)",
-    "sm": "var(--space-sm)",
-    "xl": "var(--space-xl)",
-    "xs": "var(--space-xs)"
+    lg: "var(--space-lg)",
+    md: "var(--space-md)",
+    sm: "var(--space-sm)",
+    xl: "var(--space-xl)",
+    xs: "var(--space-xs)",
   },
-  "layout": {
-    "spine": "var(--layout-spine)"
+  layout: {
+    spine: "var(--layout-spine)",
   },
-  "radii": {
-    "lg": "var(--radius-lg)",
-    "md": "var(--radius-md)",
-    "sm": "var(--radius-sm)"
+  radii: {
+    lg: "var(--radius-lg)",
+    md: "var(--radius-md)",
+    sm: "var(--radius-sm)",
   },
-  "elevation": {
-    "flat": "var(--elevation-flat)",
-    "raised": "var(--elevation-raised)",
-    "soft": "var(--elevation-soft)"
+  elevation: {
+    flat: "var(--elevation-flat)",
+    raised: "var(--elevation-raised)",
+    soft: "var(--elevation-soft)",
   },
-  "textures": {
-    "noise": "var(--texture-noise)"
+  textures: {
+    noise: "var(--texture-noise)",
   },
-  "motion": {
-    "base": {
-      "duration": "var(--motion-base-duration)",
-      "easing": "var(--motion-base-easing)"
+  motion: {
+    base: {
+      duration: "var(--motion-base-duration)",
+      easing: "var(--motion-base-easing)",
     },
-    "fast": {
-      "duration": "var(--motion-fast-duration)",
-      "easing": "var(--motion-fast-easing)"
-    }
-  }
+    fast: {
+      duration: "var(--motion-fast-duration)",
+      easing: "var(--motion-fast-easing)",
+    },
+  },
 } as TokenVars<DesignTokens>;
 
 export type TokenVarsMap = typeof tokenVars;

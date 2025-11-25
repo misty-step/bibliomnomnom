@@ -33,7 +33,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className={cn(
         "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold",
-        meta.className
+        meta.className,
       )}
     >
       {meta.label}

@@ -1,9 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import {
-  handleUpload,
-  type HandleUploadBody,
-} from "@vercel/blob/client";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -42,8 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json(response);
   } catch (error) {
     console.error("Blob upload failed:", error);
-    const message =
-      error instanceof Error ? error.message : "Unable to generate upload token";
+    const message = error instanceof Error ? error.message : "Unable to generate upload token";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

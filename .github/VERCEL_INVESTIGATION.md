@@ -1,11 +1,14 @@
 # Vercel Duplicate Projects Investigation
 
 ## Issue
+
 Two Vercel projects are integrated with this GitHub repository, causing duplicate deployment checks:
+
 - `bibliomnomnom` (double 'n')
 - `biblomnomnom` (single 'n')
 
 ## Current Status
+
 - Local project linked to: `biblomnomnom` (single 'n') - Project ID: `prj_v6VfRjUZ1tmmIS3hkU6GoTeYWKWt`
 - Both projects trigger deployment on push/PR
 - Both deployments currently failing due to missing environment variables
@@ -15,6 +18,7 @@ Two Vercel projects are integrated with this GitHub repository, causing duplicat
 ### 1. Check Project Configurations
 
 **bibliomnomnom (double 'n')**:
+
 - URL: https://vercel.com/misty-step/bibliomnomnom
 - Check:
   - [ ] Does it have custom domain `www.bibliomnomnom.com`?
@@ -23,6 +27,7 @@ Two Vercel projects are integrated with this GitHub repository, causing duplicat
   - [ ] What framework is detected?
 
 **biblomnomnom (single 'n')**:
+
 - URL: https://vercel.com/misty-step/biblomnomnom
 - Check:
   - [ ] What domain(s) are configured?
@@ -33,6 +38,7 @@ Two Vercel projects are integrated with this GitHub repository, causing duplicat
 ### 2. Determine Which Project to Keep
 
 **Decision Criteria**:
+
 1. **Custom Domain**: Keep the project with `www.bibliomnomnom.com` configured
 2. **Environment Variables**: Keep the project with more complete configuration
 3. **Recent Activity**: Keep the project with recent successful deployments
@@ -41,12 +47,14 @@ Two Vercel projects are integrated with this GitHub repository, causing duplicat
 ### 3. Recommended Action
 
 **If duplicate (most likely)**:
+
 1. Identify the "wrong" project
 2. Go to that project's Settings → Git
 3. Disconnect GitHub integration
 4. (Optional) Delete the duplicate project entirely
 
 **Keep ONLY**:
+
 - The project with custom domain configured
 - OR the project that matches `.vercel/project.json` if both have domains
 
@@ -55,6 +63,7 @@ Two Vercel projects are integrated with this GitHub repository, causing duplicat
 Once single project identified, configure in Vercel Dashboard → Settings → Environment Variables:
 
 **Production Environment** (all values are placeholders; rotate real keys and keep out of git):
+
 ```bash
 # Clerk (from .env.production)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_REDACTED
@@ -76,6 +85,7 @@ NEXT_PUBLIC_IMPORT_ENABLED=true
 ```
 
 **Preview Environment**:
+
 ```bash
 # Convex Preview (from .env.production)
 CONVEX_DEPLOY_KEY=preview:REDACTED
@@ -92,6 +102,7 @@ CLERK_SECRET_KEY=(same as production)
 ### 5. Verify Fix
 
 After configuration:
+
 1. Push to branch → Should trigger ONLY ONE Vercel deployment check
 2. Deployment should succeed (build completes successfully)
 3. Check deployment logs for errors
@@ -100,16 +111,19 @@ After configuration:
 ## Current Deployment Failures
 
 Recent deployment: https://bibliomnomnom-1n539hi7f-misty-step.vercel.app
+
 - Status: ● Error
 - Build Duration: 0ms (immediate failure)
 - Likely cause: Missing `CONVEX_DEPLOY_KEY` environment variable
 
 **Build Command** (from vercel.json):
+
 ```bash
 npx convex deploy --cmd 'pnpm build'
 ```
 
 This requires:
+
 - `CONVEX_DEPLOY_KEY` to authenticate with Convex
 - `NEXT_PUBLIC_CONVEX_URL` for the Convex deployment URL
 - Without these, `npx convex deploy` fails immediately
@@ -136,6 +150,7 @@ This requires:
 **Root Cause Identified**: Missing `CONVEX_DEPLOY_KEY` environment variable in Preview environment, combined with decoupled build command that skips Convex deployment.
 
 **Solution Implemented**:
+
 1. ✅ Reverted `vercel.json` buildCommand to official recommended approach:
    - Changed from: `"buildCommand": "pnpm build:local"`
    - Changed to: `"buildCommand": "npx convex deploy --cmd 'next build'"`
@@ -143,18 +158,21 @@ This requires:
    - See: `.github/VERCEL_ENV_SETUP_GUIDE.md` for detailed instructions
 
 **Research conducted**:
+
 - Official Convex documentation analysis
 - Exa deep research (50+ production examples)
 - Gemini AI synthesis of best practices
 - Convex Discord community discussions (2025)
 
 **Key finding**: Coupled deployment (official approach) is superior to decoupled deployment for:
+
 - Automatic branch-based preview isolation
 - Zero manual Convex deployment steps
 - Type safety guarantees
 - Automatic cleanup (14-day TTL)
 
 **Next steps**:
+
 1. Configure environment variables in Vercel Dashboard (see guide)
 2. Push this commit to trigger new preview deployment
 3. Verify preview deployment works

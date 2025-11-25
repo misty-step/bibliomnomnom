@@ -30,14 +30,14 @@ However, this requires the `CONVEX_DEPLOY_KEY` environment variable to be config
 
    Check that these are already configured for Preview environment:
 
-   | Variable | Expected Value | Source |
-   |----------|---------------|--------|
-   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_...` or `pk_test_...` | Clerk dashboard |
-   | `CLERK_SECRET_KEY` | `sk_live_...` or `sk_test_...` | Clerk dashboard |
-   | `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` | Static |
-   | `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` | Static |
-   | `BLOB_READ_WRITE_TOKEN` | (auto-configured) | Vercel Blob integration |
-   | `NEXT_PUBLIC_IMPORT_ENABLED` | `true` | Feature flag |
+   | Variable                            | Expected Value                 | Source                  |
+   | ----------------------------------- | ------------------------------ | ----------------------- |
+   | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_...` or `pk_test_...` | Clerk dashboard         |
+   | `CLERK_SECRET_KEY`                  | `sk_live_...` or `sk_test_...` | Clerk dashboard         |
+   | `NEXT_PUBLIC_CLERK_SIGN_IN_URL`     | `/sign-in`                     | Static                  |
+   | `NEXT_PUBLIC_CLERK_SIGN_UP_URL`     | `/sign-up`                     | Static                  |
+   | `BLOB_READ_WRITE_TOKEN`             | (auto-configured)              | Vercel Blob integration |
+   | `NEXT_PUBLIC_IMPORT_ENABLED`        | `true`                         | Feature flag            |
 
    **Optional (for import feature):**
    - `OPENAI_API_KEY` - OpenAI API key for LLM extraction
@@ -55,17 +55,17 @@ However, this requires the `CONVEX_DEPLOY_KEY` environment variable to be config
 
 Confirm these are configured for **Production** environment:
 
-| Variable | Expected Value | Notes |
-|----------|---------------|-------|
-| `CONVEX_DEPLOY_KEY` | `prod:doting-spider-972\|{token}` | **Required** |
-| `NEXT_PUBLIC_CONVEX_URL` | `https://doting-spider-972.convex.cloud` | **Set explicitly** |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_...` | Production key |
-| `CLERK_SECRET_KEY` | `sk_live_...` | Production key |
-| `CLERK_WEBHOOK_SECRET` | `whsec_...` | Production webhook |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | `/sign-in` | Static |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | `/sign-up` | Static |
-| `BLOB_READ_WRITE_TOKEN` | (auto-configured) | Vercel integration |
-| `NEXT_PUBLIC_IMPORT_ENABLED` | `true` | Feature flag |
+| Variable                            | Expected Value                           | Notes              |
+| ----------------------------------- | ---------------------------------------- | ------------------ |
+| `CONVEX_DEPLOY_KEY`                 | `prod:doting-spider-972\|{token}`        | **Required**       |
+| `NEXT_PUBLIC_CONVEX_URL`            | `https://doting-spider-972.convex.cloud` | **Set explicitly** |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_...`                            | Production key     |
+| `CLERK_SECRET_KEY`                  | `sk_live_...`                            | Production key     |
+| `CLERK_WEBHOOK_SECRET`              | `whsec_...`                              | Production webhook |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`     | `/sign-in`                               | Static             |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`     | `/sign-up`                               | Static             |
+| `BLOB_READ_WRITE_TOKEN`             | (auto-configured)                        | Vercel integration |
+| `NEXT_PUBLIC_IMPORT_ENABLED`        | `true`                                   | Feature flag       |
 
 ---
 
@@ -120,11 +120,13 @@ Once environment variables are configured:
 ### If preview deployment still fails:
 
 **Check build logs for:**
+
 - ❌ "Missing CONVEX_DEPLOY_KEY" → Variable not configured correctly
 - ❌ "Invalid deploy key" → Wrong key format or type
 - ❌ "Deployment failed" → Check Convex dashboard for errors
 
 **Common issues:**
+
 1. **Used wrong key type**: Production key in Preview environment (or vice versa)
 2. **Key not scoped correctly**: Must select "Preview" environment when adding variable
 3. **Typo in variable name**: Must be exactly `CONVEX_DEPLOY_KEY`
@@ -132,6 +134,7 @@ Once environment variables are configured:
 ### If app loads but shows "Backend not configured":
 
 This means `NEXT_PUBLIC_CONVEX_URL` is not being injected. Verify:
+
 1. Build command is `npx convex deploy --cmd 'next build'`
 2. `CONVEX_DEPLOY_KEY` is set for Preview environment
 3. No manually-set `NEXT_PUBLIC_CONVEX_URL` in Preview (conflicts with auto-injection)
@@ -143,10 +146,12 @@ This means `NEXT_PUBLIC_CONVEX_URL` is not being injected. Verify:
 After preview deployments are working, clean up the duplicate project:
 
 **Investigation findings** (from VERCEL_INVESTIGATION.md):
+
 - Two projects exist: `bibliomnomnom` (double 'n') and `biblomnomnom` (single 'n')
 - Both are triggering deployment checks
 
 **Action:**
+
 1. Identify which project has custom domain `www.bibliomnomnom.com`
 2. In the OTHER project:
    - Go to Settings → Git

@@ -79,7 +79,7 @@ export function BookForm({
       ...DEFAULT_VALUES,
       ...initialValues,
     }),
-    [initialValues]
+    [initialValues],
   );
 
   const [values, setValues] = useState<BookFormValues>(snapshot);
@@ -167,7 +167,7 @@ export function BookForm({
                   "flex-1 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
                   values.status === option.value
                     ? "bg-text-ink text-canvas-bone shadow-sm"
-                    : "text-text-inkMuted hover:text-text-ink"
+                    : "text-text-inkMuted hover:text-text-ink",
                 )}
               >
                 {option.label}
@@ -187,10 +187,12 @@ export function BookForm({
               "flex w-full items-center justify-center gap-2 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
               values.isFavorite
                 ? "bg-text-ink text-canvas-bone shadow-sm"
-                : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink"
+                : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink",
             )}
           >
-            <Star className={cn("h-3.5 w-3.5", values.isFavorite && "fill-amber-400 text-amber-400")} />
+            <Star
+              className={cn("h-3.5 w-3.5", values.isFavorite && "fill-amber-400 text-amber-400")}
+            />
             Favorite
           </button>
         </FormField>
@@ -288,10 +290,7 @@ export function BookForm({
             Cancel
           </button>
         )}
-        <Button
-          type="submit"
-          disabled={isSubmitting || (requireDirtyForSubmit && !isDirty)}
-        >
+        <Button type="submit" disabled={isSubmitting || (requireDirtyForSubmit && !isDirty)}>
           {isSubmitting ? busyLabel : submitLabel}
         </Button>
       </div>

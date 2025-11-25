@@ -277,6 +277,7 @@ import { cn } from "@/lib/utils";
 ## Component Organization
 
 ### Small Components (<100 lines)
+
 Keep in single file:
 
 ```
@@ -284,6 +285,7 @@ components/book/BookCard.tsx
 ```
 
 ### Large Components (>100 lines)
+
 Extract sub-components:
 
 ```
@@ -299,6 +301,7 @@ components/book/
 ## Testing Components
 
 ### Current: Manual Testing
+
 Test components via Storybook (configured but no stories yet) or browser.
 
 ### Future: Automated Tests
@@ -339,24 +342,29 @@ See [BACKLOG.md](../BACKLOG.md) for component testing roadmap.
 ## Common Issues
 
 ### Component not re-rendering after mutation
+
 **Cause**: Not using Convex hooks or mutation not updating database.
 **Fix**: Use `useAuthedQuery` for reads (auto-subscribes to changes).
 
 ### "Cannot read property 'title' of undefined"
+
 **Cause**: Data still loading (query returns `undefined` during fetch).
 **Fix**: Add loading state check before accessing data.
 
 ### Styles not applying
+
 **Cause**: Tailwind class name not recognized or CSS not rebuilt.
 **Fix**: Restart `pnpm dev` to rebuild Tailwind.
 
 ### Type errors on Convex data
+
 **Cause**: Generated types out of sync with schema.
 **Fix**: Run `pnpm convex:push` to regenerate types.
 
 ## Best Practices
 
 ### ✅ DO:
+
 - Use `useAuthedQuery` for Convex data (auto-subscribes)
 - Handle loading, empty, and error states
 - Use shadcn/ui primitives for consistency
@@ -365,6 +373,7 @@ See [BACKLOG.md](../BACKLOG.md) for component testing roadmap.
 - Add `key` prop to mapped elements
 
 ### ❌ DON'T:
+
 - Fetch data with `useEffect` + `fetch` (use Convex hooks)
 - Mutate props (components should be pure)
 - Store server state in `useState` (use Convex reactivity)

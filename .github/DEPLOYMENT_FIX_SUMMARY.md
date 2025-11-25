@@ -8,6 +8,7 @@
 ## Root Causes Identified
 
 ### 1. Missing `--cmd-url-env-var-name` Flag in Build Command
+
 **Problem**: `vercel.json` had `buildCommand: "npx convex deploy --cmd 'next build'"` without the flag to auto-set `NEXT_PUBLIC_CONVEX_URL`.
 
 **Evidence**: Build logs showed Convex deployment succeeded but `NEXT_PUBLIC_CONVEX_URL` was never set, causing the app to show "Backend not configured" error.
@@ -15,22 +16,26 @@
 **Solution**: Updated to `buildCommand: "npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'next build'"`
 
 ### 2. Missing `CONVEX_DEPLOY_KEY` in Vercel Environment Variables
+
 **Problem**: Despite being "configured" earlier via CLI, the `CONVEX_DEPLOY_KEY` was not actually present in Vercel's environment variables list.
 
 **Evidence**: `vercel env ls` showed only 9 variables, missing the critical `CONVEX_DEPLOY_KEY`.
 
 **Solution**: Added deploy keys to Vercel:
+
 ```bash
 echo -n "preview:phaedrus:bibliomnomnom|eyJ2MiI6IjVlNGRlYzY0ZjQ4ZTQ5MDM4MGZlMDFmNjUzOGM5ODAyIn0=" | vercel env add CONVEX_DEPLOY_KEY preview
 echo -n "prod:doting-spider-972|eyJ2MiI6ImVmZDE1ZmFkODg5NzRlMmNiZWE5YTZmNmQ3OTFhYTkxIn0=" | vercel env add CONVEX_DEPLOY_KEY production
 ```
 
 ### 3. Convex Static Analysis of `auth.config.ts`
+
 **Problem**: Convex validates auth config server-side and rejects deployments that reference `process.env.CLERK_JWT_ISSUER_DOMAIN` if the variable doesn't exist on the deployment, even with fallback values.
 
 **Evidence**: Multiple deployments failed with "Environment variable CLERK_JWT_ISSUER_DOMAIN is used in auth config file but its value was not set" even after adding the variable to Convex production deployment and using `|| "fallback"` syntax.
 
 **Solution**: Hardcoded the Clerk JWT issuer domain directly in `convex/auth.config.ts` since it's the same across all environments:
+
 ```typescript
 export default {
   providers: [
@@ -71,6 +76,7 @@ export default {
 **Convex Backend**: <https://festive-dinosaur-434.convex.cloud>
 
 **Build Log Evidence**:
+
 ```plaintext
 ✔ Deployed Convex functions to https://festive-dinosaur-434.convex.cloud
 ✔ Added table indexes:
@@ -92,23 +98,29 @@ export default {
 Analyzed sibling projects (volume, scry) that successfully use Vercel + Convex + Clerk:
 
 **volume/vercel.json**:
+
 ```json
 {
   "buildCommand": "npx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'pnpm run build'",
   "framework": "nextjs"
 }
 ```
+
 ✅ Uses `--cmd-url-env-var-name` flag (same pattern we adopted)
 
 **volume/convex/auth.config.ts**:
+
 ```typescript
 export default {
-  providers: [{
-    domain: process.env.CLERK_JWT_ISSUER_DOMAIN,
-    applicationID: "convex",
-  }],
+  providers: [
+    {
+      domain: process.env.CLERK_JWT_ISSUER_DOMAIN,
+      applicationID: "convex",
+    },
+  ],
 };
 ```
+
 ✅ Has `CLERK_JWT_ISSUER_DOMAIN` set on Convex production deployment
 
 **Our Solution**: Since preview deployments don't inherit Convex environment variables and Convex's static analysis rejects `process.env` references, we hardcoded the value instead.
@@ -118,6 +130,7 @@ export default {
 ## Environment Variable Configuration Status
 
 ### Vercel (bibliomnomnom project):
+
 - ✅ `CONVEX_DEPLOY_KEY` (Preview + Production)
 - ✅ `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
 - ✅ `CLERK_SECRET_KEY`
@@ -130,6 +143,7 @@ export default {
 - ✅ `BLOB_READ_WRITE_TOKEN`
 
 ### Convex (Production Deployment):
+
 - ✅ `CLERK_JWT_ISSUER_DOMAIN` (but now unused due to hardcoding)
 - ✅ `GEMINI_API_KEY`
 - ✅ `OPENAI_API_KEY`

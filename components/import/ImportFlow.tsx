@@ -58,7 +58,11 @@ export function ImportFlow() {
     if (status !== prev) {
       if (status === "parsing") {
         startedAtRef.current = Date.now();
-        logImportEvent({ phase: "preview", importRunId: job.state.importRunId ?? "pending", sourceType: "detecting" });
+        logImportEvent({
+          phase: "preview",
+          importRunId: job.state.importRunId ?? "pending",
+          sourceType: "detecting",
+        });
       }
 
       if (status === "ready") {
@@ -93,7 +97,14 @@ export function ImportFlow() {
 
       prevStatus.current = status;
     }
-  }, [job.state.importRunId, job.state.page, job.state.pages, job.state.sourceType, job.state.status, job.state.summary]);
+  }, [
+    job.state.importRunId,
+    job.state.page,
+    job.state.pages,
+    job.state.sourceType,
+    job.state.status,
+    job.state.summary,
+  ]);
 
   if (!IMPORT_ENABLED) {
     return (
@@ -103,7 +114,10 @@ export function ImportFlow() {
     );
   }
 
-  const isWorking = job.state.status === "parsing" || job.state.status === "previewing" || job.state.status === "committing";
+  const isWorking =
+    job.state.status === "parsing" ||
+    job.state.status === "previewing" ||
+    job.state.status === "committing";
 
   return (
     <div className="space-y-4">
@@ -111,9 +125,13 @@ export function ImportFlow() {
         <div className="flex items-center justify-between">
           <div>
             <p className="font-display text-xl text-text-ink">Import your library</p>
-            <p className="text-sm text-text-inkMuted">Goodreads, StoryGraph, TXT, or Markdown. Up to 10MB.</p>
+            <p className="text-sm text-text-inkMuted">
+              Goodreads, StoryGraph, TXT, or Markdown. Up to 10MB.
+            </p>
           </div>
-          {isWorking && <Loader2 className="h-5 w-5 animate-spin text-text-ink" aria-label="Loading" />}
+          {isWorking && (
+            <Loader2 className="h-5 w-5 animate-spin text-text-ink" aria-label="Loading" />
+          )}
         </div>
       </Surface>
 
@@ -125,10 +143,7 @@ export function ImportFlow() {
         />
       ) : (
         <Surface className="p-4 space-y-4">
-          <UploadDropzone
-            onFileSelected={(file) => job.start(file)}
-            disabled={isWorking}
-          />
+          <UploadDropzone onFileSelected={(file) => job.start(file)} disabled={isWorking} />
 
           {/* Loading state */}
           {isWorking && (
@@ -142,7 +157,8 @@ export function ImportFlow() {
                 </p>
                 <p className="text-sm text-text-inkMuted mt-1">
                   {job.state.status === "parsing" && "Reading and parsing content..."}
-                  {job.state.status === "previewing" && "Using GPT-5.1-mini for extraction and Gemini 2.5 Flash for verification..."}
+                  {job.state.status === "previewing" &&
+                    "Using GPT-5.1-mini for extraction and Gemini 2.5 Flash for verification..."}
                   {job.state.status === "committing" && "Adding to your library..."}
                 </p>
               </div>
@@ -163,7 +179,9 @@ export function ImportFlow() {
               {job.state.errors.length > 0 && (
                 <div className="mt-2 space-y-1">
                   {job.state.errors.map((err, i) => (
-                    <p key={i} className="text-xs text-red-600">{err}</p>
+                    <p key={i} className="text-xs text-red-600">
+                      {err}
+                    </p>
                   ))}
                 </div>
               )}
@@ -177,15 +195,25 @@ export function ImportFlow() {
           {job.state.pages.length > 0 && job.state.status !== "idle" && !isWorking && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-text-ink">Preview (page {job.state.page + 1} of {job.state.totalPages})</p>
+                <p className="text-sm font-medium text-text-ink">
+                  Preview (page {job.state.page + 1} of {job.state.totalPages})
+                </p>
                 <div className="flex gap-2">
                   {job.state.page > 0 && (
-                    <Button variant="ghost" size="sm" onClick={() => job.setPage(job.state.page - 1)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => job.setPage(job.state.page - 1)}
+                    >
                       Previous
                     </Button>
                   )}
                   {job.state.page + 1 < job.state.totalPages && (
-                    <Button variant="ghost" size="sm" onClick={() => job.setPage(job.state.page + 1)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => job.setPage(job.state.page + 1)}
+                    >
                       Next
                     </Button>
                   )}

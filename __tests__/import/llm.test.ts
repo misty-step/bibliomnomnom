@@ -82,7 +82,10 @@ describe("llmExtract", () => {
     // @ts-expect-error - Deleting window to simulate server environment
     delete global.window;
 
-    const result = await llmExtract("text", { provider: failingProvider, fallbackProvider: fallback });
+    const result = await llmExtract("text", {
+      provider: failingProvider,
+      fallbackProvider: fallback,
+    });
 
     // Restore window
     if (windowBackup !== undefined) {

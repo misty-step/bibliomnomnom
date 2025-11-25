@@ -1,11 +1,7 @@
 import type { DatabaseReader, DatabaseWriter } from "@/convex/_generated/server";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 
-import type {
-  BookRepository,
-  ImportPreviewRepository,
-  ImportRunRepository,
-} from "./interfaces";
+import type { BookRepository, ImportPreviewRepository, ImportRunRepository } from "./interfaces";
 
 type Db = Pick<DatabaseReader & DatabaseWriter, "query" | "get" | "insert" | "patch" | "delete">;
 
@@ -73,19 +69,21 @@ export class ConvexImportPreviewRepository implements ImportPreviewRepository {
   async findByUserRunPage(
     userId: Id<"users">,
     runId: string,
-    page: number
+    page: number,
   ): Promise<Doc<"importPreviews"> | null> {
     return (
       (await this.db
         .query("importPreviews")
         .withIndex("by_user_run_page", (q) =>
-          q.eq("userId", userId).eq("importRunId", runId).eq("page", page)
+          q.eq("userId", userId).eq("importRunId", runId).eq("page", page),
         )
         .first()) ?? null
     );
   }
 
-  async create(preview: Omit<Doc<"importPreviews">, "_id" | "_creationTime">): Promise<Id<"importPreviews">> {
+  async create(
+    preview: Omit<Doc<"importPreviews">, "_id" | "_creationTime">,
+  ): Promise<Id<"importPreviews">> {
     return this.db.insert("importPreviews", preview);
   }
 }

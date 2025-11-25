@@ -7,6 +7,7 @@
 ## Context
 
 **Architecture**: Complete Quality Stack with Progressive Enforcement (TASK.md)
+
 - Start with low thresholds (50% coverage), ratchet to 75% over 2-4 weeks
 - Parallel execution: lint, typecheck, test, gitleaks in CI
 - Pre-commit (< 10s): gitleaks, lint, format, typecheck
@@ -14,6 +15,7 @@
 - All checks green = production ready, zero manual verification
 
 **Key Files**:
+
 - `lefthook.yml` (new) - Git hooks configuration
 - `.github/workflows/ci.yml` (exists, needs enhancement)
 - `.prettierrc` (new) - Code formatting
@@ -23,17 +25,20 @@
 - `scripts/validate-env.sh` (new) - Environment validation
 
 **Existing Patterns**:
+
 - Testing: Vitest with jsdom, `__tests__/` directories
 - CI: Basic workflow in `.github/workflows/ci.yml` (lint + test)
 - Scripts: `scripts/build-tokens.mjs` pattern for automation
 - Package manager: pnpm (strictly enforced)
 
 **Dependencies to Install**:
+
 ```bash
 pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @vitest/coverage-v8 npm-run-all
 ```
 
 **System Dependencies** (already installed):
+
 - gitleaks: `/opt/homebrew/bin/gitleaks`
 
 ---
@@ -246,6 +251,7 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 ### 10. Update .gitignore
 
 - [ ] Add coverage and lefthook-local to .gitignore
+
   ```
   Files: .gitignore (modify)
   Architecture: Ignore generated artifacts and local hook overrides
@@ -289,7 +295,7 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 
 ### 11. Fix Existing TypeScript Errors in Tests
 
-- [ ] Resolve 7 type errors in __tests__/import/dedup.test.ts
+- [ ] Resolve 7 type errors in **tests**/import/dedup.test.ts
   ```
   Files: __tests__/import/dedup.test.ts (modify lines 11, 64, 74, 86, 88)
   Architecture: Fix Convex Id type mismatches
@@ -382,7 +388,8 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 ### 16. Update README.md with Quality Commands
 
 - [ ] Add quality check commands to README.md development section
-  ```
+
+  ````
   Files: README.md (modify)
   Architecture: Document new npm scripts for developers
   Add section "Quality Checks":
@@ -404,11 +411,15 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 
     # Skip hooks (rare - emergency only)
     LEFTHOOK=0 git commit -m "emergency fix"
-    ```
+  ````
+
   Success: README documents new developer workflow
   Test: Commands listed are accurate and work
   Dependencies: Task 1 (scripts added to package.json)
   Time: 10min
+
+  ```
+
   ```
 
 ### Phase 2 Validation
@@ -466,16 +477,19 @@ See TASK.md lines 760-798 for detailed specs.
 ## Design Iteration Checkpoints
 
 **After Phase 1 Complete**:
+
 - Review hook performance: Are pre-commit checks < 10s? Pre-push < 2min?
 - Review CI performance: Is pipeline < 5min? Any serial jobs that could parallelize?
 - Review false positive rate: Are developers bypassing hooks? Why?
 
 **After Phase 2 Complete**:
+
 - Review documentation: Do new contributors understand workflow from CONTRIBUTING.md?
 - Review coverage baseline: What's current state? What modules need most attention?
 - Review TypeScript errors: Are all type errors resolved? Any new ones introduced?
 
 **After Phase 3 Week 2**:
+
 - Review coverage progress: Did we hit 55%? Which modules lagging?
 - Review test quality: Are tests catching real bugs or just execution?
 - Adjust thresholds: Too aggressive? Too lenient?
@@ -485,6 +499,7 @@ See TASK.md lines 760-798 for detailed specs.
 ## Automation Opportunities
 
 **Identified during planning**:
+
 1. **Coverage trending**: Script to track coverage % over time (git log + coverage reports)
 2. **Hook performance profiling**: Script to time each hook command, identify slowdowns
 3. **Dependency vulnerability scanning**: Automate `pnpm audit` in CI
@@ -499,6 +514,7 @@ See TASK.md lines 760-798 for detailed specs.
 ✅ **Can merge to production Friday at 5pm and turn phone off?**
 
 **Phase 1 Success**:
+
 - All checks green = production ready
 - Pre-commit runs < 10s (lint, format, typecheck, gitleaks)
 - Pre-push runs < 2min (test, build, env validation)
@@ -506,6 +522,7 @@ See TASK.md lines 760-798 for detailed specs.
 - Zero manual verification needed
 
 **Phase 2 Success**:
+
 - Documentation complete (CONTRIBUTING.md, README.md updates)
 - All TypeScript errors resolved
 - Coverage baseline documented
@@ -513,6 +530,7 @@ See TASK.md lines 760-798 for detailed specs.
 - Escape hatches tested and documented
 
 **Phase 3 Success** (async over 4 weeks):
+
 - Coverage ≥75% on critical paths (books, auth, notes)
 - Coverage ≥70% on API routes (blob upload)
 - CI fails if coverage drops below threshold

@@ -14,7 +14,7 @@ type DedupControlProps = {
 export function DedupControls({ tempId, decision, onChange, match, disabled }: DedupControlProps) {
   const existingBook = useQuery(
     api.books.get,
-    match?.existingBookId ? { id: match.existingBookId } : "skip"
+    match?.existingBookId ? { id: match.existingBookId } : "skip",
   );
   const isLoading = match?.existingBookId ? existingBook === undefined : false;
   const isMissing = match?.existingBookId ? existingBook === null : false;
@@ -42,7 +42,9 @@ export function DedupControls({ tempId, decision, onChange, match, disabled }: D
           {isLoading ? (
             <p className="mt-2 text-2xs text-text-inkMuted">Loading book details...</p>
           ) : isMissing ? (
-            <p className="mt-2 text-2xs text-text-inkMuted">Book no longer exists or is inaccessible.</p>
+            <p className="mt-2 text-2xs text-text-inkMuted">
+              Book no longer exists or is inaccessible.
+            </p>
           ) : existingBook ? (
             <div className="mt-2 p-2 bg-canvas-boneMuted rounded-md space-y-1">
               <p className="font-medium text-text-ink">{existingBook.title}</p>

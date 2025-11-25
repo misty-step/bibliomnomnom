@@ -1,20 +1,18 @@
 import { useCallback, useMemo, useReducer } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 
-import type { ParsedBook, PreviewResult, DedupDecisionAction, ParseError } from "../lib/import/types";
+import type {
+  ParsedBook,
+  PreviewResult,
+  DedupDecisionAction,
+  ParseError,
+} from "../lib/import/types";
 import { IMPORT_PAGE_SIZE as PAGE_SIZE } from "../lib/import/types";
 import { inferGenericCsv } from "../lib/import/client/csvInfer";
 import { parseGoodreadsCsv } from "../lib/import/client/goodreads";
 import { makeTempId } from "../lib/import/types";
 
-type Status =
-  | "idle"
-  | "parsing"
-  | "previewing"
-  | "ready"
-  | "committing"
-  | "success"
-  | "error";
+type Status = "idle" | "parsing" | "previewing" | "ready" | "committing" | "success" | "error";
 
 type Decision = {
   action: DedupDecisionAction;
@@ -176,23 +174,22 @@ const slicePages = (rows: ParsedBook[], size: number) => {
 
 const detectSourceType = (fileName: string, mime?: string): PreviewResult["sourceType"] => {
   if (mime?.includes("csv") || fileName.toLowerCase().endsWith(".csv")) {
-    return fileName.toLowerCase().includes("goodreads")
-      ? "goodreads-csv"
-      : "csv";
+    return fileName.toLowerCase().includes("goodreads") ? "goodreads-csv" : "csv";
   }
   if (fileName.toLowerCase().endsWith(".md")) return "md";
   return "txt";
 };
 
-export const useImportJob = ({ extractBooks, preparePreview, commitImport }: UseImportJobOptions) => {
+export const useImportJob = ({
+  extractBooks,
+  preparePreview,
+  commitImport,
+}: UseImportJobOptions) => {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  const setDecision = useCallback(
-    (tempId: string, decision: Decision) => {
-      dispatch({ type: "SET_DECISION", tempId, decision });
-    },
-    []
-  );
+  const setDecision = useCallback((tempId: string, decision: Decision) => {
+    dispatch({ type: "SET_DECISION", tempId, decision });
+  }, []);
 
   const start = useCallback(
     async (file: File) => {
@@ -222,7 +219,10 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
           });
 
           if (extracted.errors.length > 0) {
-            console.error("[Import] Extraction errors:", extracted.errors.map(e => e.message).join(", "));
+            console.error(
+              "[Import] Extraction errors:",
+              extracted.errors.map((e) => e.message).join(", "),
+            );
           }
 
           // Step 2: Prepare preview with extracted books (Convex mutation - saves to DB)
@@ -248,8 +248,8 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
               pages: slicePages(preview.books, PAGE_SIZE),
               dedupMatches: preview.dedupMatches,
               warnings: [...extracted.warnings, ...preview.warnings],
-              errors: [...extracted.errors, ...preview.errors ?? []].map((e) =>
-                typeof e === "string" ? e : e.message || "Unknown error"
+              errors: [...extracted.errors, ...(preview.errors ?? [])].map((e) =>
+                typeof e === "string" ? e : e.message || "Unknown error",
               ),
             },
           });
@@ -313,7 +313,7 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
             dedupMatches: preview.dedupMatches,
             warnings: [...parsedCsv.warnings, ...preview.warnings],
             errors: (preview.errors ?? []).map((e) =>
-              typeof e === "string" ? e : e.message || "Unknown error"
+              typeof e === "string" ? e : e.message || "Unknown error",
             ),
           },
         });
@@ -322,7 +322,7 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
         dispatch({ type: "PREVIEW_ERROR", message: err?.message ?? "Preview failed" });
       }
     },
-    [extractBooks, preparePreview]
+    [extractBooks, preparePreview],
   );
 
   const setPage = useCallback((page: number) => {
@@ -335,7 +335,7 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
     const pageRows = state.pages[state.page] ?? [];
 
     // Build match map for intelligent defaults
-    const matchMap = new Map(state.dedupMatches.map(m => [m.tempId, m]));
+    const matchMap = new Map(state.dedupMatches.map((m) => [m.tempId, m]));
 
     const decisions = pageRows.map((row) => {
       // If user set explicit decision, use it
@@ -399,7 +399,14 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
     } catch (err: any) {
       dispatch({ type: "COMMIT_ERROR", message: err?.message ?? "Commit failed" });
     }
-  }, [commitImport, state.decisions, state.dedupMatches, state.importRunId, state.page, state.pages]);
+  }, [
+    commitImport,
+    state.decisions,
+    state.dedupMatches,
+    state.importRunId,
+    state.page,
+    state.pages,
+  ]);
 
   const reset = useCallback(() => dispatch({ type: "RESET" }), []);
 
@@ -413,7 +420,7 @@ export const useImportJob = ({ extractBooks, preparePreview, commitImport }: Use
       reset,
       pageSize: PAGE_SIZE,
     }),
-    [commitPage, setDecision, setPage, start, state, reset]
+    [commitPage, setDecision, setPage, start, state, reset],
   );
 };
 

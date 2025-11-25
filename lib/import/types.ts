@@ -8,12 +8,7 @@ import {
   statusOptions,
 } from "./status";
 
-export type ImportSourceType =
-  | "goodreads-csv"
-  | "csv"
-  | "txt"
-  | "md"
-  | "unknown";
+export type ImportSourceType = "goodreads-csv" | "csv" | "txt" | "md" | "unknown";
 
 export type PrivacyLevel = "private" | "public";
 
@@ -78,12 +73,9 @@ export type CommitSummary = {
 export const IMPORT_PAGE_SIZE = 300;
 export const LLM_TOKEN_CAP = 60_000;
 
-export const collapseWhitespace = (value: string): string =>
-  value.trim().replace(/\s+/g, " ");
+export const collapseWhitespace = (value: string): string => value.trim().replace(/\s+/g, " ");
 
-export const normalizeOptionalText = (
-  value?: string | null
-): string | undefined => {
+export const normalizeOptionalText = (value?: string | null): string | undefined => {
   if (value === null || value === undefined) return undefined;
   const normalized = collapseWhitespace(value);
   return normalized.length ? normalized : undefined;
@@ -107,11 +99,7 @@ export const parsedBookSchema = v.object({
   title: v.string(),
   author: v.string(),
   status: v.optional(
-    v.union(
-      v.literal("want-to-read"),
-      v.literal("currently-reading"),
-      v.literal("read")
-    )
+    v.union(v.literal("want-to-read"), v.literal("currently-reading"), v.literal("read")),
   ),
   isbn: v.optional(v.string()),
   edition: v.optional(v.string()),
@@ -123,11 +111,7 @@ export const parsedBookSchema = v.object({
   dateFinished: v.optional(v.number()),
   coverUrl: v.optional(v.string()),
   apiSource: v.optional(
-    v.union(
-      v.literal("google-books"),
-      v.literal("open-library"),
-      v.literal("manual")
-    )
+    v.union(v.literal("google-books"), v.literal("open-library"), v.literal("manual")),
   ),
   apiId: v.optional(v.string()),
   privacy: v.optional(v.union(v.literal("private"), v.literal("public"))),
@@ -136,21 +120,13 @@ export const parsedBookSchema = v.object({
 export const dedupMatchSchema = v.object({
   tempId: v.string(),
   existingBookId: v.id("books"),
-  matchType: v.union(
-    v.literal("isbn"),
-    v.literal("title-author"),
-    v.literal("apiId")
-  ),
+  matchType: v.union(v.literal("isbn"), v.literal("title-author"), v.literal("apiId")),
   confidence: v.number(),
 });
 
 export const dedupDecisionSchema = v.object({
   tempId: v.string(),
-  action: v.union(
-    v.literal("skip"),
-    v.literal("merge"),
-    v.literal("create")
-  ),
+  action: v.union(v.literal("skip"), v.literal("merge"), v.literal("create")),
   fieldsToMerge: v.optional(v.array(v.string())),
 });
 
@@ -166,7 +142,7 @@ export const previewResultSchema = v.object({
     v.literal("csv"),
     v.literal("txt"),
     v.literal("md"),
-    v.literal("unknown")
+    v.literal("unknown"),
   ),
   books: v.array(parsedBookSchema),
   warnings: v.array(v.string()),

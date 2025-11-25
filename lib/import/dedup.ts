@@ -24,7 +24,7 @@ const MERGEABLE_FIELDS: (keyof Doc<"books">)[] = [
 export const findMatches = async (
   db: DbReader,
   userId: Id<"users">,
-  rows: ParsedBook[]
+  rows: ParsedBook[],
 ): Promise<Match[]> => {
   const existing = await fetchUserBooks(db, userId);
   return matchBooks(existing, rows);
@@ -35,7 +35,7 @@ export type BookPatch = Partial<Doc<"books">>;
 export const applyDecision = (
   existing: Doc<"books">,
   incoming: ParsedBook,
-  action: DedupDecisionAction
+  action: DedupDecisionAction,
 ): BookPatch | null => {
   if (action === "skip") return null;
   if (action === "create") return null; // handled by caller
@@ -59,7 +59,7 @@ export const applyDecision = (
 
 export const buildNewBook = (
   incoming: ParsedBook,
-  userId: Id<"users">
+  userId: Id<"users">,
 ): Omit<Doc<"books">, "_id" | "_creationTime"> => {
   return {
     userId,
@@ -86,9 +86,7 @@ export const buildNewBook = (
   };
 };
 
-export const makeDecisionAction = (
-  decision: DedupDecision
-): DedupDecisionAction => decision.action;
+export const makeDecisionAction = (decision: DedupDecision): DedupDecisionAction => decision.action;
 
 export type DedupHelpers = {
   findMatches: typeof findMatches;

@@ -44,7 +44,7 @@ const buildHeaderLookup = (headers: string[]): HeaderLookup => {
 const getValue = (
   row: string[],
   lookup: HeaderLookup,
-  keys: readonly string[]
+  keys: readonly string[],
 ): string | undefined => {
   for (const key of keys) {
     const column = lookup[key];
@@ -82,13 +82,13 @@ const parseCsv = (text: string): string[][] => {
     const char = text[i];
     const next = text[i + 1];
 
-    if (char === "\"" && inQuote && next === "\"") {
-      current += "\"";
+    if (char === '"' && inQuote && next === '"') {
+      current += '"';
       i += 1;
       continue;
     }
 
-    if (char === "\"") {
+    if (char === '"') {
       inQuote = !inQuote;
       continue;
     }
@@ -151,12 +151,8 @@ export const parseGoodreadsCsv = (fileText: string): ClientParseResult => {
 
   dataRows.forEach((row, index) => {
     const lineNumber = index + 2; // account for header row
-    const title = normalizeOptionalText(
-      getValue(row, headerLookup, ["title"])
-    );
-    const author = normalizeOptionalText(
-      getValue(row, headerLookup, ["author"])
-    );
+    const title = normalizeOptionalText(getValue(row, headerLookup, ["title"]));
+    const author = normalizeOptionalText(getValue(row, headerLookup, ["author"]));
 
     if (!title || !author) {
       errors.push({
@@ -175,33 +171,21 @@ export const parseGoodreadsCsv = (fileText: string): ClientParseResult => {
       warnings.push(`Row ${lineNumber}: ${shelfResolution.warning}`);
     }
 
-    const isbn = normalizeIsbn(
-      getValue(row, headerLookup, OPTIONAL_HEADERS.isbn)
-    );
+    const isbn = normalizeIsbn(getValue(row, headerLookup, OPTIONAL_HEADERS.isbn));
 
-    const pageCount = toNumber(
-      getValue(row, headerLookup, OPTIONAL_HEADERS.pages)
-    );
+    const pageCount = toNumber(getValue(row, headerLookup, OPTIONAL_HEADERS.pages));
 
     const publishedYear =
       toNumber(getValue(row, headerLookup, OPTIONAL_HEADERS.yearPublished)) ??
       toNumber(getValue(row, headerLookup, OPTIONAL_HEADERS.originalYear));
 
-    const dateFinished = toDateTimestamp(
-      getValue(row, headerLookup, OPTIONAL_HEADERS.dateRead)
-    );
+    const dateFinished = toDateTimestamp(getValue(row, headerLookup, OPTIONAL_HEADERS.dateRead));
 
-    const dateStarted = toDateTimestamp(
-      getValue(row, headerLookup, OPTIONAL_HEADERS.dateAdded)
-    );
+    const dateStarted = toDateTimestamp(getValue(row, headerLookup, OPTIONAL_HEADERS.dateAdded));
 
-    const coverUrl = normalizeOptionalText(
-      getValue(row, headerLookup, OPTIONAL_HEADERS.coverUrl)
-    );
+    const coverUrl = normalizeOptionalText(getValue(row, headerLookup, OPTIONAL_HEADERS.coverUrl));
 
-    const edition = normalizeOptionalText(
-      getValue(row, headerLookup, OPTIONAL_HEADERS.edition)
-    );
+    const edition = normalizeOptionalText(getValue(row, headerLookup, OPTIONAL_HEADERS.edition));
 
     const cleanAuthor = collapseWhitespace(author);
     const cleanTitle = collapseWhitespace(title);

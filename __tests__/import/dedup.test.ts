@@ -55,10 +55,7 @@ const incoming = (overrides: Partial<ParsedBook> = {}): ParsedBook => ({
 
 describe("normalizeTitleAuthorKey", () => {
   it("folds diacritics and punctuation", () => {
-    const key = normalizeTitleAuthorKey(
-      "Cien años de soledad!",
-      "G. G. Márquez",
-    );
+    const key = normalizeTitleAuthorKey("Cien años de soledad!", "G. G. Márquez");
     expect(key).toBe("cien anos de soledad|g g marquez");
   });
 });
@@ -73,9 +70,7 @@ describe("matchBooks", () => {
         userId: fakeId<"users">("user_1"),
       }),
     ];
-    const rows: ParsedBook[] = [
-      incoming({ tempId: "r1", isbn: "123", author: "Frank Herbert" }),
-    ];
+    const rows: ParsedBook[] = [incoming({ tempId: "r1", isbn: "123", author: "Frank Herbert" })];
 
     const matches = matchBooks(docs, rows);
 
@@ -109,9 +104,7 @@ describe("matchBooks", () => {
         author: "Different Author",
       }),
     ];
-    const rows: ParsedBook[] = [
-      incoming({ tempId: "r3", isbn: undefined, apiId: "gb:dune" }),
-    ];
+    const rows: ParsedBook[] = [incoming({ tempId: "r3", isbn: undefined, apiId: "gb:dune" })];
 
     const matches = matchBooks(docs, rows);
 
