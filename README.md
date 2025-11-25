@@ -319,6 +319,66 @@ This project **exclusively uses pnpm**. Attempts to use npm, yarn, or bun will b
 | `pnpm lint`         | Run ESLint                                                 |
 | `pnpm typecheck`    | Run TypeScript compiler check                              |
 | `pnpm tokens:build` | Regenerate design tokens from source                       |
+| `pnpm test`         | Run test suite                                             |
+| `pnpm test:coverage`| Run tests with coverage report                             |
+| `pnpm validate`     | Run all quality checks (lint, typecheck, coverage, build)  |
+| `pnpm validate:fast`| Run quick checks (lint, typecheck, tests only)             |
+
+## Quality Checks
+
+This project uses automated quality gates to ensure code quality and prevent bugs.
+
+### Running Quality Checks Locally
+
+```bash
+# Run all quality checks (recommended before pushing)
+pnpm validate
+
+# Run quick checks (no coverage, no build) - faster feedback
+pnpm validate:fast
+
+# Format code
+pnpm format
+
+# Check code formatting
+pnpm format:check
+
+# Type check
+pnpm typecheck
+
+# Run tests
+pnpm test
+
+# Run tests with coverage report
+pnpm test:coverage
+```
+
+### Git Hooks
+
+Quality checks run automatically via [Lefthook](https://github.com/evilmartians/lefthook):
+
+- **Pre-commit**: Secret detection, linting, formatting, type checking
+- **Pre-push**: Environment validation, tests, build verification
+- **Commit-msg**: Conventional commit format enforcement
+
+Hooks are installed automatically via `pnpm install`.
+
+### Skipping Hooks (Emergency Use Only)
+
+**⚠️ Only skip hooks in emergencies.** All checks exist to prevent bugs and security issues.
+
+```bash
+# Skip all hooks (emergency hotfix)
+LEFTHOOK=0 git commit -m "fix: critical bug"
+
+# Skip specific hook
+SKIP=gitleaks git commit -m "feat: add feature"
+
+# Skip pre-commit only
+git commit --no-verify -m "fix: urgent"
+```
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete contributor guidelines and best practices.
 
 ## Tech Stack
 
