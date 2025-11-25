@@ -757,33 +757,159 @@ All queries use database indexes for performance:
 - Virtual scrolling for large libraries (>500 books)
 - Image optimization (WebP conversion, responsive sizes)
 
+## Quality Infrastructure
+
+**North Star**: "Friday afternoon deploy confidence" - ship with complete certainty that changes won't break production.
+
+### Git Hooks (Lefthook)
+
+**Pre-Commit** (runs on `git commit`):
+
+1. **Gitleaks** - Secret detection (scans staged files for credentials, API keys)
+2. **ESLint** - Auto-fixes linting issues (staged files only)
+3. **Prettier** - Auto-formats code (staged files only)
+4. **TypeScript** - Type checking (full project)
+
+Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 seconds.
+
+**Pre-Push** (runs on `git push`):
+
+1. **Environment validation** - Checks required env vars exist (via `scripts/validate-env.sh`)
+2. **Test suite** - Runs all 54 tests with Vitest
+3. **Build verification** - Ensures production build succeeds (`pnpm build:local`)
+
+**Commit-Msg** (runs on commit message creation):
+
+1. **Commitlint** - Enforces conventional commits format (feat, fix, docs, etc.)
+
+### CI/CD Pipeline (GitHub Actions)
+
+**On Pull Request**:
+
+- Checkout code
+- Install dependencies (pnpm)
+- Run linting (ESLint)
+- Run type checking (TypeScript)
+- Run test suite with coverage
+- Build production bundle
+- Comment coverage report on PR
+
+**On Push to Main**:
+
+- Same checks as PR
+- Deploy to Vercel (automatic)
+- Deploy Convex schema (via `npx convex deploy`)
+
+### Coverage Tracking
+
+**Baseline** (Week 1 - 2025-11-25):
+
+- 88.07% statements, 75.47% branches, 86.04% functions, 89.34% lines
+- HTML reports generated in `coverage/` directory
+- Coverage enforced in CI (fails if below threshold)
+
+**Ratcheting Strategy** (4-week plan):
+
+- Week 2: 55% branches (focus: `rateLimit.ts` edge cases)
+- Week 3: 65% branches (expand to `import/repository/`)
+- Week 4: 75% branches (production-ready coverage)
+
+**Coverage Provider**: Vitest with v8 (fast, accurate, native Node.js coverage)
+
+### Secret Detection
+
+**Gitleaks** configuration:
+
+- Scans all commits for 100+ secret patterns
+- Detects: AWS keys, API tokens, private keys, database URLs
+- Pre-commit hook blocks commits with secrets
+- `.gitleaksignore` for documented false positives
+
+**Protected Secrets**:
+
+- `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`
+- `CONVEX_DEPLOY_KEY`
+- `BLOB_READ_WRITE_TOKEN`
+- `OPENAI_API_KEY`, `GEMINI_API_KEY`
+
+### Escape Hatches
+
+**Emergency Use Only** (documented in CONTRIBUTING.md):
+
+```bash
+# Skip all hooks (emergency hotfix)
+LEFTHOOK=0 git commit -m "fix: critical bug"
+
+# Skip specific hook (e.g., working offline)
+SKIP=gitleaks git commit -m "feat: add feature"
+
+# Skip pre-commit only (rare)
+git commit --no-verify -m "fix: urgent"
+```
+
+**When to skip**:
+
+- ✅ Emergency production hotfix
+- ✅ Fixing broken CI (when hooks block the fix)
+- ❌ "Too slow" - Fix performance instead
+- ❌ "I'll fix it later" - Fix it now
+
+### Quality Commands
+
+```bash
+# Quick validation (no coverage, no build) - 30s
+pnpm validate:fast
+
+# Full validation (includes coverage + build) - 2-3min
+pnpm validate
+
+# Individual checks
+pnpm lint              # ESLint
+pnpm typecheck         # TypeScript
+pnpm test              # Vitest
+pnpm test:coverage     # Vitest with coverage report
+pnpm build:local       # Next.js production build
+```
+
 ## Testing Strategy
 
-### Current State (MVP)
+### Current State
 
-- **Manual testing** of critical paths during development
-- **Type safety** as primary bug prevention (TypeScript strict mode)
-- **No automated tests** yet (planned for post-MVP)
+**Automated Test Suite** (Vitest):
 
-### Future Testing (Post-MVP)
+- **54 passing tests** covering business logic and utilities
+- **88% statement coverage**, 75% branch coverage, 86% function coverage
+- Tests run in pre-push git hooks and CI/CD pipeline
+- Coverage enforced with incremental ratcheting (targeting 75%+ over 4 weeks)
 
-**Unit Tests** (Convex functions):
+**Test Coverage** (as of 2025-11-25):
 
-- Use `convex-test` library
-- Test auth helpers, privacy filtering, auto-dating logic
-- Target: 80% coverage of business logic
+- `import/` module: 81% statements (dedup, normalization, LLM parsing)
+- `import/client/`: 92% statements (CSV inference, Goodreads parsing)
+- `import/dedup/`: 97% statements (duplicate detection algorithms)
+- `import/repository/`: 91% statements (Convex integration)
 
-**Integration Tests** (API flows):
+**Quality Infrastructure**:
 
-- Test complete workflows (create book → add note → upload cover)
-- Verify ownership validation across modules
-- Target: All critical paths covered
+- Vitest with v8 coverage provider
+- Pre-commit hooks (linting, formatting, typecheck, secret detection)
+- Pre-push hooks (tests, build verification, env validation)
+- GitHub Actions CI with coverage reporting
+- Commitlint for conventional commits
+
+### Future Testing Expansion (Post-MVP)
 
 **E2E Tests** (Playwright):
 
 - User flows: Sign up → Add book → View library → Create note
 - Cross-browser testing (Chrome, Firefox, Safari)
 - Target: 5-10 critical user journeys
+
+**Additional Coverage**:
+
+- Convex backend functions (auth, books, notes modules)
+- API routes (blob upload, webhooks)
+- UI components with complex interactions
 
 ## Security Considerations
 
