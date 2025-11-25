@@ -8,7 +8,14 @@ pre-commit:
   parallel: true
   commands:
     trufflehog:
-      run: trufflehog git file://. --since-commit HEAD --only-verified --fail --no-update
+      run: |
+        if ! command -v trufflehog &> /dev/null; then
+          echo "❌ TruffleHog not found. Install with:"
+          echo "   brew install trufflesecurity/trufflehog/trufflehog"
+          echo "   or: https://github.com/trufflesecurity/trufflehog#installation"
+          exit 1
+        fi
+        trufflehog git file://. --since-commit HEAD --only-verified --fail --no-update
 
     lint:
       glob: "**/*.{ts,tsx,js,jsx}"

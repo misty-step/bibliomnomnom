@@ -21,8 +21,8 @@ However, this requires the `CONVEX_DEPLOY_KEY` environment variable to be config
 2. **Add `CONVEX_DEPLOY_KEY` for Preview**:
    - Click "Add New" button
    - **Key**: `CONVEX_DEPLOY_KEY`
-   - **Value**: `preview:phaedrus:bibliomnomnom|eyJ2MiI6IjVlNGRlYzY0ZjQ4ZTQ5MDM4MGZlMDFmNjUzOGM5ODAyIn0=`
-     (This is your preview deploy key from .env.production)
+   - **Value**: `preview:<team>:<project>|<base64-encoded-token>`
+     (Get from Convex Dashboard → Settings → Deploy Keys → Preview deployment)
    - **Environment**: Select **Preview** only (NOT Production or Development)
    - Click "Save"
 
@@ -55,17 +55,17 @@ However, this requires the `CONVEX_DEPLOY_KEY` environment variable to be config
 
 Confirm these are configured for **Production** environment:
 
-| Variable                            | Expected Value                           | Notes              |
-| ----------------------------------- | ---------------------------------------- | ------------------ |
-| `CONVEX_DEPLOY_KEY`                 | `prod:doting-spider-972\|{token}`        | **Required**       |
-| `NEXT_PUBLIC_CONVEX_URL`            | `https://doting-spider-972.convex.cloud` | **Set explicitly** |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_...`                            | Production key     |
-| `CLERK_SECRET_KEY`                  | `sk_live_...`                            | Production key     |
-| `CLERK_WEBHOOK_SECRET`              | `whsec_...`                              | Production webhook |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`     | `/sign-in`                               | Static             |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`     | `/sign-up`                               | Static             |
-| `BLOB_READ_WRITE_TOKEN`             | (auto-configured)                        | Vercel integration |
-| `NEXT_PUBLIC_IMPORT_ENABLED`        | `true`                                   | Feature flag       |
+| Variable                            | Expected Value                           | Notes                                    |
+| ----------------------------------- | ---------------------------------------- | ---------------------------------------- |
+| `CONVEX_DEPLOY_KEY`                 | `prod:<deployment-name>\|<token>`        | **Required** - Get from Convex Dashboard |
+| `NEXT_PUBLIC_CONVEX_URL`            | `https://doting-spider-972.convex.cloud` | **Set explicitly**                       |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | `pk_live_...`                            | Production key                           |
+| `CLERK_SECRET_KEY`                  | `sk_live_...`                            | Production key                           |
+| `CLERK_WEBHOOK_SECRET`              | `whsec_...`                              | Production webhook                       |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`     | `/sign-in`                               | Static                                   |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`     | `/sign-up`                               | Static                                   |
+| `BLOB_READ_WRITE_TOKEN`             | (auto-configured)                        | Vercel integration                       |
+| `NEXT_PUBLIC_IMPORT_ENABLED`        | `true`                                   | Feature flag                             |
 
 ---
 

@@ -59,6 +59,27 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
 - Performance budgets (Lighthouse CI)
 - Dependency updates (Dependabot)
 
+**PR Review Feedback - Deferred Items** (from #2 quality infrastructure PR):
+
+**Code Quality Improvements**:
+- `PopoverTrigger` asChild prop is currently a no-op (components/ui/popover.tsx:11-21)
+- `useImportJob` status union includes unused "previewing"/"committing" states (hooks/useImportJob.ts:15-36)
+- `useToast` effect re-subscribes on every state change (optimization opportunity) (hooks/use-toast.ts:169-187)
+- `STATUS_ALIASES` has redundant normalized keys (lib/import/status.ts:5-14)
+- `makeId` uses `Id<any>` instead of generic type parameter (lib/import/repository/memory.ts:7)
+- `CreateNote` save/cancel behavior asymmetry - consider if Cancel should also reset type/page (components/notes/CreateNote.tsx:42-125)
+
+**Documentation Drift** (normal for living docs, update as needed):
+- Coverage baseline numbers will drift as tests expand (ARCHITECTURE.md:876-899)
+- Testing strategy docs reference "no automated tests" but 54 tests exist (CLAUDE.md:296-305)
+- Rate-limit checkbox marked unchecked but may be implemented (DEPLOYMENT.md:262-268)
+- Build command examples inconsistent across deployment docs
+
+**Observability Upgrade** (when Sentry integrated):
+- Replace console.log/console.error in `withObservability` with Sentry SDK
+- Add transaction tracing and performance monitoring
+- Configure error grouping and release tracking
+
 See full PRD in TASK.md. Run `/architect` when ready to break down into implementation tasks.
 
 ---

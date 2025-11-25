@@ -303,7 +303,7 @@ export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5.1-mini",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       }),

@@ -24,9 +24,12 @@
 **Solution**: Added deploy keys to Vercel:
 
 ```bash
-echo -n "preview:phaedrus:bibliomnomnom|eyJ2MiI6IjVlNGRlYzY0ZjQ4ZTQ5MDM4MGZlMDFmNjUzOGM5ODAyIn0=" | vercel env add CONVEX_DEPLOY_KEY preview
-echo -n "prod:doting-spider-972|eyJ2MiI6ImVmZDE1ZmFkODg5NzRlMmNiZWE5YTZmNmQ3OTFhYTkxIn0=" | vercel env add CONVEX_DEPLOY_KEY production
+# Get actual deploy keys from Convex Dashboard → Settings → Deploy Keys
+echo -n "preview:<team>:<project>|<base64-encoded-token>" | vercel env add CONVEX_DEPLOY_KEY preview
+echo -n "prod:<deployment-name>|<base64-encoded-token>" | vercel env add CONVEX_DEPLOY_KEY production
 ```
+
+**Note**: Replace `<team>`, `<project>`, `<deployment-name>`, and `<base64-encoded-token>` with actual values from your Convex dashboard.
 
 ### 3. Convex Static Analysis of `auth.config.ts`
 

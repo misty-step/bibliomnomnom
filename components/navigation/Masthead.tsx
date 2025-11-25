@@ -22,7 +22,6 @@ export function Masthead() {
       {/* Right: User Actions */}
       <div className="flex w-12 justify-end">
         <UserButton
-          afterSignOutUrl="/"
           appearance={{
             elements: {
               avatarBox: "h-8 w-8 ring-2 ring-canvas-bone hover:ring-text-ink/10 transition-all",

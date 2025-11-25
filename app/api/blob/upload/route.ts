@@ -1,11 +1,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { withObservability } from "@/lib/api/withObservability";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
-export async function POST(request: Request) {
+export const POST = withObservability(async (request: Request) => {
   const { userId } = await auth();
 
   if (!userId) {
@@ -42,4 +43,4 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Unable to generate upload token";
     return NextResponse.json({ error: message }, { status: 400 });
   }
-}
+}, "blob-upload");

@@ -54,9 +54,9 @@
 ### Font Stack
 
 ```css
---font-display:
-  "Canela", "Times New Roman", serif --font-sans: "Söhne", "Neue Montreal", system-ui,
-  sans-serif --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
+--font-display: "Canela", "Times New Roman", serif;
+--font-sans: "Söhne", "Neue Montreal", system-ui, sans-serif;
+--font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
 ```
 
 **Key Decision**: Removed Inter from fallback stack (overused in modern web design).
