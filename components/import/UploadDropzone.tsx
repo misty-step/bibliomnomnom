@@ -41,7 +41,7 @@ export function UploadDropzone({
       const name = file.name.toLowerCase();
       return allowed.some((pattern) => name.endsWith(pattern));
     },
-    [accept]
+    [accept],
   );
 
   const handleFiles = useCallback(
@@ -59,7 +59,7 @@ export function UploadDropzone({
       setError(null);
       onFileSelected(file);
     },
-    [maxBytes, onFileSelected, acceptsExtension, accept]
+    [maxBytes, onFileSelected, acceptsExtension, accept],
   );
 
   const onDrop = (event: React.DragEvent<HTMLDivElement>) => {
@@ -112,7 +112,7 @@ export function UploadDropzone({
         "border-dashed border-2 border-line-ghost bg-canvas-boneMuted/60 transition-colors",
         dragActive && "border-text-ink",
         disabled && "opacity-60 cursor-not-allowed",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text-ink"
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-text-ink",
       )}
       padding="lg"
     >

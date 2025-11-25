@@ -53,7 +53,9 @@ describe("useImportJob", () => {
   });
 
   it("records decisions and sends to commit", async () => {
-    const commitImport = vi.fn().mockResolvedValue({ created: 1, merged: 0, skipped: 0, errors: [] });
+    const commitImport = vi
+      .fn()
+      .mockResolvedValue({ created: 1, merged: 0, skipped: 0, errors: [] });
     const { result } = setup({ commitImport });
     const file = new File(["Title,Author\nA,B\n"], "books.csv", { type: "text/csv" });
     (file as any).text ??= () => Promise.resolve("Title,Author\nA,B\n");

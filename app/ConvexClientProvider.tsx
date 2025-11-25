@@ -18,8 +18,8 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
         <div className="space-y-3 max-w-md">
           <p className="font-display text-xl text-text-ink">Backend not configured</p>
           <p className="text-sm text-text-inkMuted">
-            NEXT_PUBLIC_CONVEX_URL is missing. Add your Convex deployment URL to the Vercel environment (preview & prod)
-            and redeploy.
+            NEXT_PUBLIC_CONVEX_URL is missing. Add your Convex deployment URL to the Vercel
+            environment (preview & prod) and redeploy.
           </p>
         </div>
       </div>

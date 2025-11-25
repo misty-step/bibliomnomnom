@@ -11,16 +11,16 @@
 
 ### 2025 (10 books)
 
-- **Hyperion** by Dan Simmons *(Nov 2)*
-- **A Philosophy of Software Design** by John Ousterhout *(Oct 1)*
-- **The Man Who Solved the Market: How Jim Simons Launched the Quant Revolution** by Gregory Zuckerman *(Sep 18)*
-- **A Mind at Play: How Claude Shannon Invented the Information Age** by Jimmy Soni, Rob Goodman *(Aug 29)*
-- **Project Hail Mary** by Andy Weir *(Aug 26)*
-- **The Sovereign Individual** by James Dale Davidson and Lord William Rees-Mogg *(Apr 17)*
-- **The Hobbit** by J.R.R. Tolkien *(Apr 12)*
-- **Vagabond** by Takehiko Inoue *(Apr 4)*
+- **Hyperion** by Dan Simmons _(Nov 2)_
+- **A Philosophy of Software Design** by John Ousterhout _(Oct 1)_
+- **The Man Who Solved the Market: How Jim Simons Launched the Quant Revolution** by Gregory Zuckerman _(Sep 18)_
+- **A Mind at Play: How Claude Shannon Invented the Information Age** by Jimmy Soni, Rob Goodman _(Aug 29)_
+- **Project Hail Mary** by Andy Weir _(Aug 26)_
+- **The Sovereign Individual** by James Dale Davidson and Lord William Rees-Mogg _(Apr 17)_
+- **The Hobbit** by J.R.R. Tolkien _(Apr 12)_
+- **Vagabond** by Takehiko Inoue _(Apr 4)_
 
 ### 2021 (2 books)
 
-- **The Sovereign Individual** by James Dale Davidson and Lord William Rees-Mogg *(Mar 9)*
-- **Genghis Khan and the Making of the Modern World** by Jack Weatherford *(Feb 16)*
+- **The Sovereign Individual** by James Dale Davidson and Lord William Rees-Mogg _(Mar 9)_
+- **Genghis Khan and the Making of the Modern World** by Jack Weatherford _(Feb 16)_

@@ -3,11 +3,7 @@ import { requireAuth } from "./auth";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
-const noteType = v.union(
-  v.literal("note"),
-  v.literal("quote"),
-  v.literal("reflection")
-);
+const noteType = v.union(v.literal("note"), v.literal("quote"), v.literal("reflection"));
 
 export const list = query({
   args: { bookId: v.id("books") },

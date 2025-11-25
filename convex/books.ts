@@ -19,7 +19,7 @@ type PublicBook = {
 const statusField = v.union(
   v.literal("want-to-read"),
   v.literal("currently-reading"),
-  v.literal("read")
+  v.literal("read"),
 );
 
 export const list = query({
@@ -31,9 +31,7 @@ export const list = query({
     const userId = await requireAuth(ctx);
     const { status, favoritesOnly } = args;
 
-    let booksQuery = ctx.db
-      .query("books")
-      .withIndex("by_user", (q) => q.eq("userId", userId));
+    let booksQuery = ctx.db.query("books").withIndex("by_user", (q) => q.eq("userId", userId));
 
     if (status) {
       booksQuery = booksQuery.filter((q) => q.eq(q.field("status"), status));
@@ -101,12 +99,7 @@ const baseBookFields = {
   apiCoverUrl: v.optional(v.union(v.string(), v.null())),
   apiId: v.optional(v.union(v.string(), v.null())),
   apiSource: v.optional(
-    v.union(
-      v.literal("google-books"),
-      v.literal("open-library"),
-      v.literal("manual"),
-      v.null()
-    )
+    v.union(v.literal("google-books"), v.literal("open-library"), v.literal("manual"), v.null()),
   ),
 };
 
@@ -119,10 +112,7 @@ export const create = mutation({
     const now = Date.now();
 
     const cleanArgs = Object.fromEntries(
-      Object.entries(args).map(([key, value]) => [
-        key,
-        value === null ? undefined : value,
-      ])
+      Object.entries(args).map(([key, value]) => [key, value === null ? undefined : value]),
     );
 
     return await ctx.db.insert("books", {
@@ -135,8 +125,8 @@ export const create = mutation({
       publishedYear: cleanArgs.publishedYear as number | undefined,
       pageCount: cleanArgs.pageCount as number | undefined,
       status: cleanArgs.status as Doc<"books">["status"],
-      isFavorite: cleanArgs.isFavorite as boolean ?? false,
-      isAudiobook: cleanArgs.isAudiobook as boolean ?? false,
+      isFavorite: (cleanArgs.isFavorite as boolean) ?? false,
+      isAudiobook: (cleanArgs.isAudiobook as boolean) ?? false,
       privacy: "private",
       timesRead: cleanArgs.status === "read" ? 1 : 0,
       dateStarted: cleanArgs.status === "currently-reading" ? now : undefined,
@@ -167,12 +157,7 @@ export const update = mutation({
     apiCoverUrl: v.optional(v.union(v.string(), v.null())),
     apiId: v.optional(v.union(v.string(), v.null())),
     apiSource: v.optional(
-      v.union(
-        v.literal("google-books"),
-        v.literal("open-library"),
-        v.literal("manual"),
-        v.null()
-      )
+      v.union(v.literal("google-books"), v.literal("open-library"), v.literal("manual"), v.null()),
     ),
     privacy: v.optional(v.union(v.literal("private"), v.literal("public"))),
     isFavorite: v.optional(v.boolean()),

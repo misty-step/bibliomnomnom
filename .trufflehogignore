@@ -1,0 +1,21 @@
+# Documentation
+*.example
+# NOTE: Markdown files are NOT excluded - they frequently contain secrets in
+# setup guides, troubleshooting docs, and example commands. Use inline
+# trufflehog:ignore comments or obvious placeholders for legitimate examples.
+
+# Tests
+__tests__/fixtures/**
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Build artifacts
+.next/**
+node_modules/**
+convex/_generated/**
+coverage/**
+.vercel/**
+*.tsbuildinfo
+pnpm-lock.yaml

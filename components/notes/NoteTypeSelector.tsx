@@ -30,7 +30,7 @@ export function NoteTypeSelector({ value, onChange }: NoteTypeSelectorProps) {
             "flex-1 rounded-md px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-all duration-150",
             value === type.value
               ? "bg-text-ink text-canvas-bone shadow-sm"
-              : "text-text-inkMuted hover:text-text-ink"
+              : "text-text-inkMuted hover:text-text-ink",
           )}
         >
           {type.label}

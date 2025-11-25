@@ -49,7 +49,7 @@ export function Editor({
       attributes: {
         class: cn(
           "prose prose-sm max-w-none min-h-[4rem] focus:outline-none text-text-ink placeholder:text-text-inkSubtle/50",
-          className
+          className,
         ),
       },
     },
@@ -67,17 +67,17 @@ export function Editor({
   const isMounted = useRef(false);
   useEffect(() => {
     if (!editor) return;
-    
+
     // Only update if the content is different from current editor state to avoid loops/cursor jumps
     const currentMarkdown = htmlToMarkdown(editor.getHTML());
     if (initialContent !== currentMarkdown) {
-       // If initialContent is empty, it's likely a reset.
-       if (!initialContent) {
-         editor.commands.clearContent();
-       } else if (!isMounted.current) {
-         // Only set initial content on mount or strict reset
-         editor.commands.setContent(markdownToHtml(initialContent));
-       }
+      // If initialContent is empty, it's likely a reset.
+      if (!initialContent) {
+        editor.commands.clearContent();
+      } else if (!isMounted.current) {
+        // Only set initial content on mount or strict reset
+        editor.commands.setContent(markdownToHtml(initialContent));
+      }
     }
     isMounted.current = true;
   }, [editor, initialContent]);

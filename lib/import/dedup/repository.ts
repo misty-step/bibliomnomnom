@@ -5,7 +5,7 @@ type DbReader = Pick<DatabaseReader, "query">;
 
 export const fetchUserBooks = async (
   db: DbReader,
-  userId: Id<"users">
+  userId: Id<"users">,
 ): Promise<Doc<"books">[]> => {
   return db
     .query("books")

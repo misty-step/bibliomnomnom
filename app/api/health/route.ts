@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { withObservability } from "@/lib/api/withObservability";
 
 export const runtime = "nodejs";
 
@@ -8,7 +9,7 @@ export const runtime = "nodejs";
  * Returns 200 OK if the application is running and can respond to requests
  * Includes basic service availability checks
  */
-export async function GET() {
+export const GET = withObservability(async () => {
   try {
     const health = {
       status: "healthy",
@@ -41,7 +42,7 @@ export async function GET() {
         headers: {
           "Cache-Control": "no-store, no-cache, must-revalidate",
         },
-      }
+      },
     );
   }
-}
+}, "health-check");

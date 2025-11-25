@@ -23,12 +23,14 @@ Complete guide for deploying bibliomnomnom to production on Vercel with Convex a
 You need TWO deploy keys:
 
 **Production Deploy Key:**
+
 1. Go to Settings → Deploy Keys in Convex Dashboard
 2. Click "Generate Production Deploy Key"
 3. Copy the key (format: `prod:deployment-name|base64-token`)
 4. Save securely - you'll need this for Vercel
 
 **Preview Deploy Key:**
+
 1. Go to Settings → Deploy Keys
 2. Click "Generate Preview Deploy Key"
 3. Copy the key (format: `preview:username:project|base64-token`)
@@ -258,6 +260,7 @@ vercel logs --prod
 ```
 
 Look for:
+
 - ❌ Clerk webhook signature failures
 - ❌ Convex connection errors
 - ❌ Missing environment variables
@@ -268,6 +271,7 @@ Look for:
 ### 6.1 How Preview Deployments Work
 
 Every PR/branch push creates:
+
 - **Fresh Vercel preview deployment** (unique URL: `project-git-branch-team.vercel.app`)
 - **Fresh Convex preview deployment** (isolated database, auto-cleanup after 14 days)
 
@@ -276,11 +280,13 @@ This allows testing backend changes safely before merging to production.
 ### 6.2 Test Preview Deployment
 
 1. Create a new branch:
+
    ```bash
    git checkout -b test/preview-deployment
    ```
 
 2. Push to GitHub:
+
    ```bash
    git push origin test/preview-deployment
    ```
@@ -300,6 +306,7 @@ This allows testing backend changes safely before merging to production.
 ### 7.1 Built-in Vercel Analytics
 
 Enable in Vercel Dashboard → Analytics:
+
 - Web Vitals (LCP, FID, CLS)
 - Page load performance
 - Geographic distribution
@@ -309,12 +316,14 @@ Enable in Vercel Dashboard → Analytics:
 Set up external monitoring:
 
 **BetterUptime (free tier):**
+
 1. Sign up at [betteruptime.com](https://betteruptime.com)
 2. Add monitor: `https://your-domain.com/api/health`
 3. Set check interval: 1 minute
 4. Configure alerts (email/Slack)
 
 **UptimeRobot (free tier):**
+
 1. Sign up at [uptimerobot.com](https://uptimerobot.com)
 2. Add HTTP(s) monitor
 3. URL: `https://your-domain.com/api/health`
@@ -331,6 +340,7 @@ Set up external monitoring:
 5. Errors automatically tracked with source maps
 
 **Benefits:**
+
 - Stack traces with source maps
 - User context (which user hit the error)
 - Release tracking (which deploy introduced error)
@@ -343,6 +353,7 @@ Set up external monitoring:
 **Cause**: Convex not deployed before Next.js build
 
 **Fix**:
+
 - Verify `vercel.json` has correct `buildCommand`
 - Check build logs show `npx convex deploy` running first
 - Ensure `CONVEX_DEPLOY_KEY` set in Vercel env vars
@@ -352,6 +363,7 @@ Set up external monitoring:
 **Cause**: `CLERK_WEBHOOK_SECRET` mismatch
 
 **Fix**:
+
 1. Go to Clerk Dashboard → Webhooks → Your Endpoint
 2. Copy the **Signing Secret** (not the endpoint URL!)
 3. Update `CLERK_WEBHOOK_SECRET` in Vercel env vars
@@ -362,11 +374,13 @@ Set up external monitoring:
 **Cause**: Third-party script not allowed by Content Security Policy
 
 **Fix**:
+
 1. Check browser console for blocked resource
 2. Add domain to appropriate CSP directive in `next.config.ts`
 3. Redeploy
 
 Example: `Blocked loading font from 'https://fonts.gstatic.com'`
+
 - Add to `font-src` directive: `font-src 'self' data: https://fonts.gstatic.com`
 
 ### Preview Deployment Fails
@@ -374,6 +388,7 @@ Example: `Blocked loading font from 'https://fonts.gstatic.com'`
 **Cause**: Missing `CONVEX_DEPLOY_KEY` for preview environment
 
 **Fix**:
+
 1. Go to Convex Dashboard → Settings → Deploy Keys
 2. Generate Preview Deploy Key
 3. Add to Vercel env vars with Environment = "Preview"
@@ -384,6 +399,7 @@ Example: `Blocked loading font from 'https://fonts.gstatic.com'`
 **Cause**: Missing LLM API keys
 
 **Fix**:
+
 1. Add `OPENAI_API_KEY` or `GEMINI_API_KEY` to Vercel env vars (Production)
 2. Verify keys are valid and have quota remaining
 3. Check Vercel logs for specific API error messages

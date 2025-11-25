@@ -120,15 +120,11 @@ describe("READING_SUMMARY.md import", () => {
 
       // Verify duplicate re-read (same book, different years)
       const sovereignIndividuals = result.rows.filter(
-        (r) => r.title === "The Sovereign Individual"
+        (r) => r.title === "The Sovereign Individual",
       );
       expect(sovereignIndividuals).toHaveLength(2);
-      expect(sovereignIndividuals[0].dateFinished).toBe(
-        new Date("2025-04-17").getTime()
-      );
-      expect(sovereignIndividuals[1].dateFinished).toBe(
-        new Date("2021-03-09").getTime()
-      );
+      expect(sovereignIndividuals[0].dateFinished).toBe(new Date("2025-04-17").getTime());
+      expect(sovereignIndividuals[1].dateFinished).toBe(new Date("2021-03-09").getTime());
     });
   });
 
@@ -157,7 +153,8 @@ describe("READING_SUMMARY.md import", () => {
     });
 
     it("matches books with subtitle variations", () => {
-      const fullTitle = "The Man Who Solved the Market: How Jim Simons Launched the Quant Revolution";
+      const fullTitle =
+        "The Man Who Solved the Market: How Jim Simons Launched the Quant Revolution";
       const shortTitle = "The Man Who Solved the Market";
 
       const key1 = normalizeTitleAuthorKey(fullTitle, "Gregory Zuckerman");
@@ -166,7 +163,7 @@ describe("READING_SUMMARY.md import", () => {
       // Should NOT match: different normalized strings
       expect(key1).not.toBe(key2);
       expect(key1).toBe(
-        "the man who solved the market how jim simons launched the quant revolution|gregory zuckerman"
+        "the man who solved the market how jim simons launched the quant revolution|gregory zuckerman",
       );
       expect(key2).toBe("the man who solved the market|gregory zuckerman");
     });
@@ -232,11 +229,7 @@ describe("READING_SUMMARY.md import", () => {
         get: async () => null,
       };
 
-      const matches = await dedupHelpers.findMatches(
-        mockDb as any,
-        "user1" as Id<"users">,
-        rows
-      );
+      const matches = await dedupHelpers.findMatches(mockDb as any, "user1" as Id<"users">, rows);
 
       // Both rows should match the existing book
       expect(matches).toHaveLength(2);

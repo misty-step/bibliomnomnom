@@ -16,10 +16,7 @@ type NoteCardProps = {
   note: Doc<"notes">;
 };
 
-const TYPE_STYLES: Record<
-  NoteType,
-  { label: string; className: string }
-> = {
+const TYPE_STYLES: Record<NoteType, { label: string; className: string }> = {
   note: {
     label: "Note",
     className: "bg-leather/10 text-leather",
@@ -37,10 +34,10 @@ const TYPE_STYLES: Record<
 export function NoteCard({ note }: NoteCardProps) {
   const updateNote = useMutation(api.notes.update);
   const deleteNote = useMutation(api.notes.remove);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   // Edit State
   const [content, setContent] = useState(note.content);
   const [type, setType] = useState<NoteType>(note.type ?? "note");
@@ -94,19 +91,19 @@ export function NoteCard({ note }: NoteCardProps) {
             autoFocus
           />
         </div>
-        
+
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
-             <NoteTypeSelector value={type} onChange={setType} />
-             <div className="h-4 w-px bg-line-ghost" />
-             <input
-                value={page}
-                onChange={(e) => setPage(e.target.value)}
-                placeholder="Page #"
-                className="w-20 rounded-md bg-canvas-boneMuted px-2 py-1 text-sm font-medium text-text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
-             />
+            <NoteTypeSelector value={type} onChange={setType} />
+            <div className="h-4 w-px bg-line-ghost" />
+            <input
+              value={page}
+              onChange={(e) => setPage(e.target.value)}
+              placeholder="Page #"
+              className="w-20 rounded-md bg-canvas-boneMuted px-2 py-1 text-sm font-medium text-text-ink focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -130,11 +127,7 @@ export function NoteCard({ note }: NoteCardProps) {
             >
               Cancel
             </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={isSaving || !content.trim()}
-            >
+            <Button size="sm" onClick={handleSave} disabled={isSaving || !content.trim()}>
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
             </Button>
           </div>
@@ -151,18 +144,16 @@ export function NoteCard({ note }: NoteCardProps) {
             className={cn(
               "inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset",
               meta.className,
-              "bg-opacity-10 ring-opacity-20" // Subtle background and border
+              "bg-opacity-10 ring-opacity-20", // Subtle background and border
             )}
           >
             {meta.label}
           </span>
           {note.page ? (
-            <span className="text-xs font-medium text-text-inkSubtle">
-              Page {note.page}
-            </span>
+            <span className="text-xs font-medium text-text-inkSubtle">Page {note.page}</span>
           ) : null}
         </div>
-        
+
         <button
           onClick={() => setIsEditing(true)}
           className="opacity-0 transition-opacity group-hover:opacity-100 p-1 text-text-inkMuted hover:text-text-ink"
@@ -171,14 +162,18 @@ export function NoteCard({ note }: NoteCardProps) {
           <Pencil className="h-4 w-4" />
         </button>
       </header>
-      
+
       <div
         className="prose prose-sm max-w-none text-text-ink/90"
         dangerouslySetInnerHTML={{ __html: displayContent }}
       />
-      
+
       <footer className="text-xs text-text-inkSubtle/60">
-        {updatedAt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+        {updatedAt.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}
       </footer>
     </article>
   );

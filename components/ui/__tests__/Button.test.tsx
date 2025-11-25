@@ -10,8 +10,4 @@ describe("Button", () => {
 
     expect(button).toHaveClass("bg-text-ink", "text-canvas-bone");
   });
-
-
-
-
 });

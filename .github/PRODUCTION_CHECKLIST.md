@@ -223,6 +223,7 @@ Environment: **Preview only**
 ## Troubleshooting Reference
 
 If issues occur, see:
+
 - **[DEPLOYMENT.md](../DEPLOYMENT.md)** - Complete deployment guide with troubleshooting section
 - **[CLAUDE.md](../CLAUDE.md)** - Architecture and patterns
 - **Vercel Logs** - Real-time deployment and runtime logs
@@ -236,6 +237,7 @@ If issues occur, see:
 **Deployed By**: `_______________________________`
 
 **Notes**:
+
 ```text
 ___________________________________________________________________
 ___________________________________________________________________

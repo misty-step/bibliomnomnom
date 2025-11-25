@@ -10,10 +10,7 @@ const MATCH_CONFIDENCE: Record<NonNullable<Match["matchType"]>, number> = {
   apiId: 0.6,
 };
 
-export const matchBooks = (
-  existingBooks: Doc<"books">[],
-  incomingRows: ParsedBook[]
-): Match[] => {
+export const matchBooks = (existingBooks: Doc<"books">[], incomingRows: ParsedBook[]): Match[] => {
   const isbnMap = new Map<string, Doc<"books">>();
   const titleAuthorMap = new Map<string, Doc<"books">>();
   const apiIdMap = new Map<string, Doc<"books">>();

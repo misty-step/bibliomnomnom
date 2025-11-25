@@ -52,9 +52,8 @@ function resolveEmailAddress(data: ClerkUserPayload): string | undefined {
   }
 
   const primary =
-    data.email_addresses.find(
-      (email) => email.id === data.primary_email_address_id
-    ) ?? data.email_addresses[0];
+    data.email_addresses.find((email) => email.id === data.primary_email_address_id) ??
+    data.email_addresses[0];
 
   return primary.email_address;
 }

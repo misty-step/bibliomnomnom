@@ -1,0 +1,48 @@
+# Lefthook Configuration
+# Enables Friday afternoon deploy confidence with automated quality gates
+# Docs: https://lefthook.dev/
+
+min_version: 2.0.0
+
+pre-commit:
+  parallel: true
+  commands:
+    trufflehog:
+      run: |
+        if ! command -v trufflehog &> /dev/null; then
+          echo "❌ TruffleHog not found. Install with:"
+          echo "   brew install trufflesecurity/trufflehog/trufflehog"
+          echo "   or: https://github.com/trufflesecurity/trufflehog#installation"
+          exit 1
+        fi
+        trufflehog git file://. --since-commit HEAD --only-verified --fail --no-update
+
+    lint:
+      glob: "**/*.{ts,tsx,js,jsx}"
+      run: pnpm eslint --fix --max-warnings 0 {staged_files}
+      stage_fixed: true
+
+    format:
+      glob: "**/*.{ts,tsx,js,jsx,json,md,css}"
+      run: pnpm prettier --write {staged_files}
+      stage_fixed: true
+
+    typecheck:
+      run: pnpm tsc --noEmit
+
+pre-push:
+  parallel: true
+  commands:
+    env-check:
+      run: ./scripts/validate-env.sh
+
+    test:
+      run: pnpm test
+
+    build:
+      run: pnpm build:local
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}

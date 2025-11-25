@@ -3,10 +3,10 @@ export type ImportStatus = "want-to-read" | "currently-reading" | "read";
 export const DEFAULT_STATUS: ImportStatus = "want-to-read";
 
 const STATUS_ALIASES: Record<string, ImportStatus> = {
-  "read": "read",
+  read: "read",
   "currently-reading": "currently-reading",
   "currently reading": "currently-reading",
-  "currently_reading": "currently-reading",
+  currently_reading: "currently-reading",
   "to-read": "want-to-read",
   "to read": "want-to-read",
   "want-to-read": "want-to-read",
@@ -38,8 +38,4 @@ export const mapShelfToStatus = (raw?: string | null): StatusResolution => {
 export const coerceStatus = (raw?: string | null): ImportStatus | undefined =>
   mapShelfToStatus(raw).status;
 
-export const statusOptions: ImportStatus[] = [
-  "want-to-read",
-  "currently-reading",
-  "read",
-];
+export const statusOptions: ImportStatus[] = ["want-to-read", "currently-reading", "read"];

@@ -67,7 +67,7 @@ export function AddBookSheet({
         setInternalIsOpen(open);
       }
     },
-    [controlledOnOpenChange]
+    [controlledOnOpenChange],
   );
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
@@ -79,8 +79,8 @@ export function AddBookSheet({
   const [isFavorite, setIsFavorite] = useState(false);
   const [isAudiobook, setIsAudiobook] = useState(false);
   const [dateFinished, setDateFinished] = useState("");
-  const [exampleBook, setExampleBook] = useState(() =>
-    EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)]
+  const [exampleBook, setExampleBook] = useState(
+    () => EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)],
   );
 
   const createBook = useMutation(api.books.create);
@@ -186,9 +186,7 @@ export function AddBookSheet({
       }
 
       // Convert date string to timestamp if provided
-      const dateFinishedTimestamp = dateFinished
-        ? new Date(dateFinished).getTime()
-        : undefined;
+      const dateFinishedTimestamp = dateFinished ? new Date(dateFinished).getTime() : undefined;
 
       // Create book
       await createBook({
@@ -219,21 +217,23 @@ export function AddBookSheet({
   return (
     <>
       {/* Only render trigger when not in controlled mode */}
-      {controlledIsOpen === undefined && (
-        triggerVariant === "primary" ? (
-           <Button onClick={handleOpen} className={triggerClassName}>
-              {triggerLabel}
-           </Button>
+      {controlledIsOpen === undefined &&
+        (triggerVariant === "primary" ? (
+          <Button onClick={handleOpen} className={triggerClassName}>
+            {triggerLabel}
+          </Button>
         ) : (
           <button
-              type="button"
-              onClick={handleOpen}
-              className={triggerClassName || "relative group cursor-pointer font-sans text-sm text-ink hover:text-inkMuted"}
+            type="button"
+            onClick={handleOpen}
+            className={
+              triggerClassName ||
+              "relative group cursor-pointer font-sans text-sm text-ink hover:text-inkMuted"
+            }
           >
-              {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
+            {triggerClassName ? triggerLabel : `+ ${triggerLabel}`}
           </button>
-        )
-      )}
+        ))}
 
       <SideSheet open={isOpen} onOpenChange={setIsOpen} title="Add Book">
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -247,12 +247,7 @@ export function AddBookSheet({
                 <div className="group relative w-40">
                   {/* Cover Image */}
                   <div className="aspect-[2/3] overflow-hidden rounded-sm shadow-md">
-                    <Image
-                      src={coverPreview}
-                      alt="Cover preview"
-                      fill
-                      className="object-cover"
-                    />
+                    <Image src={coverPreview} alt="Cover preview" fill className="object-cover" />
                   </div>
 
                   {/* Hover Overlay */}
@@ -282,7 +277,7 @@ export function AddBookSheet({
               <label
                 className={cn(
                   "flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-line-ghost bg-canvas-boneMuted transition hover:border-text-inkMuted hover:bg-canvas-bone",
-                  isSubmitting && "pointer-events-none opacity-60"
+                  isSubmitting && "pointer-events-none opacity-60",
                 )}
               >
                 <input
@@ -346,7 +341,7 @@ export function AddBookSheet({
                     "flex-1 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
                     status === option.value
                       ? "bg-text-ink text-canvas-bone shadow-sm"
-                      : "text-text-inkMuted hover:text-text-ink"
+                      : "text-text-inkMuted hover:text-text-ink",
                   )}
                 >
                   {option.label}
@@ -383,10 +378,12 @@ export function AddBookSheet({
                   "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
                   isFavorite
                     ? "bg-text-ink text-canvas-bone shadow-sm"
-                    : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink"
+                    : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink",
                 )}
               >
-                <Star className={cn("h-3.5 w-3.5", isFavorite && "fill-amber-400 text-amber-400")} />
+                <Star
+                  className={cn("h-3.5 w-3.5", isFavorite && "fill-amber-400 text-amber-400")}
+                />
                 Favorite
               </button>
               <button
@@ -396,7 +393,7 @@ export function AddBookSheet({
                   "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150",
                   isAudiobook
                     ? "bg-text-ink text-canvas-bone shadow-sm"
-                    : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink"
+                    : "bg-canvas-boneMuted text-text-inkMuted hover:text-text-ink",
                 )}
               >
                 <Headphones className="h-3.5 w-3.5" />

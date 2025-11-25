@@ -32,11 +32,11 @@ export function BookTile({ book }: BookTileProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={shouldReduce ? undefined : { y: -4 }}
-      transition={{ 
-        type: "spring", 
-        stiffness: 250, 
-        damping: 25, 
-        mass: 1 
+      transition={{
+        type: "spring",
+        stiffness: 250,
+        damping: 25,
+        mass: 1,
       }}
       className="group relative cursor-pointer"
       onClick={navigate}
@@ -47,7 +47,6 @@ export function BookTile({ book }: BookTileProps) {
     >
       {/* Cover Container */}
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm shadow-surface transition-shadow duration-300 group-hover:shadow-raised bg-canvas-boneMuted">
-
         {coverSrc ? (
           <>
             {/* Cover image with hover fade */}
@@ -80,7 +79,9 @@ export function BookTile({ book }: BookTileProps) {
                   </span>
                   <div className="flex gap-2">
                     {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
-                    {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                    {book.isFavorite && (
+                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    )}
                   </div>
                 </div>
               )}
@@ -100,18 +101,17 @@ export function BookTile({ book }: BookTileProps) {
             </div>
             {(book.publishedYear || book.isAudiobook || book.isFavorite) && (
               <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
-                <span className="font-mono text-xs text-text-inkSubtle">
-                  {book.publishedYear}
-                </span>
+                <span className="font-mono text-xs text-text-inkSubtle">{book.publishedYear}</span>
                 <div className="flex gap-2">
                   {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
-                  {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                  {book.isFavorite && (
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  )}
                 </div>
               </div>
             )}
           </div>
         )}
-
       </div>
     </motion.article>
   );

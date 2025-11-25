@@ -13,12 +13,8 @@ import {
 describe("status helpers", () => {
   it("maps known shelves to statuses", () => {
     expect(statusHelpers.mapShelfToStatus("read").status).toBe("read");
-    expect(statusHelpers.mapShelfToStatus("currently-reading").status).toBe(
-      "currently-reading"
-    );
-    expect(statusHelpers.mapShelfToStatus("to-read").status).toBe(
-      "want-to-read"
-    );
+    expect(statusHelpers.mapShelfToStatus("currently-reading").status).toBe("currently-reading");
+    expect(statusHelpers.mapShelfToStatus("to-read").status).toBe("want-to-read");
   });
 
   it("defaults unknown shelves to want-to-read with warning", () => {

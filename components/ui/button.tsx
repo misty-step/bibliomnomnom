@@ -9,14 +9,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary:
-          "bg-text-ink text-canvas-bone hover:bg-text-inkMuted",
+        primary: "bg-text-ink text-canvas-bone hover:bg-text-inkMuted",
         secondary:
           "bg-canvas-boneMuted text-text-ink hover:bg-canvas-bone border border-line-ghost",
-        ghost:
-          "bg-transparent text-text-ink hover:bg-canvas-boneMuted",
-        destructive:
-          "bg-accent-ember text-white hover:bg-accent-ember/90",
+        ghost: "bg-transparent text-text-ink hover:bg-canvas-boneMuted",
+        destructive: "bg-accent-ember text-white hover:bg-accent-ember/90",
       },
       size: {
         sm: "px-sm py-2xs text-xs",
@@ -33,7 +30,7 @@ const buttonVariants = cva(
       size: "md",
       fullWidth: false,
     },
-  }
+  },
 );
 
 export interface ButtonProps
@@ -52,7 +49,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       />
     );
-  }
+  },
 );
 Button.displayName = "Button";
 

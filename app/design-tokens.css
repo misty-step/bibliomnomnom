@@ -1,23 +1,24 @@
 /* Auto-generated from design-tokens.json. Do not edit manually. */
 :root {
-  --color-accent-ember: #DC2626;
-  --color-canvas-bone: #FAF8F5;
-  --color-canvas-bone-muted: #F2EDE5;
-  --color-line-ember: rgba(28,25,23,0.15);
-  --color-line-ghost: rgba(28,25,23,0.08);
-  --color-status-danger: #FF4D4F;
-  --color-status-positive: #46D549;
-  --color-status-warning: #FFB347;
-  --color-surface-dawn: #FEFDFB;
-  --color-text-ink: #1C1917;
-  --color-text-ink-muted: #78716C;
-  --color-text-ink-subtle: #A8A29E;
+  --color-accent-ember: #dc2626;
+  --color-canvas-bone: #faf8f5;
+  --color-canvas-bone-muted: #f2ede5;
+  --color-line-ember: rgba(28, 25, 23, 0.15);
+  --color-line-ghost: rgba(28, 25, 23, 0.08);
+  --color-status-danger: #ff4d4f;
+  --color-status-positive: #46d549;
+  --color-status-warning: #ffb347;
+  --color-surface-dawn: #fefdfb;
+  --color-text-ink: #1c1917;
+  --color-text-ink-muted: #78716c;
+  --color-text-ink-subtle: #a8a29e;
   --elevation-flat: none;
-  --elevation-raised: 0 8px 24px rgba(5,8,16,0.12);
-  --elevation-soft: 0 4px 16px rgba(12,22,38,0.06);
+  --elevation-raised: 0 8px 24px rgba(5, 8, 16, 0.12);
+  --elevation-soft: 0 4px 16px rgba(12, 22, 38, 0.06);
   --font-display: "Playfair Display", "Times New Roman", serif;
   --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
-  --font-sans: "Geist", "Söhne", "Neue Montreal", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans:
+    "Geist", "Söhne", "Neue Montreal", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   --layout-spine: 12.5rem;
   --motion-base-duration: 400ms;
   --motion-base-easing: cubic-bezier(0.25, 1, 0.35, 1);

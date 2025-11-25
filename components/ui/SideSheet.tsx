@@ -12,13 +12,7 @@ type SideSheetProps = {
   description?: string;
 };
 
-export function SideSheet({
-  open,
-  onOpenChange,
-  children,
-  title,
-  description,
-}: SideSheetProps) {
+export function SideSheet({ open, onOpenChange, children, title, description }: SideSheetProps) {
   return (
     <Transition.Root show={open} as={Fragment}>
       <Dialog as="div" className="relative z-50" onClose={onOpenChange}>
@@ -71,9 +65,7 @@ export function SideSheet({
                         </Dialog.Description>
                       )}
                     </div>
-                    <div className="relative mt-8 flex-1 px-4 sm:px-6">
-                      {children}
-                    </div>
+                    <div className="relative mt-8 flex-1 px-4 sm:px-6">{children}</div>
                   </div>
                 </Dialog.Panel>
               </Transition.Child>

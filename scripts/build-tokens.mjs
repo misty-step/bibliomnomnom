@@ -19,7 +19,7 @@ const CATEGORY_PREFIX = {
   elevation: "elevation",
   glass: "glass",
   motion: "motion",
-  textures: "texture"
+  textures: "texture",
 };
 
 const raw = JSON.parse(readFileSync(SOURCE_PATH, "utf8"));
@@ -66,9 +66,7 @@ const cssEntries = [];
 const varRefs = {};
 for (const [category, values] of Object.entries(raw)) {
   const prefix = CATEGORY_PREFIX[category] ?? toKebab(category);
-  cssEntries.push(
-    ...flattenEntries(values, [prefix])
-  );
+  cssEntries.push(...flattenEntries(values, [prefix]));
   varRefs[category] = buildVarObject(values, [prefix]);
 }
 

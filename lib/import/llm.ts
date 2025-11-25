@@ -46,7 +46,9 @@ const splitIntoChunks = (text: string, maxTokens: number): string[] => {
   return chunks;
 };
 
-const buildPrompt = (chunk: string) => `You are a strict data extractor. Parse books from the provided text.
+const buildPrompt = (
+  chunk: string,
+) => `You are a strict data extractor. Parse books from the provided text.
 
 CRITICAL: You MUST extract EVERY SINGLE BOOK from the text. Do not stop early. Extract ALL books completely before finishing.
 
@@ -106,7 +108,9 @@ const sanitizeRow = (row: Partial<ParsedBook>, index: number): ParsedBook | null
   } satisfies ParsedBook;
 };
 
-const validateAndCollect = (rawRows: ParsedBook[]): { rows: ParsedBook[]; warnings: string[]; errors: ParseError[] } => {
+const validateAndCollect = (
+  rawRows: ParsedBook[],
+): { rows: ParsedBook[]; warnings: string[]; errors: ParseError[] } => {
   const warnings: string[] = [];
   const errors: ParseError[] = [];
   const rows: ParsedBook[] = [];
@@ -133,7 +137,10 @@ const runProvider = async (provider: LlmProvider, prompt: string): Promise<Parse
   return parseModelJson(content);
 };
 
-const buildVerificationPrompt = (originalText: string, extractedBooks: ParsedBook[]) => `You are a verification assistant. Review the extraction results for completeness and accuracy.
+const buildVerificationPrompt = (
+  originalText: string,
+  extractedBooks: ParsedBook[],
+) => `You are a verification assistant. Review the extraction results for completeness and accuracy.
 
 Original text contains book information. Extracted ${extractedBooks.length} books.
 
@@ -161,7 +168,7 @@ Return JSON with:
 const verifyExtraction = async (
   verifier: LlmProvider | undefined,
   chunk: string,
-  extracted: ParsedBook[]
+  extracted: ParsedBook[],
 ): Promise<{ complete: boolean; estimatedTotal: number; issues: string[] }> => {
   if (!verifier || !extracted.length) {
     return { complete: true, estimatedTotal: extracted.length, issues: [] };
@@ -185,7 +192,7 @@ const verifyExtraction = async (
 
 export const llmExtract = async (
   rawText: string,
-  opts: LlmExtractOptions = {}
+  opts: LlmExtractOptions = {},
 ): Promise<LlmExtractResult> => {
   if (typeof window !== "undefined") {
     throw new Error("llmExtract is server-only");
@@ -261,7 +268,7 @@ export const llmExtract = async (
 
       if (!verification.complete) {
         warnings.push(
-          `Chunk verification: Extracted ${parsed.length} books, but verifier estimates ${verification.estimatedTotal} total`
+          `Chunk verification: Extracted ${parsed.length} books, but verifier estimates ${verification.estimatedTotal} total`,
         );
       }
 
@@ -296,7 +303,7 @@ export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-5.1-mini",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
       }),
@@ -328,7 +335,7 @@ export const createGeminiProvider = (apiKey: string): LlmProvider => ({
             responseMimeType: "application/json",
           },
         }),
-      }
+      },
     );
 
     if (!response.ok) {

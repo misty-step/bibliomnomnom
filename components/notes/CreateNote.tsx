@@ -22,7 +22,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
   const [page, setPage] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Collapse on click outside if empty
@@ -41,7 +41,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
 
   const handleSave = async () => {
     if (!content.trim()) return;
-    
+
     setIsSaving(true);
     try {
       await createNote({
@@ -50,7 +50,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
         type,
         page: page || undefined,
       });
-      
+
       // Reset state completely
       setContent("");
       setPage("");
@@ -70,9 +70,9 @@ export function CreateNote({ bookId }: CreateNoteProps) {
         elevation={isExpanded ? "raised" : "flat"}
         className={cn(
           "transition-all duration-200 ease-in-out",
-          isExpanded 
-            ? "border-line-ghost bg-surface-dawn" 
-            : "cursor-text border-line-ghost/50 bg-canvas-boneMuted hover:bg-canvas-bone"
+          isExpanded
+            ? "border-line-ghost bg-surface-dawn"
+            : "cursor-text border-line-ghost/50 bg-canvas-boneMuted hover:bg-canvas-bone",
         )}
         padding="none"
         onClick={() => !isExpanded && setIsExpanded(true)}
@@ -104,9 +104,9 @@ export function CreateNote({ bookId }: CreateNoteProps) {
               </div>
 
               <div className="flex items-center justify-end gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => {
                     setContent("");
                     setIsExpanded(false);
@@ -115,9 +115,9 @@ export function CreateNote({ bookId }: CreateNoteProps) {
                 >
                   Cancel
                 </Button>
-                <Button 
-                  size="sm" 
-                  onClick={handleSave} 
+                <Button
+                  size="sm"
+                  onClick={handleSave}
                   disabled={!content.trim() || isSaving}
                   className="min-w-[4rem]"
                 >

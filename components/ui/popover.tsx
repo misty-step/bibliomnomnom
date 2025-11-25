@@ -4,18 +4,8 @@ import { Popover as HeadlessPopover, Transition } from "@headlessui/react";
 import { Fragment, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export function Popover({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <HeadlessPopover className={cn("relative", className)}>
-      {children}
-    </HeadlessPopover>
-  );
+export function Popover({ children, className }: { children: ReactNode; className?: string }) {
+  return <HeadlessPopover className={cn("relative", className)}>{children}</HeadlessPopover>;
 }
 
 export function PopoverTrigger({
@@ -54,7 +44,7 @@ export function PopoverContent({
       <HeadlessPopover.Panel
         className={cn(
           "absolute left-0 z-50 mt-2 w-56 origin-top-right rounded-lg bg-canvas-bone shadow-raised ring-1 ring-black/5 focus:outline-none border border-line-ghost",
-          className
+          className,
         )}
       >
         {({ close }) => (

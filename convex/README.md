@@ -5,6 +5,7 @@ This directory contains the Convex backend - the single source of truth for bibl
 ## What is Convex?
 
 Convex is a real-time backend platform that provides:
+
 - **Database**: Serverless, auto-scaling document database
 - **API**: Type-safe functions (queries, mutations, actions)
 - **Real-time**: Automatic reactivity - components re-render when data changes
@@ -14,13 +15,13 @@ Convex is a real-time backend platform that provides:
 
 ### Core Modules
 
-| File | Purpose | Lines | Exports | Depth |
-|------|---------|-------|---------|-------|
-| **auth.ts** | Auth helpers | 41 | 2 functions | Deep (9/10) |
-| **books.ts** | Book CRUD + privacy | 298 | 8 functions | Deep (9/10) |
-| **notes.ts** | Note/quote/reflection CRUD | 95 | 4 functions | Medium-Deep (8/10) |
-| **users.ts** | User lifecycle | 61 | 3 functions | Medium (7/10) |
-| **schema.ts** | Database schema | 62 | Schema exports | N/A (config) |
+| File          | Purpose                    | Lines | Exports        | Depth              |
+| ------------- | -------------------------- | ----- | -------------- | ------------------ |
+| **auth.ts**   | Auth helpers               | 41    | 2 functions    | Deep (9/10)        |
+| **books.ts**  | Book CRUD + privacy        | 298   | 8 functions    | Deep (9/10)        |
+| **notes.ts**  | Note/quote/reflection CRUD | 95    | 4 functions    | Medium-Deep (8/10) |
+| **users.ts**  | User lifecycle             | 61    | 3 functions    | Medium (7/10)      |
+| **schema.ts** | Database schema            | 62    | Schema exports | N/A (config)       |
 
 ### Generated Files (Do Not Edit)
 
@@ -148,6 +149,7 @@ export const getPublic = query({
 ### Tables
 
 #### users
+
 - `clerkId` (string) - Clerk user ID (primary identifier)
 - `email` (string) - User email
 - `name` (string, optional) - Display name
@@ -155,9 +157,11 @@ export const getPublic = query({
 - `_creationTime` (number) - Auto-set timestamp
 
 **Indexes**:
+
 - `by_clerk_id` - Fast lookup by Clerk ID
 
 #### books
+
 - `userId` (id<"users">) - Owner
 - `title` (string) - Book title
 - `author` (string) - Author name
@@ -173,11 +177,13 @@ export const getPublic = query({
 - `_creationTime` (number) - Auto-set timestamp
 
 **Indexes**:
+
 - `by_user` - Filter by userId
 - `by_user_status` - Filter by userId + status (composite)
 - `by_user_favorite` - Filter by userId + favorite
 
 #### notes
+
 - `userId` (id<"users">) - Owner (for index only, ownership validated via book)
 - `bookId` (id<"books">) - Parent book
 - `type` (string) - Note type ("note", "quote", "reflection")
@@ -185,10 +191,12 @@ export const getPublic = query({
 - `_creationTime` (number) - Auto-set timestamp
 
 **Indexes**:
+
 - `by_book` - Filter by bookId
 - `by_user` - Filter by userId (for user's notes across all books)
 
 #### importRuns
+
 - `userId` (id<"users">) - Owner of the import run
 - `importRunId` (string) - Client-provided UUID used for idempotency
 - `status` ("previewed" | "committed" | "failed") - Current run state
@@ -200,6 +208,7 @@ export const getPublic = query({
 - `createdAt` / `updatedAt` (number) - Timestamps for tracing + rate limits
 
 **Indexes**:
+
 - `by_user_run` - Find a run by userId + importRunId (idempotency + rate limit guard)
 
 **After schema edits**: run `pnpm convex:push` to apply changes and regenerate `_generated/*` types.
@@ -236,6 +245,7 @@ export const updateStatus = mutation({
 ```
 
 **Behavior**:
+
 - **"want-to-read"**: No date changes
 - **"currently-reading"**: Sets `dateStarted` if not already set (preserves original start date on re-reads)
 - **"read"**: Sets `dateFinished` to now, increments `timesRead`
@@ -264,9 +274,11 @@ Errors are caught by frontend and displayed via toast notifications.
 ## Testing
 
 ### Current: Manual Testing
+
 During development, test functions via Convex dashboard or frontend UI.
 
 ### Future: Automated Tests
+
 ```typescript
 import { convexTest } from "convex-test";
 import { api } from "./_generated/api";
@@ -299,24 +311,29 @@ See [BACKLOG.md](../BACKLOG.md) for test coverage roadmap.
 ## Common Issues
 
 ### "Could not find public function"
+
 **Cause**: Schema not synced to Convex deployment.
 **Fix**: Run `pnpm convex:push` to sync schema and functions.
 
 ### "Authentication required"
+
 **Cause**: `requireAuth()` called but no Clerk session present.
 **Fix**: Check Clerk configuration, ensure JWT template named `convex` exists.
 
 ### "Access denied" on valid request
+
 **Cause**: Ownership validation failing.
 **Debug**: Log `userId` and `book.userId` to verify they match. Check that `requireAuth()` returns correct user ID.
 
 ### Type errors after schema change
+
 **Cause**: Generated types out of sync.
 **Fix**: Run `pnpm convex:push` to regenerate types, restart `pnpm dev` if needed.
 
 ## Best Practices
 
 ### ✅ DO:
+
 - Call `requireAuth(ctx)` at the start of every mutation
 - Validate ownership before any database writes
 - Use indexes for filtering (`withIndex("by_user", ...)`)
@@ -324,6 +341,7 @@ See [BACKLOG.md](../BACKLOG.md) for test coverage roadmap.
 - Throw descriptive errors (`ConvexError` with message)
 
 ### ❌ DON'T:
+
 - Skip auth validation (security vulnerability)
 - Trust client-provided `userId` (always derive from auth)
 - Query without indexes (performance issue)

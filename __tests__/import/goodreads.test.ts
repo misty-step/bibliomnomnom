@@ -32,8 +32,7 @@ describe("parseGoodreadsCsv", () => {
   });
 
   it("emits warning and defaults status for unknown shelf", () => {
-    const csv = CSV_HEADER +
-      "Book,Author,,,,,,,someday-maybe,someday-maybe\n";
+    const csv = CSV_HEADER + "Book,Author,,,,,,,someday-maybe,someday-maybe\n";
 
     const result = parseGoodreadsCsv(csv);
 

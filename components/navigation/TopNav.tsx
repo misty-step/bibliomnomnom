@@ -31,7 +31,7 @@ export function TopNav() {
                 "font-mono text-sm uppercase tracking-wider transition",
                 isActive("/library")
                   ? "text-accent-ember font-semibold"
-                  : "text-text-inkMuted hover:text-text-ink"
+                  : "text-text-inkMuted hover:text-text-ink",
               )}
             >
               Library
@@ -42,7 +42,8 @@ export function TopNav() {
         <UserButton
           appearance={{
             elements: {
-              avatarBox: "h-10 w-10 rounded-full border-2 border-line-ghost hover:border-accent-ember transition",
+              avatarBox:
+                "h-10 w-10 rounded-full border-2 border-line-ghost hover:border-accent-ember transition",
             },
           }}
         />

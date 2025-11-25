@@ -19,7 +19,7 @@ const AlertDialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       "fixed inset-0 z-50 bg-text-ink/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className
+      className,
     )}
     {...props}
   />
@@ -36,7 +36,7 @@ const AlertDialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-6 rounded-lg border border-line-ghost bg-canvas-bone p-6 shadow-raised duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
-        className
+        className,
       )}
       {...props}
     />
@@ -44,26 +44,14 @@ const AlertDialogContent = React.forwardRef<
 ));
 AlertDialogContent.displayName = AlertDialogPrimitive.Content.displayName;
 
-const AlertDialogHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn("flex flex-col space-y-2 text-left", className)}
-    {...props}
-  />
+const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col space-y-2 text-left", className)} {...props} />
 );
 AlertDialogHeader.displayName = "AlertDialogHeader";
 
-const AlertDialogFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
+const AlertDialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn(
-      "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-2",
-      className
-    )}
+    className={cn("flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-2", className)}
     {...props}
   />
 );
@@ -75,10 +63,7 @@ const AlertDialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <AlertDialogPrimitive.Title
     ref={ref}
-    className={cn(
-      "font-display text-xl font-semibold text-text-ink",
-      className
-    )}
+    className={cn("font-display text-xl font-semibold text-text-ink", className)}
     {...props}
   />
 ));
@@ -104,7 +89,7 @@ const AlertDialogAction = React.forwardRef<
     ref={ref}
     className={cn(
       "inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-accent-ember px-5 py-2 text-sm font-semibold text-white transition hover:bg-accent-ember/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ember/50 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-bone disabled:pointer-events-none disabled:opacity-60",
-      className
+      className,
     )}
     {...props}
   />
@@ -119,7 +104,7 @@ const AlertDialogCancel = React.forwardRef<
     ref={ref}
     className={cn(
       "inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border border-line-ghost bg-canvas-bone px-5 py-2 text-sm font-medium text-text-ink transition hover:bg-canvas-boneMuted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-ink/20 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-bone disabled:pointer-events-none disabled:opacity-60",
-      className
+      className,
     )}
     {...props}
   />

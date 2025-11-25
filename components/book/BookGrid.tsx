@@ -81,23 +81,32 @@ export function BookGrid() {
                     "group flex items-center gap-2 rounded-full border px-4 py-1.5 transition-all duration-fast ease-fast",
                     isActive
                       ? "border-text-ink bg-text-ink text-canvas-bone shadow-sm"
-                      : "border-transparent bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+                      : "border-transparent bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink",
                   )}
                 >
-                  <Icon className={cn("h-3.5 w-3.5", isActive ? "text-canvas-bone" : "text-text-inkSubtle group-hover:text-text-ink")} />
+                  <Icon
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      isActive
+                        ? "text-canvas-bone"
+                        : "text-text-inkSubtle group-hover:text-text-ink",
+                    )}
+                  />
                   <span className="font-sans text-sm font-medium">{filter.label}</span>
                   {filter.count > 0 && (
                     <span
                       className={cn(
                         "ml-1 font-mono text-xs",
-                        isActive ? "text-canvas-bone/70" : "text-text-inkSubtle group-hover:text-text-ink/70"
+                        isActive
+                          ? "text-canvas-bone/70"
+                          : "text-text-inkSubtle group-hover:text-text-ink/70",
                       )}
                     >
                       {filter.count}
                     </span>
                   )}
                 </button>
-              )
+              );
             })}
           </nav>
 
@@ -130,10 +139,7 @@ export function BookGrid() {
       </div>
 
       {/* Manual Add Dialog */}
-      <AddBookSheet
-        isOpen={manualAddOpen}
-        onOpenChange={setManualAddOpen}
-      />
+      <AddBookSheet isOpen={manualAddOpen} onOpenChange={setManualAddOpen} />
     </>
   );
 }
@@ -248,9 +254,7 @@ function FavoritesView({
 function SectionHeader({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-8 flex items-center gap-4">
-      <h2 className="font-display text-2xl font-medium text-text-ink">
-        {children}
-      </h2>
+      <h2 className="font-display text-2xl font-medium text-text-ink">{children}</h2>
       <div className="h-px flex-1 bg-line-ghost" />
     </div>
   );
@@ -275,7 +279,7 @@ function BooksGrid({
 
 function AddBookButton({
   onManualAdd,
-  onImport
+  onImport,
 }: {
   onManualAdd: () => void;
   onImport: () => void;

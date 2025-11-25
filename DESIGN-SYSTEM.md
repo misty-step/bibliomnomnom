@@ -13,27 +13,33 @@
 ## Color Palette
 
 ### Canvas
+
 - **Bone** `#F6F1E5` - Primary background (aged paper aesthetic)
 - **Bone Muted** `#ECE2D1` - Secondary surfaces
 
 ### Text
+
 - **Ink** `#0F1115` - Primary text
 - **Ink Muted** `#4B5563` - Secondary text
 - **Ink Subtle** `#7F8897` - Tertiary text
 
 ### Surface
+
 - **Dawn** `#FDF8EF` - Elevated surfaces (cards, modals)
 
 ### Line
+
 - **Ghost** `rgba(15,17,21,0.08)` - Subtle borders
 - **Ember** `rgba(15,17,21,0.15)` - Defined borders
 
 ### Status
+
 - **Positive** `#46D549` - Success states
 - **Warning** `#FFB347` - Warning states
 - **Danger** `#FF4D4F` - Error states
 
 ### What We Removed
+
 ❌ Electric blue (#2F6BFF)
 ❌ Orchid purple (#A86BFF)
 ❌ Sunset orange (#FF8A5C)
@@ -46,20 +52,23 @@
 ## Typography
 
 ### Font Stack
+
 ```css
---font-display: "Canela", "Times New Roman", serif
---font-sans: "Söhne", "Neue Montreal", system-ui, sans-serif
---font-mono: "JetBrains Mono", "IBM Plex Mono", monospace
+--font-display: "Canela", "Times New Roman", serif;
+--font-sans: "Söhne", "Neue Montreal", system-ui, sans-serif;
+--font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
 ```
 
 **Key Decision**: Removed Inter from fallback stack (overused in modern web design).
 
 ### Scale
+
 - **Display** (headings): 48px, 32px, 24px
 - **Body**: 16px, 14px
 - **Mono** (metadata): 12px uppercase with 0.25em tracking
 
 ### Usage
+
 - **Canela (display)**: Large headlines, book titles, page headers
 - **Söhne (sans)**: All body copy, UI text, descriptions
 - **JetBrains Mono**: Metadata labels, status badges, technical information
@@ -143,16 +152,19 @@ base: 300ms cubic-bezier(0.16, 0.84, 0.44, 1)
 **Purpose**: Universal container primitive.
 
 **Props**:
+
 - `elevation`: `flat | soft | raised`
 - `padding`: `none | sm | md | lg | xl`
 - `interactive`: boolean (adds hover/focus states)
 
 **What We Removed**:
+
 - ❌ `tone` prop (6 variants → always `dawn`)
 - ❌ `texture` prop (cloud/matrix/grain complexity)
 - ❌ Glass/night/twilight variants
 
 **Usage**:
+
 ```tsx
 <Surface elevation="soft" padding="md">
   Content here
@@ -166,12 +178,14 @@ base: 300ms cubic-bezier(0.16, 0.84, 0.44, 1)
 **Purpose**: All clickable actions.
 
 **Variants**: 2 only
+
 - `primary`: Ink background, dawn text (default)
 - `ghost`: Transparent, subtle hover
 
 **Sizes**: `sm | md | lg`
 
 **What We Removed**:
+
 - ❌ `primary-electric` (electric blue)
 - ❌ `secondary-bone`
 - ❌ `subtle-glass`
@@ -179,6 +193,7 @@ base: 300ms cubic-bezier(0.16, 0.84, 0.44, 1)
 - ❌ `icon` variant
 
 **Usage**:
+
 ```tsx
 <Button variant="primary" size="md">Sign in</Button>
 <Button variant="ghost">Cancel</Button>
@@ -189,6 +204,7 @@ base: 300ms cubic-bezier(0.16, 0.84, 0.44, 1)
 ### What We Deleted
 
 **Components removed entirely**:
+
 - ❌ TextureOverlay (atmospheric complexity)
 - ❌ SplitBillboard (complex marketing hero)
 - ❌ MetricCard / HeroStatPanel (premature analytics)
@@ -259,6 +275,7 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 ## Implementation Status
 
 ### ✅ Completed
+
 - Design tokens simplified (62 lines, down from 99)
 - Color palette reduced to monochrome + status colors
 - Surface component (2 elevation variants)
@@ -268,11 +285,13 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 - Library page structure
 
 ### 🚧 In Progress
+
 - Fix remaining TextureOverlay references
 - Update tailwind.config.ts for simplified tokens
 - Clean up legacy color classes (bg-paper → bg-canvas-bone)
 
 ### 📋 Next
+
 - Perfect Library grid view
 - Perfect Add Book modal
 - Perfect Book Detail + Notes
@@ -285,18 +304,16 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 ## Usage Examples
 
 ### Page Structure
+
 ```tsx
 <section className="motion-fade-in space-y-8 px-4 py-8">
-  <h1 className="font-display text-4xl tracking-tight text-text-ink">
-    Your Library
-  </h1>
-  <p className="text-text-ink-muted">
-    Every book you're reading.
-  </p>
+  <h1 className="font-display text-4xl tracking-tight text-text-ink">Your Library</h1>
+  <p className="text-text-ink-muted">Every book you're reading.</p>
 </section>
 ```
 
 ### Card Layout
+
 ```tsx
 <Surface elevation="soft" padding="md" className="space-y-4">
   <h2 className="font-display text-2xl text-text-ink">Book Title</h2>
@@ -305,6 +322,7 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 ```
 
 ### Button Group
+
 ```tsx
 <div className="flex gap-3">
   <Button variant="primary">Save</Button>
@@ -319,6 +337,7 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 ### Old → New
 
 **Colors**:
+
 - `bg-paper` → `bg-canvas-bone`
 - `bg-paper-secondary` → `bg-canvas-bone-muted`
 - `text-ink` → `text-text-ink`
@@ -327,12 +346,14 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 - `bg-action-electric` → `bg-text-ink`
 
 **Components**:
+
 - `<Surface tone="bone">` → `<Surface>` (tone removed)
 - `<Button variant="primary-electric">` → `<Button variant="primary">`
 - `<Button variant="ghost-ink">` → `<Button variant="ghost">`
 - `<TextureOverlay />` → Remove entirely
 
 **Motion**:
+
 - `motion-page` → `motion-fade-in`
 - `duration-snappy` → `duration-fast`
 - `duration-drift` → `duration-base`
@@ -342,6 +363,7 @@ Inter is the most overused sans-serif in modern web design. By removing it from 
 ## Future Considerations
 
 When the app grows beyond 3 core flows, we may need:
+
 - One accent color (warm amber or monochrome only)
 - Layout primitives (Stack, Center, Container)
 - More button variants (but justify each one)
@@ -351,6 +373,6 @@ When the app grows beyond 3 core flows, we may need:
 
 ---
 
-*Last Updated: 2025-01-13*
-*Status: Foundation established, implementation in progress*
-*Philosophy: Radically simple, editorially precise, bibliophile-first*
+_Last Updated: 2025-01-13_
+_Status: Foundation established, implementation in progress_
+_Philosophy: Radically simple, editorially precise, bibliophile-first_

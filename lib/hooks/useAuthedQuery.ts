@@ -12,9 +12,7 @@ export function useAuthedQuery<Query extends FunctionReference<"query">>(
   const { isAuthenticated } = useAuth();
   const userRequestedSkip = args[0] === "skip";
   const shouldRun = isAuthenticated && !userRequestedSkip;
-  const normalizedArgs = shouldRun
-    ? args
-    : (["skip"] as OptionalRestArgsOrSkip<Query>);
+  const normalizedArgs = shouldRun ? args : (["skip"] as OptionalRestArgsOrSkip<Query>);
 
   return useQuery(query, ...normalizedArgs);
 }
