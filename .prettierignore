@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs
+.next
+out
+dist
+build
+
+# Convex generated files
+convex/_generated
+
+# Cache directories
+.turbo
+.swc
+.cache
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS files
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Package manager
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Testing
+coverage
+
+# Misc
+.contentlayer
