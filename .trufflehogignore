@@ -1,0 +1,19 @@
+# Documentation
+*.example
+*.md
+
+# Tests
+__tests__/fixtures/**
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Build artifacts
+.next/**
+node_modules/**
+convex/_generated/**
+coverage/**
+.vercel/**
+*.tsbuildinfo
+pnpm-lock.yaml

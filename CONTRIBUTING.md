@@ -136,7 +136,7 @@ All commits go through automated quality gates via git hooks.
 
 ### Pre-Commit Checks (runs on `git commit`)
 
-1. **Gitleaks** - Scans for secrets/credentials
+1. **TruffleHog** - Scans for secrets/credentials
 2. **ESLint** - Auto-fixes linting issues
 3. **Prettier** - Auto-formats code
 4. **TypeScript** - Type checking
@@ -264,7 +264,7 @@ LEFTHOOK=0 git commit -m "feat: emergency hotfix"
 
 #### Skip Specific Hook
 ```bash
-SKIP=gitleaks git commit -m "feat: add feature"
+SKIP=trufflehog git commit -m "feat: add feature"
 ```
 
 #### Skip Pre-Commit Only
@@ -294,12 +294,17 @@ pnpm hooks:install
 ls -la .git/hooks/
 ```
 
-### Gitleaks False Positives
+### TruffleHog False Positives
 
-If gitleaks flags a false positive:
-1. Review the detection carefully
-2. If truly a false positive, add to `.gitleaksignore`
-3. Document why it's safe in a comment
+If trufflehog flags a false positive:
+1. Review the detection carefully - verify it's not an actual secret
+2. If truly a false positive, add the file path or pattern to `.trufflehogignore`
+3. Document why it's safe in a comment within the ignore file
+4. Example:
+   ```bash
+   # Safe test fixture with dummy credentials
+   __tests__/fixtures/mock-auth.ts
+   ```
 
 ### TypeScript Errors
 

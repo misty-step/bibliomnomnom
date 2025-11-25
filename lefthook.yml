@@ -7,8 +7,8 @@ min_version: 2.0.0
 pre-commit:
   parallel: true
   commands:
-    gitleaks:
-      run: gitleaks protect --staged
+    trufflehog:
+      run: trufflehog git file://. --since-commit HEAD --only-verified --fail --no-update
 
     lint:
       glob: "**/*.{ts,tsx,js,jsx}"

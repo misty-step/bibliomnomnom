@@ -765,7 +765,7 @@ All queries use database indexes for performance:
 
 **Pre-Commit** (runs on `git commit`):
 
-1. **Gitleaks** - Secret detection (scans staged files for credentials, API keys)
+1. **TruffleHog** - Secret detection (scans staged files for credentials, API keys)
 2. **ESLint** - Auto-fixes linting issues (staged files only)
 3. **Prettier** - Auto-formats code (staged files only)
 4. **TypeScript** - Type checking (full project)
@@ -818,12 +818,12 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 
 ### Secret Detection
 
-**Gitleaks** configuration:
+**TruffleHog** configuration:
 
-- Scans all commits for 100+ secret patterns
-- Detects: AWS keys, API tokens, private keys, database URLs
-- Pre-commit hook blocks commits with secrets
-- `.gitleaksignore` for documented false positives
+- Scans all commits for 800+ built-in secret detectors
+- Detects: AWS keys, API tokens, private keys, database URLs, Clerk, Convex, Vercel, and more
+- Pre-commit hook blocks commits with verified secrets
+- `.trufflehogignore` for documented false positives
 
 **Protected Secrets**:
 
@@ -841,7 +841,7 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 LEFTHOOK=0 git commit -m "fix: critical bug"
 
 # Skip specific hook (e.g., working offline)
-SKIP=gitleaks git commit -m "feat: add feature"
+SKIP=trufflehog git commit -m "feat: add feature"
 
 # Skip pre-commit only (rare)
 git commit --no-verify -m "fix: urgent"

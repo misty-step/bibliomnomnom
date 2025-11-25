@@ -372,7 +372,7 @@ Hooks are installed automatically via `pnpm install`.
 LEFTHOOK=0 git commit -m "fix: critical bug"
 
 # Skip specific hook
-SKIP=gitleaks git commit -m "feat: add feature"
+SKIP=trufflehog git commit -m "feat: add feature"
 
 # Skip pre-commit only
 git commit --no-verify -m "fix: urgent"
