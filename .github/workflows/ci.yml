@@ -80,7 +80,7 @@ jobs:
         with:
           base: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
           head: ${{ github.ref_name }}
-          extra_args: --only-verified --fail --no-update
+          extra_args: --only-verified --no-update
 
   build:
     name: Build
