@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuth } from "./auth";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -56,6 +56,17 @@ export const get = query({
     }
 
     return book;
+  },
+});
+
+/**
+ * Internal query for actions to fetch book data
+ * No auth required - ownership validation happens in the calling mutation
+ */
+export const getForAction = internalQuery({
+  args: { bookId: v.id("books") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.bookId);
   },
 });
 
@@ -282,26 +293,38 @@ export const updatePrivacy = mutation({
   },
 });
 
-export const updateCoverFromBlob = mutation({
+const updateCoverFromBlobArgs = {
+  bookId: v.id("books"),
+  blobUrl: v.string(),
+  apiSource: v.union(v.literal("open-library"), v.literal("google-books")),
+  apiCoverUrl: v.string(),
+};
+
+export async function updateCoverFromBlobHandler(
+  ctx: MutationCtx,
   args: {
-    bookId: v.id("books"),
-    blobUrl: v.string(),
-    apiSource: v.union(v.literal("open-library"), v.literal("google-books")),
-    apiCoverUrl: v.string(),
+    bookId: Id<"books">;
+    blobUrl: string;
+    apiSource: "open-library" | "google-books";
+    apiCoverUrl: string;
   },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    const book = await ctx.db.get(args.bookId);
+) {
+  const userId = await requireAuth(ctx);
+  const book = await ctx.db.get(args.bookId);
 
-    if (!book || book.userId !== userId) {
-      throw new Error("Access denied");
-    }
+  if (!book || book.userId !== userId) {
+    throw new Error("Access denied");
+  }
 
-    await ctx.db.patch(args.bookId, {
-      coverUrl: args.blobUrl,
-      apiSource: args.apiSource,
-      apiCoverUrl: args.apiCoverUrl,
-      updatedAt: Date.now(),
-    });
-  },
+  await ctx.db.patch(args.bookId, {
+    coverUrl: args.blobUrl,
+    apiSource: args.apiSource,
+    apiCoverUrl: args.apiCoverUrl,
+    updatedAt: Date.now(),
+  });
+}
+
+export const updateCoverFromBlob = mutation({
+  args: updateCoverFromBlobArgs,
+  handler: updateCoverFromBlobHandler,
 });

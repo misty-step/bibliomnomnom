@@ -1,6 +1,7 @@
 import { internalAction } from "../_generated/server";
 import { v } from "convex/values";
 import type { Id } from "../_generated/dataModel";
+import { internal } from "../_generated/api";
 
 const OPEN_LIBRARY_API = "https://openlibrary.org/api/books";
 const GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes";
@@ -219,7 +220,7 @@ export async function searchBookCoverHelper(book: { isbn?: string } | null): Pro
  * Search for book cover across multiple APIs with cascading fallback
  * Internal action - callable only from other Convex functions
  *
- * Note: Actions cannot access ctx.db directly, so we create an internal
+ * Note: Actions cannot access ctx.db directly, so we call an internal
  * query to fetch the book. This is the Convex best practice for actions.
  */
 export const searchBookCover = internalAction({
@@ -227,12 +228,12 @@ export const searchBookCover = internalAction({
     bookId: v.id("books"),
   },
   handler: async (ctx, args): Promise<CoverResult> => {
-    // Actions can't access database directly - need to call query
-    // For now, we'll pass the book data from the mutation that calls this
-    // This will be fixed when we add the orchestration mutation
-    return {
-      error: "This action must be called with book data from mutation",
-    };
+    // Actions can't access database directly - call internal query to get book
+    const book = await ctx.runQuery(internal.books.getForAction, {
+      bookId: args.bookId,
+    });
+
+    return searchBookCoverHelper(book);
   },
 });
 

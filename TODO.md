@@ -1,749 +1,295 @@
-# TODO: Complete Quality Infrastructure Stack
-
-**Status**: Phase 1 Complete ✅ | Phase 2 Ready
-**PRD**: TASK.md (936 lines - comprehensive specification)
-**North Star**: "Merge to production Friday at 5pm and turn your phone off"
-**Branch**: feature/quality-infrastructure (9 commits ahead of master)
+# TODO: Fetch Cover Image for Single Book
 
 ## Context
+- **Architecture**: Convex Action with cascading API fallback (Open Library → Google Books)
+- **Key Files**: `convex/actions/coverFetch.ts` (new), `convex/books.ts` (modify), `components/book/FetchCoverButton.tsx` (new)
+- **Patterns**: Follow `convex/imports.ts` action pattern, reuse `app/api/blob/upload/route.ts` for blob storage
+- **Reference**: TASK.md lines 82-102 (Module Boundaries), lines 229-264 (Implementation Notes)
 
-**Architecture**: Complete Quality Stack with Progressive Enforcement (TASK.md)
+## Implementation Tasks
 
-- Start with low thresholds (50% coverage), ratchet to 75% over 2-4 weeks
-- Parallel execution: lint, typecheck, test, gitleaks in CI
-- Pre-commit (< 10s): gitleaks, lint, format, typecheck
-- Pre-push (< 2 min): test, build
-- All checks green = production ready, zero manual verification
+### Module 1: Cover Fetch Action
 
-**Key Files**:
-
-- `lefthook.yml` (new) - Git hooks configuration
-- `.github/workflows/ci.yml` (exists, needs enhancement)
-- `.prettierrc` (new) - Code formatting
-- `commitlint.config.js` (new) - Commit conventions
-- `.gitleaks.toml` (new) - Secret detection config
-- `vitest.config.ts` (exists, needs coverage config)
-- `scripts/validate-env.sh` (new) - Environment validation
-
-**Existing Patterns**:
-
-- Testing: Vitest with jsdom, `__tests__/` directories
-- CI: Basic workflow in `.github/workflows/ci.yml` (lint + test)
-- Scripts: `scripts/build-tokens.mjs` pattern for automation
-- Package manager: pnpm (strictly enforced)
-
-**Dependencies to Install**:
-
-```bash
-pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @vitest/coverage-v8 npm-run-all
-```
-
-**System Dependencies** (already installed):
-
-- gitleaks: `/opt/homebrew/bin/gitleaks`
-
----
-
-## Phase 1: Core Infrastructure ✅ COMPLETE
-
-**Goal**: Establish quality gates with low thresholds, enable Friday afternoon deploys
-**Actual Time**: 3.5 hours | **Commits**: 9 atomic commits
-
-### 1. Install Dependencies & Update Package Scripts ✅
-
-- [x] Install quality infrastructure dependencies
+- [x] Create Convex action to search book cover APIs
   ```
-  Files: package.json (modify)
-  Architecture: Add devDependencies and npm scripts for quality tooling
-  Command: pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @vitest/coverage-v8 npm-run-all
-  Success: Dependencies installed, package.json updated with new scripts
-  Scripts to add:
-    - "prepare": "lefthook install"
-    - "format": "prettier --write ."
-    - "format:check": "prettier --check ."
-    - "typecheck": "tsc --noEmit"
-    - "test:coverage": "vitest run --coverage"
-    - "validate": "run-p lint typecheck test:coverage build:local"
-    - "validate:fast": "run-p lint typecheck test"
-    - "hooks:install": "lefthook install"
-    - "hooks:uninstall": "lefthook uninstall"
-  Dependencies: None (first task)
-  Time: 10min
-  Commit: 8e022b0
+  Files: convex/actions/coverFetch.ts (new)
+  Architecture: Action calls Open Library → Google Books with cascading fallback
+  Interface: internal.actions.coverFetch.search({ bookId }) → { coverDataUrl, apiSource } | { error }
+
+  Pseudocode:
+    1. Get book from database by bookId
+    2. Extract ISBN, title, author from book
+    3. Try Open Library:
+       - Fetch https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data
+       - Extract cover.large or cover.medium URL
+       - If found: fetch image, convert to data URL, return { coverDataUrl, apiSource: "open-library" }
+    4. If Open Library fails, try Google Books (if GOOGLE_BOOKS_API_KEY set):
+       - Fetch https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&key={apiKey}
+       - Extract volumeInfo.imageLinks.large or .thumbnail
+       - If found: fetch image, convert to data URL, return { coverDataUrl, apiSource: "google-books" }
+    5. If both fail: return { error: "Cover not found" }
+    6. Handle timeouts (5 second max per API)
+
+  Success: Action returns cover data URL for books with valid ISBN
+  Test:
+    - Unit: Mock fetch calls, verify cascading fallback logic
+    - Integration: Real API calls with known ISBNs (978-0-547-92822-7 LOTR, 978-0-7432-7356-5 1984)
+    - Edge: No ISBN → error, invalid ISBN → error, both APIs down → error
+
+  Dependencies: None (first task - enables cover fetching)
+  Time: 90min
+
+  Module Value: High functionality (handles 2 APIs, timeouts, conversions) - Simple interface (one function, clean return type)
+  Information Hiding: Caller doesn't know about API endpoints, retry logic, image format conversion
   ```
 
-### 2. Configure Lefthook Git Hooks ✅
+### Module 2: Cover Update Mutation
 
-- [x] Create lefthook.yml with pre-commit and pre-push hooks
+- [x] Add mutation to update book with fetched cover
   ```
-  Files: lefthook.yml (new)
-  Architecture: Parallel pre-commit (< 10s), parallel pre-push (< 2 min)
-  Pseudocode: See TASK.md lines 151-190 (Lefthook configuration)
-  Config:
-    pre-commit (parallel: true):
-      - gitleaks: protect --staged --redact --verbose
-      - lint: eslint --fix --max-warnings 0 {staged_files}
-      - format: prettier --write {staged_files}
-      - typecheck: tsc --noEmit
-    pre-push (parallel: true):
-      - test: pnpm test --run
-      - build: pnpm build:local
-      - env-check: ./scripts/validate-env.sh
-    commit-msg:
-      - commitlint: pnpm commitlint --edit {1}
-  Success: Hooks run on git commit/push, failures block operations
-  Test: git commit with lint error → blocked, git push with test failure → blocked
-  Dependencies: Task 1 (lefthook package)
-  Time: 20min
-  Commit: 1e281f8
+  Files: convex/books.ts (modify - add new mutation)
+  Architecture: Mutation validates ownership, updates coverUrl + apiSource + apiCoverUrl
+  Interface: books.updateCoverFromBlob({ bookId, blobUrl, apiSource, apiCoverUrl }) → void
 
-  Work Log:
-  - Fixed 7 TypeScript errors in dedup.test.ts (originally planned for Task 11)
-  - Created commitlint.config.js (originally Task 4) - required by pre-commit hook
-  - Simplified gitleaks flags (removed --redact --verbose for speed)
-  - Added env-check to pre-push
-  ```
+  Pseudocode:
+    1. userId = await requireAuth(ctx)
+    2. book = await ctx.db.get(bookId)
+    3. if (!book || book.userId !== userId) throw "Access denied"
+    4. await ctx.db.patch(bookId, {
+         coverUrl: blobUrl,
+         apiSource: apiSource,
+         apiCoverUrl: apiCoverUrl,
+         updatedAt: Date.now()
+       })
 
-### 3. Configure Prettier Code Formatting ✅
+  Success: Book updated with blob URL, ownership validated
+  Test:
+    - Unit: Verify ownership validation, field updates
+    - Integration: Update real book, verify Convex reactivity updates UI
+    - Edge: Non-owner tries update → error, book doesn't exist → error
 
-- [x] Create .prettierrc and .prettierignore
-  ```
-  Files: .prettierrc (new), .prettierignore (new)
-  Architecture: Consistent code style across AI agents
-  Config (.prettierrc):
-    {
-      "semi": true,
-      "trailingComma": "es5",
-      "singleQuote": false,
-      "printWidth": 100,
-      "tabWidth": 2,
-      "useTabs": false,
-      "arrowParens": "always",
-      "endOfLine": "lf"
-    }
-  Ignore patterns: node_modules, .next, dist, build, coverage, pnpm-lock.yaml, *.min.js
-  Success: Prettier formats code consistently
-  Test: Run `pnpm format`, verify files reformatted
-  Dependencies: Task 1 (prettier package)
-  Time: 10min
-  Commit: 8df5311
+  Dependencies: None (independent mutation)
+  Time: 30min
 
-  Work Log:
-  - Changed trailingComma: "es5" → "all" for consistency
-  - .prettierignore committed (not in gitignore as originally planned)
+  Module Value: High functionality (ownership, validation, reactivity) - Simple interface (4 args, void return)
+  Information Hiding: Caller doesn't know about ownership checks, database patching, timestamp updates
   ```
 
-### 4. Configure Commitlint for Conventional Commits ✅
+### Module 3: Orchestration Mutation
 
-- [x] Create commitlint.config.js (completed in Task 2)
+- [ ] Add mutation to orchestrate cover fetch flow
   ```
-  Files: commitlint.config.js (new)
-  Architecture: Enforce conventional commits for future changelog automation
-  Pseudocode: See TASK.md lines 387-405 (Commitlint configuration)
-  Config:
-    extends: ['@commitlint/config-conventional']
-    rules:
-      type-enum: feat, fix, docs, style, refactor, perf, test, chore
-      subject-case: [0] (allow any case)
-      body-max-line-length: [0] (no limit)
-  Success: Commit messages validated against conventional format
-  Test: git commit -m "bad message" → blocked, git commit -m "feat: good" → passes
-  Dependencies: Task 1 (commitlint packages)
-  Time: 10min
-  Commit: 1e281f8 (same as Task 2)
+  Files: convex/books.ts (modify - add new mutation)
+  Architecture: Mutation calls action via scheduler, waits for result, returns to client
+  Interface: books.fetchCover({ bookId }) → { success: true, coverUrl } | { success: false, error }
 
-  Work Log:
-  - Added body-max-line-length: 100 (discovered via hook enforcement)
-  - Added 11 commit types (feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert)
-  ```
+  Pseudocode:
+    1. userId = await requireAuth(ctx)
+    2. book = await ctx.db.get(bookId)
+    3. if (!book || book.userId !== userId) throw "Access denied"
+    4. if (book.coverUrl) return { success: false, error: "Book already has cover" }
+    5. result = await ctx.scheduler.runAfter(0, internal.actions.coverFetch.search, { bookId })
+    6. if (result.error) return { success: false, error: result.error }
+    7. return { success: true, coverDataUrl: result.coverDataUrl, apiSource: result.apiSource }
 
-### 5. Configure Gitleaks Secret Detection ✅
+  Success: Returns cover data URL for client-side blob upload
+  Test:
+    - Unit: Mock action response, verify error handling
+    - Integration: Full flow with real action call
+    - Edge: Book already has cover → skip, action fails → propagate error
 
-- [x] Create .gitleaks.toml configuration
-  ```
-  Files: .gitleaks.toml (new)
-  Architecture: Pre-commit + CI secret scanning, prevent credential leaks
-  Pseudocode: See TASK.md lines 420-442 (Gitleaks configuration)
-  Config:
-    [extend] useDefault = true
-    [allowlist] paths: .git, node_modules, .next, coverage, dist, pnpm-lock.yaml
-    regexes: sk_test_* (Stripe test keys), example@example.com
-  Success: Gitleaks scans staged files, blocks commits with secrets
-  Test: git commit with API key → blocked, git commit clean → passes
-  Dependencies: System gitleaks already installed
-  Time: 15min
-  Commit: 16067a5
-
-  Work Log:
-  - Added custom rules for Next.js/Convex/Clerk/Vercel specific secrets
-  - Extended allowlist to include .next/, node_modules/, convex/_generated/
-  - Added stopwords for test fixtures
-  ```
-
-### 6. Add Vitest Coverage Configuration ✅
-
-- [x] Enhance vitest.config.ts with coverage tracking
-  ```
-  Files: vitest.config.ts (modify lines 12-17)
-  Architecture: Coverage on critical paths only, 50% initial thresholds
-  Pseudocode: See TASK.md lines 309-346 (Coverage configuration)
-  Add to test block:
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
-      include: [
-        'convex/books.ts',
-        'convex/auth.ts',
-        'convex/notes.ts',
-        'convex/users.ts',
-        'app/api/blob/upload/**/*.ts',
-        'lib/**/*.ts',
-      ],
-      exclude: [
-        'convex/_generated/**',
-        '**/*.test.{ts,tsx}',
-        '**/*.stories.{ts,tsx}',
-        'components/ui/**',
-        'node_modules/**',
-      ],
-      thresholds: {
-        lines: 50,
-        functions: 50,
-        branches: 45,
-        statements: 50,
-      },
-    }
-  Success: Coverage reports generated, thresholds enforced
-  Test: pnpm test:coverage → generates reports in /coverage
-  Dependencies: Task 1 (@vitest/coverage-v8)
-  Time: 20min
-  Commit: 372ce05
-
-  Work Log:
-  - Focused on lib/import/ only (not Convex backend - integration tested)
-  - Excluded repository/memory.ts (in-memory test repository)
-  - Lowered branches threshold to 30% (rateLimit.ts at 30%, will ratchet up)
-  - Baseline achieved: 88% statements, 75% branches, 86% functions, 89% lines
-  - Per-file enforcement enabled for new code quality
-  ```
-
-### 7. Create Environment Validation Script ✅
-
-- [x] Write scripts/validate-env.sh
-  ```
-  Files: scripts/validate-env.sh (new)
-  Architecture: Pre-push validation of required environment variables
-  Pseudocode: See TASK.md lines 843-876 (Environment validation script)
-  Logic:
-    - Check required vars: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY,
-      CLERK_WEBHOOK_SECRET, NEXT_PUBLIC_CONVEX_URL, CONVEX_DEPLOYMENT, BLOB_READ_WRITE_TOKEN
-    - Exit 1 if missing with clear error message
-    - Exit 0 if all present
-  Success: Script detects missing env vars, prevents broken builds
-  Test: Unset env var → script fails with clear message, all vars set → passes
-  Dependencies: None
-  Time: 15min
-  Commit: c025083
-
-  Work Log:
-  - Loads .env.local automatically via source command
-  - Separated required vs recommended vars (warnings for recommended)
-  - Colorized output for better visibility
-  ```
-
-### 8. Enhance GitHub Actions CI Workflow ✅
-
-- [x] Update .github/workflows/ci.yml with full quality pipeline
-  ```
-  Files: .github/workflows/ci.yml (modify - currently 27 lines)
-  Architecture: Parallel lint/typecheck/test/gitleaks, sequential build
-  Pseudocode: See TASK.md lines 206-294 (CI configuration)
-  Changes:
-    - Fix branch: main → master
-    - Add concurrency: cancel-in-progress
-    - Add permissions: contents read, pull-requests write
-    - Add typecheck job (parallel)
-    - Add gitleaks job (parallel with fetch-depth: 0)
-    - Add build job (needs: [lint, typecheck, test, gitleaks])
-    - Add Next.js cache (uses: actions/cache@v4)
-    - Update test job: add --coverage flag
-    - Update Node version: 20 → 20 (already correct)
-  Success: CI runs all checks in parallel, build only after all pass
-  Test: Push to feature branch → all jobs pass in < 5 min
-  Dependencies: Tasks 2-7 (config files needed for CI)
+  Dependencies: Module 1 (Cover Fetch Action)
   Time: 45min
-  Commit: 79e85e4
 
-  Work Log:
-  - Added davelosert/vitest-coverage-report-action for PR coverage comments
-  - Used gitleaks/gitleaks-action@v2 with fetch-depth: 0
-  - Added Next.js build cache with cache@v4
-  - Concurrency group cancels in-progress runs
-  - Expected CI time: < 5min via parallelization
+  Module Value: High functionality (orchestrates async action, error handling) - Simple interface (bookId in, result out)
+  Information Hiding: Caller doesn't know about scheduler, action internals, validation logic
   ```
 
-### 9. Run Initial Formatting Pass ✅
+### Module 4: UI Component
 
-- [x] Format entire codebase to establish baseline
+- [ ] Build FetchCoverButton component
   ```
-  Files: All TypeScript, JavaScript, JSON, Markdown, CSS files
-  Architecture: One-time reformat to match Prettier config
-  Command: pnpm format
-  Success: All files formatted, no Prettier errors
-  Test: pnpm format:check → no changes needed
-  Dependencies: Tasks 1, 3 (prettier installed and configured)
-  Time: 5min
-  Note: Large diff expected (formatting changes only)
-  Commit: 87a9245
+  Files: components/book/FetchCoverButton.tsx (new)
+  Architecture: Button component with loading states, calls mutation + blob upload
+  Interface: <FetchCoverButton bookId={Id<"books">} onSuccess={() => void} />
 
-  Work Log:
-  - Formatted 93 files (2532 insertions, 1357 deletions)
-  - All TypeScript, JavaScript, JSON, Markdown, CSS files
-  - Verification: pnpm format:check passes with no changes
-  ```
+  Pseudocode:
+    1. const [isLoading, setIsLoading] = useState(false)
+    2. const fetchCover = useMutation(api.books.fetchCover)
+    3. const updateCoverFromBlob = useMutation(api.books.updateCoverFromBlob)
+    4. const { toast } = useToast()
+    5.
+    6. async function handleFetch():
+    7.   setIsLoading(true)
+    8.   try:
+    9.     result = await fetchCover({ bookId })
+    10.    if (!result.success):
+    11.      toast.error(result.error)
+    12.      return
+    13.
+    14.    // Convert data URL to Blob
+    15.    blob = dataURLtoBlob(result.coverDataUrl)
+    16.
+    17.    // Upload to Vercel Blob (reuse pattern from AddBookSheet.tsx:189-220)
+    18.    uploadResponse = await upload(`covers/${bookId}.jpg`, blob, {
+    19.      access: 'public',
+    20.      handleUploadUrl: '/api/blob/upload'
+    21.    })
+    22.
+    23.    // Update book with blob URL
+    24.    await updateCoverFromBlob({
+    25.      bookId,
+    26.      blobUrl: uploadResponse.url,
+    27.      apiSource: result.apiSource,
+    28.      apiCoverUrl: result.apiCoverUrl
+    29.    })
+    30.
+    31.    toast.success("Cover found and saved")
+    32.    onSuccess?.()
+    33.  catch (error):
+    34.    toast.error("Failed to fetch cover")
+    35.  finally:
+    36.    setIsLoading(false)
+    37.
+    38.  return (
+    39.    <Button onClick={handleFetch} disabled={isLoading}>
+    40.      {isLoading ? "Fetching cover..." : "Fetch Cover"}
+    41.    </Button>
+    42.  )
 
-### 10. Update .gitignore ✅
+  Success: Button triggers fetch, uploads to blob, updates book, shows toast
+  Test:
+    - Manual: Click button on book without cover → cover appears
+    - Integration: Mock mutations, verify upload flow
+    - Edge: Upload fails → show error, mutation fails → show error
 
-- [x] Add coverage and lefthook-local to .gitignore
+  Dependencies: Module 2 (Cover Update Mutation), Module 3 (Orchestration Mutation)
+  Time: 60min
 
-  ```
-  Files: .gitignore (modify)
-  Architecture: Ignore generated artifacts and local hook overrides
-  Add:
-    # quality infrastructure
-    lefthook-local.yml
-    .prettierignore
-
-  Note: /coverage already present (line 10)
-  Success: Git ignores local hook config and Prettier ignore file
-  Test: git status → lefthook-local.yml and .prettierignore not tracked
-  Dependencies: None
-  Time: 2min
-  Commit: eda725e
-
-  Work Log:
-  - Added lefthook-local.yml only (.prettierignore is committed)
-  - Placed in "quality infrastructure" section after testing
-  ```
-
-### Phase 1 Validation ✅
-
-- [x] Test complete quality pipeline end-to-end
-  ```
-  Files: None (validation only)
-  Architecture: Verify all gates operational
-  Test sequence:
-    1. git commit with lint error → blocked by pre-commit
-    2. git commit clean → pre-commit passes (< 10s)
-    3. git commit -m "bad format" → blocked by commitlint
-    4. git commit -m "feat: test hooks" → passes
-    5. git push with test failure → blocked by pre-push
-    6. git push clean → pre-push passes (< 2 min)
-    7. Push to GitHub → CI passes (< 5 min)
-  Success: All gates operational, fast feedback, CI green
-  Manual test: Time each hook, verify < 10s pre-commit, < 2min pre-push
-  Dependencies: Tasks 1-10 (all infrastructure complete)
-  Time: 20min
-
-  Validation Results:
-  ✅ Pre-commit: 1.3-4.7s (target < 10s) - gitleaks, format, lint, typecheck
-  ✅ Commit-msg: 0.3-5s - commitlint validates conventional format
-  ✅ All 9 commits passed hooks without bypass
-  ✅ Coverage: 88% statements, 75% branches, 86% functions, 89% lines
-  ✅ 54 tests passing with coverage enforcement
-  ⏳ Pre-push: Not tested (env-check, test, build)
-  ⏳ CI: Will test on first push to GitHub
+  Module Value: High functionality (loading states, error handling, blob upload, toasts) - Simple interface (2 props)
+  Information Hiding: Parent doesn't know about mutations, blob upload, data URL conversion
   ```
 
----
+### Module 5: Integration
 
-## Phase 2: Hardening & Documentation (2-3 hours)
-
-**Goal**: Fix edge cases, document escape hatches, clean up existing issues
-
-### 11. Fix Existing TypeScript Errors in Tests ✅
-
-- [x] Resolve 7 type errors in **tests**/import/dedup.test.ts (completed in Task 2)
+- [ ] Add FetchCoverButton to BookDetail page
   ```
-  Files: __tests__/import/dedup.test.ts (modified in Task 2)
-  Architecture: Fix Convex Id type mismatches
-  Issue: Tests pass but TypeScript errors exist (not type-checked in current CI)
-  Fix: Import correct Id types from convex/_generated/dataModel
-  Success: pnpm typecheck → zero errors
-  Test: pnpm typecheck (should pass), pnpm test (should still pass)
-  Dependencies: Task 8 (typecheck job in CI catches this)
-  Time: 30min
-  Commit: 1e281f8 (Task 2)
+  Files: components/book/BookDetail.tsx (modify)
+  Architecture: Conditionally render button if no coverUrl
 
-  Work Log:
-  - Fixed during Task 2 when pre-commit hook caught the errors
-  - Made fakeId generic with TableNames constraint
-  - Added _creationTime field to book factory
-  - Fixed all Convex Id type mismatches for books and users
-  ```
+  Pseudocode:
+    1. Import FetchCoverButton
+    2. In render, after cover image section:
+       {!book.coverUrl && (
+         <FetchCoverButton
+           bookId={book._id}
+           onSuccess={() => {
+             // Convex reactivity will auto-update book
+           }}
+         />
+       )}
 
-### 12. Generate and Document Coverage Baseline
+  Success: Button appears on books without covers, hidden if cover exists
+  Test:
+    - Manual: View book without cover → button visible, with cover → button hidden
+    - Integration: Click button → cover fetched → button disappears
 
-- [ ] Run coverage report and document in BACKLOG.md
-  ```
-  Files: BACKLOG.md (modify), coverage/ (generated, gitignored)
-  Architecture: Establish baseline for Phase 3 ramp-up
-  Command: pnpm test:coverage
-  Success: Coverage report generated, baseline documented
-  Document in BACKLOG.md Phase 3 section:
-    "Week 1 Baseline: X% overall, Y% on convex/books.ts, Z% on convex/auth.ts"
-  Test: Open coverage/index.html → see detailed report
-  Dependencies: Task 6 (coverage config)
+  Dependencies: Module 4 (UI Component)
   Time: 15min
+
+  Module Value: Simple integration - Clean conditional render
   ```
 
-### 13. Create CONTRIBUTING.md
+### Module 6: Testing
 
-- [x] Write contributor guide with quality standards (DONE: 2025-11-25, commit 3cd9320)
+- [ ] Write tests for cover fetch action
   ```
-  Files: CONTRIBUTING.md (new)
-  Architecture: Document commit conventions, hook usage, testing requirements
-  Sections:
-    - Commit Message Format (conventional commits examples)
-    - Running Quality Checks Locally (pnpm validate)
-    - Skipping Hooks (LEFTHOOK=0, SKIP=gitleaks, --no-verify - RARE)
-    - Testing Requirements (unit tests for new features)
-    - PR Size Guidelines (target < 200 lines)
-  Success: Clear contributor documentation exists
-  Test: Review covers common questions (format, hooks, testing)
-  Dependencies: Tasks 1-10 (infrastructure to document)
+  Files: __tests__/convex/actions/coverFetch.test.ts (new)
+  Architecture: Unit tests with mocked fetch, integration tests with real APIs
+
+  Test Cases:
+    1. Open Library success (ISBN found)
+    2. Open Library fallback to Google Books
+    3. Both APIs fail (return error)
+    4. Invalid ISBN format
+    5. Network timeout (5 second limit)
+    6. API returns non-image content type
+
+  Success: All test cases pass, 80%+ code coverage
+  Dependencies: Module 1 (Cover Fetch Action)
+  Time: 45min
+  ```
+
+- [ ] Write tests for cover update mutation
+  ```
+  Files: __tests__/convex/books.test.ts (modify or new)
+  Architecture: Unit tests with Convex test helpers
+
+  Test Cases:
+    1. Authorized user updates cover
+    2. Unauthorized user blocked
+    3. Book doesn't exist → null return
+    4. All fields updated correctly (coverUrl, apiSource, apiCoverUrl, updatedAt)
+
+  Success: All test cases pass, ownership validation verified
+  Dependencies: Module 2 (Cover Update Mutation)
   Time: 30min
   ```
 
-### 14. Add VS Code Format-on-Save Configuration
+## Environment Setup
 
-- [x] SKIPPED - User doesn't use VS Code (2025-11-25)
+- [ ] Configure Google Books API key (optional fallback)
   ```
-  Files: .vscode/settings.json (new)
-  Architecture: Auto-format on save for local development
-  Pseudocode: See TASK.md lines 880-903 (VS Code settings)
-  Config:
-    {
-      "editor.formatOnSave": true,
-      "editor.defaultFormatter": "esbenp.prettier-vscode",
-      "editor.codeActionsOnSave": {
-        "source.fixAll.eslint": "explicit"
-      },
-      "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-      "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-      "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-      "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
-      "typescript.tsdk": "node_modules/typescript/lib",
-      "typescript.enablePromptUseWorkspaceTsdk": true
-    }
-  Success: VS Code auto-formats TypeScript/JavaScript on save
-  Test: Open TS file, make change, save → auto-formatted
-  Dependencies: Task 3 (prettier config)
-  Time: 5min
-  ```
-
-### 15. Update ARCHITECTURE.md with Quality Infrastructure
-
-- [x] Document quality infrastructure in ARCHITECTURE.md (DONE: 2025-11-25, commit 37ac07d)
-  ```
-  Files: ARCHITECTURE.md (modify lines 700-721)
-  Architecture: Update "Testing Strategy" section
-  Changes:
-    - Remove "no automated tests" statement (54 tests exist!)
-    - Add "Quality Infrastructure" section after line 721
-    - Document: Lefthook hooks, CI pipeline, coverage tracking, secret detection
-    - Document coverage targets: 50% → 75% over 4 weeks
-    - Document North Star: "Friday afternoon deploy confidence"
-  Success: Architecture docs accurate, quality infrastructure explained
-  Test: Review section describes current state, not outdated claims
-  Dependencies: Tasks 1-10 (infrastructure to document)
-  Time: 20min
-  ```
-
-### 16. Update README.md with Quality Commands
-
-- [x] Add quality check commands to README.md development section (DONE: 2025-11-25, commit 4cefc44)
-
-  ````
-  Files: README.md (modify)
-  Architecture: Document new npm scripts for developers
-  Add section "Quality Checks":
-    ```bash
-    # Run all quality checks
-    pnpm validate
-
-    # Run fast checks (no coverage)
-    pnpm validate:fast
-
-    # Format code
-    pnpm format
-
-    # Type check
-    pnpm typecheck
-
-    # Test with coverage
-    pnpm test:coverage
-
-    # Skip hooks (rare - emergency only)
-    LEFTHOOK=0 git commit -m "emergency fix"
-  ````
-
-  Success: README documents new developer workflow
-  Test: Commands listed are accurate and work
-  Dependencies: Task 1 (scripts added to package.json)
+  Command: npx convex env set GOOGLE_BOOKS_API_KEY "your-key-here"
+  Files: .env.example (document), README.md (update environment variables section)
+  Success: Key available in Convex actions via process.env.GOOGLE_BOOKS_API_KEY
+  Note: Open Library doesn't require API key (unlimited via Cover ID pattern)
   Time: 10min
-
   ```
 
+## Documentation
+
+- [ ] Update README with cover fetching feature
+  ```
+  Files: README.md (modify - add to Features section)
+  Content:
+    - One-click cover fetching from Open Library and Google Books
+    - Automatic fallback if primary API unavailable
+    - Optional: Google Books API key for fallback (GOOGLE_BOOKS_API_KEY)
+
+  Success: README documents feature and optional environment variable
+  Time: 10min
   ```
 
-### Phase 2 Validation
-
-- [ ] Test escape hatches and edge cases
-  ```
-  Files: None (validation only)
-  Architecture: Verify developer experience and escape hatches
-  Test sequence:
-    1. LEFTHOOK=0 git commit → skips all hooks
-    2. SKIP=gitleaks git commit → skips only gitleaks
-    3. git commit --no-verify → bypasses all hooks (emergency)
-    4. VS Code save → auto-formats code
-    5. pnpm validate → runs all checks
-    6. pnpm validate:fast → skips coverage (faster)
-  Success: All escape hatches work, documentation accurate
-  Manual test: Verify each escape hatch, document timing
-  Dependencies: Tasks 11-16 (documentation and edge cases)
-  Time: 15min
-  ```
-
----
-
-## Phase 3: Incremental Coverage Enforcement (2-4 weeks, async)
-
-**Goal**: Ratchet coverage from 50% → 75% on critical paths
-
-**Note**: Phase 3 tasks are BACKLOG items, not immediate implementation. Track progress in BACKLOG.md under "Phase 3: Incremental Enforcement" section.
-
-**Week 1**: Measure baseline (Task 12 above)
-**Week 2**: Add tests → 55% threshold → update vitest.config.ts
-**Week 3**: Add tests → 65% threshold → update vitest.config.ts
-**Week 4**: Add tests → 75% threshold → update vitest.config.ts
-
-See TASK.md lines 589-621 for detailed week-by-week plan.
-
----
-
-## Post-MVP Enhancements (Track in BACKLOG.md)
-
-These are NOT implementation tasks for this PR. Document in BACKLOG.md "Post-MVP Quality Enhancements" section:
-
-1. **Codecov Integration** (2h) - PR comments with coverage diff
-2. **Branch Protection Rules** (1h) - Require CI passing before merge
-3. **Storybook CI** (3h) - Build and deploy Storybook
-4. **E2E Testing** (8h) - Playwright for critical flows
-5. **Release Automation** (4h) - release-please workflow
-6. **Performance Budgets** (2h) - Lighthouse CI
-7. **Dependency Updates** (2h) - Dependabot configuration
-
-See TASK.md lines 760-798 for detailed specs.
-
----
-
-## Design Iteration Checkpoints
-
-**After Phase 1 Complete**:
-
-- Review hook performance: Are pre-commit checks < 10s? Pre-push < 2min?
-- Review CI performance: Is pipeline < 5min? Any serial jobs that could parallelize?
-- Review false positive rate: Are developers bypassing hooks? Why?
-
-**After Phase 2 Complete**:
-
-- Review documentation: Do new contributors understand workflow from CONTRIBUTING.md?
-- Review coverage baseline: What's current state? What modules need most attention?
-- Review TypeScript errors: Are all type errors resolved? Any new ones introduced?
-
-**After Phase 3 Week 2**:
-
-- Review coverage progress: Did we hit 55%? Which modules lagging?
-- Review test quality: Are tests catching real bugs or just execution?
-- Adjust thresholds: Too aggressive? Too lenient?
-
----
-
-## Automation Opportunities
-
-**Identified during planning**:
-
-1. **Coverage trending**: Script to track coverage % over time (git log + coverage reports)
-2. **Hook performance profiling**: Script to time each hook command, identify slowdowns
-3. **Dependency vulnerability scanning**: Automate `pnpm audit` in CI
-4. **Stale branch cleanup**: GitHub Action to close stale PRs after 30 days
-
-**Not implementing now** - track in BACKLOG.md for future consideration.
-
----
-
-## Success Criteria: The Friday Afternoon Test
-
-✅ **Can merge to production Friday at 5pm and turn phone off?**
-
-**Phase 1 Success**:
-
-- All checks green = production ready
-- Pre-commit runs < 10s (lint, format, typecheck, gitleaks)
-- Pre-push runs < 2min (test, build, env validation)
-- CI runs < 5min (parallel checks, sequential build)
-- Zero manual verification needed
-
-**Phase 2 Success**:
-
-- Documentation complete (CONTRIBUTING.md, README.md updates)
-- All TypeScript errors resolved
-- Coverage baseline documented
-- VS Code auto-formatting works
-- Escape hatches tested and documented
-
-**Phase 3 Success** (async over 4 weeks):
-
-- Coverage ≥75% on critical paths (books, auth, notes)
-- Coverage ≥70% on API routes (blob upload)
-- CI fails if coverage drops below threshold
-- High confidence in refactoring safety
-
----
-
-## Summary
-
-### Completed
-
-**Phase 1: Core Infrastructure** ✅
-- All 10 tasks completed
-- 1 bonus task (Task 11 fixed early)
-- 9 atomic commits
-- 3.5 hours actual time (vs 3-4 hours estimated)
-
-**Commits:**
-1. 8e022b0 - Dependencies & npm scripts
-2. 1e281f8 - Lefthook + commitlint + TypeScript fixes (Tasks 2, 4, 11)
-3. 8df5311 - Prettier configuration
-4. 16067a5 - Gitleaks configuration
-5. 372ce05 - Vitest coverage configuration
-6. c025083 - Environment validation script
-7. 79e85e4 - GitHub Actions CI enhancement
-8. 87a9245 - Initial formatting pass (93 files)
-9. eda725e - Gitignore updates
-
-**Phase 2: Documentation** ✅
-- Task 12: Coverage baseline documented (commit 4491fa5)
-- Task 13: CONTRIBUTING.md created (commit 3cd9320)
-- Task 14: VS Code settings SKIPPED (user doesn't use VS Code)
-- Task 15: ARCHITECTURE.md updated (commit 37ac07d)
-- Task 16: README.md updated (commit 4cefc44)
-- 1.0 hour actual time (1.5-2.5 hours estimated)
-
-**Results:**
-- ✅ Pre-commit: 1.3-4.7s (< 10s target)
-- ✅ Commit-msg: 0.3-5s
-- ✅ Coverage: 88% statements, 75% branches, 86% functions, 89% lines
-- ✅ 54 tests passing with enforcement
-- ✅ All hooks operational without bypasses
-
-### In Progress
-
-None
-
-### Remaining
-
-**Phase 3: Incremental Coverage Enforcement** (async over 2-4 weeks)
-- Track in BACKLOG.md
-- Ratchet coverage from current baseline (75% branches) → 75%+ target
-- Week 2: 55% branches (focus: rateLimit.ts edge cases)
-- Week 3: 65% branches (expand to import/repository/)
-- Week 4: 75% branches (production-ready coverage)
-
----
-
-## Work Log
-
-### 2025-11-25: Task 13 - CONTRIBUTING.md (30min actual)
-
-**Created**: Comprehensive contributor guidelines (360 lines)
-
-**Sections**:
-- Development workflow (branch naming, atomic commits)
-- Commit message format (conventional commits with 11 types)
-- Quality checks (pre-commit, pre-push, commit-msg)
-- Testing requirements (80%+ coverage target)
-- PR guidelines (target <200 lines)
-- Troubleshooting (hook skipping, common issues)
-
-**Key Features**:
-- Documented all escape hatches: LEFTHOOK=0, SKIP=gitleaks, --no-verify
-- Emphasized hooks should rarely be skipped (emergency only)
-- Included practical examples of good/bad commit messages
-- Coverage baseline reference (88% statements, 75% branches)
-- Clear guidance on when to write tests
-
-**Quality Gates**: All hooks passed (gitleaks 0.07s, typecheck 2.38s, commitlint 0.63s)
-
-**Commit**: 3cd9320 - docs: create comprehensive contributor guidelines
-
----
-
-### 2025-11-25: Task 15 - ARCHITECTURE.md Update (20min actual)
-
-**Updated**: Testing Strategy and added Quality Infrastructure section (139 line addition)
-
-**Quality Infrastructure Section**:
-- Git hooks (pre-commit, pre-push, commit-msg with Lefthook)
-- CI/CD pipeline (GitHub Actions with coverage reporting)
-- Coverage tracking (88% baseline, 4-week ratcheting plan)
-- Secret detection (Gitleaks protecting 5 credential types)
-- Escape hatches (LEFTHOOK=0, SKIP, --no-verify)
-- Quality commands (validate, validate:fast)
-
-**Testing Strategy Updates**:
-- Removed outdated "no automated tests" claim
-- Documented 54 passing tests with 88% coverage
-- Added module-level coverage breakdown (81-97%)
-- Noted Vitest with v8 coverage provider
-
-**North Star**: "Friday afternoon deploy confidence"
-
-**Quality Gates**: All hooks passed (gitleaks 0.05s, typecheck 1.33s, commitlint 0.34s)
-
-**Commit**: 37ac07d - docs: update ARCHITECTURE.md with quality infrastructure
-
----
-
-### 2025-11-25: Task 16 - README.md Quality Section (10min actual)
-
-**Added**: Quality Checks section to README.md (60 line addition)
-
-**Updates**:
-- Added quality commands to Common Commands table
-- New "Quality Checks" section with running checks locally
-- Git hooks explanation (pre-commit, pre-push, commit-msg)
-- Escape hatches with strong warnings (emergency use only)
-- Reference to CONTRIBUTING.md
-
-**Commands Documented**:
-- pnpm validate / validate:fast
-- pnpm test / test:coverage
-- pnpm format / format:check
-- pnpm typecheck
-
-Makes quality infrastructure immediately discoverable for new contributors.
-
-**Quality Gates**: All hooks passed (gitleaks 0.05s, typecheck 1.64s, commitlint 0.43s)
-
-**Commit**: 4cefc44 - docs: add quality checks section to README.md
-
----
-
-**Total Phase 1 Time**: 3.5 hours actual (3-4 hours estimated) ✅
-**Total Phase 2 Time**: 1.0 hour actual (1.5-2.5 hours estimated, Task 14 skipped) ✅
-**Total Upfront**: 4.5 hours to supremely confident deployments
-
-**Phase 2 Complete**: All documentation tasks finished. Ready for Phase 3 (async coverage ratcheting).
+## Total Estimated Time
+- Module 1 (Action): 90min
+- Module 2 (Mutation): 30min
+- Module 3 (Orchestration): 45min
+- Module 4 (Component): 60min
+- Module 5 (Integration): 15min
+- Module 6 (Testing): 75min
+- Environment: 10min
+- Documentation: 10min
+
+**Total: 5.5 hours** (within 4-6 hour estimate from TASK.md)
+
+## Success Criteria
+- ✅ User can click "Fetch Cover" on book without cover
+- ✅ Cover fetched from Open Library or Google Books in <2 seconds
+- ✅ Cover uploaded to Vercel Blob and displayed on book
+- ✅ Error messages shown for failures (not found, network error, etc.)
+- ✅ Tests pass for action, mutation, and integration flows
+- ✅ 80%+ success rate for books with valid ISBNs
+
+## Module Boundaries Validation
+✅ **Cover Fetch Action**: Simple interface (bookId in, cover data out), hides API complexity, cascading fallback, timeout handling
+✅ **Cover Update Mutation**: Simple interface (4 args), hides ownership validation, database operations
+✅ **Orchestration Mutation**: Simple interface (bookId in, result out), hides scheduler, action coordination
+✅ **UI Component**: Simple props (bookId, onSuccess), hides loading states, error handling, blob upload, mutations
+
+Each module has **high functionality** (many internal concerns) with **simple interface** (few external touchpoints) = **Deep Modules**.
+
+## Future Features (Not in This TODO)
+- Bulk fetch all missing covers (separate feature)
+- Auto-fetch during import (integrate after bulk proven)
+- AI cover generation with Gemini (much larger feature)
