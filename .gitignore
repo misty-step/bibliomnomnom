@@ -9,6 +9,9 @@
 # testing
 /coverage
 
+# quality infrastructure
+lefthook-local.yml
+
 # next.js
 /.next/
 /out/
