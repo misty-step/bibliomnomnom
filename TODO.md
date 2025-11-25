@@ -417,7 +417,7 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 
 ### 14. Add VS Code Format-on-Save Configuration
 
-- [ ] Create .vscode/settings.json
+- [x] SKIPPED - User doesn't use VS Code (2025-11-25)
   ```
   Files: .vscode/settings.json (new)
   Architecture: Auto-format on save for local development
@@ -444,7 +444,7 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 
 ### 15. Update ARCHITECTURE.md with Quality Infrastructure
 
-- [ ] Document quality infrastructure in ARCHITECTURE.md
+- [x] Document quality infrastructure in ARCHITECTURE.md (DONE: 2025-11-25, commit 37ac07d)
   ```
   Files: ARCHITECTURE.md (modify lines 700-721)
   Architecture: Update "Testing Strategy" section
@@ -462,7 +462,7 @@ pnpm add -D lefthook prettier @commitlint/cli @commitlint/config-conventional @v
 
 ### 16. Update README.md with Quality Commands
 
-- [ ] Add quality check commands to README.md development section
+- [x] Add quality check commands to README.md development section (DONE: 2025-11-25, commit 4cefc44)
 
   ````
   Files: README.md (modify)
@@ -634,10 +634,13 @@ See TASK.md lines 760-798 for detailed specs.
 8. 87a9245 - Initial formatting pass (93 files)
 9. eda725e - Gitignore updates
 
-**Phase 2: Documentation** (in progress)
+**Phase 2: Documentation** ✅
 - Task 12: Coverage baseline documented (commit 4491fa5)
 - Task 13: CONTRIBUTING.md created (commit 3cd9320)
-- Remaining: Tasks 14-16 (VS Code config, ARCHITECTURE.md, README.md)
+- Task 14: VS Code settings SKIPPED (user doesn't use VS Code)
+- Task 15: ARCHITECTURE.md updated (commit 37ac07d)
+- Task 16: README.md updated (commit 4cefc44)
+- 1.0 hour actual time (1.5-2.5 hours estimated)
 
 **Results:**
 - ✅ Pre-commit: 1.3-4.7s (< 10s target)
@@ -648,17 +651,16 @@ See TASK.md lines 760-798 for detailed specs.
 
 ### In Progress
 
-None - ready for Phase 2
+None
 
 ### Remaining
 
-**Phase 2: Hardening & Documentation** (Tasks 12-16)
-- 5 tasks remaining (Task 11 done early)
-- Estimated: 1.5-2.5 hours (adjusted from 2-3 hours)
-
 **Phase 3: Incremental Coverage Enforcement** (async over 2-4 weeks)
 - Track in BACKLOG.md
-- Ratchet coverage 50% → 75%
+- Ratchet coverage from current baseline (75% branches) → 75%+ target
+- Week 2: 55% branches (focus: rateLimit.ts edge cases)
+- Week 3: 65% branches (expand to import/repository/)
+- Week 4: 75% branches (production-ready coverage)
 
 ---
 
@@ -689,8 +691,59 @@ None - ready for Phase 2
 
 ---
 
-**Total Phase 1 Time**: 3.5 hours actual (3-4 hours estimated) ✅
-**Total Phase 2 Time**: 1.5-2.5 hours estimated, ~1 hour spent
-**Total Upfront**: 5-6 hours to supremely confident deployments
+### 2025-11-25: Task 15 - ARCHITECTURE.md Update (20min actual)
 
-**Next**: Execute Task 14 (VS Code settings, 5min), then Tasks 15-16 (documentation updates).
+**Updated**: Testing Strategy and added Quality Infrastructure section (139 line addition)
+
+**Quality Infrastructure Section**:
+- Git hooks (pre-commit, pre-push, commit-msg with Lefthook)
+- CI/CD pipeline (GitHub Actions with coverage reporting)
+- Coverage tracking (88% baseline, 4-week ratcheting plan)
+- Secret detection (Gitleaks protecting 5 credential types)
+- Escape hatches (LEFTHOOK=0, SKIP, --no-verify)
+- Quality commands (validate, validate:fast)
+
+**Testing Strategy Updates**:
+- Removed outdated "no automated tests" claim
+- Documented 54 passing tests with 88% coverage
+- Added module-level coverage breakdown (81-97%)
+- Noted Vitest with v8 coverage provider
+
+**North Star**: "Friday afternoon deploy confidence"
+
+**Quality Gates**: All hooks passed (gitleaks 0.05s, typecheck 1.33s, commitlint 0.34s)
+
+**Commit**: 37ac07d - docs: update ARCHITECTURE.md with quality infrastructure
+
+---
+
+### 2025-11-25: Task 16 - README.md Quality Section (10min actual)
+
+**Added**: Quality Checks section to README.md (60 line addition)
+
+**Updates**:
+- Added quality commands to Common Commands table
+- New "Quality Checks" section with running checks locally
+- Git hooks explanation (pre-commit, pre-push, commit-msg)
+- Escape hatches with strong warnings (emergency use only)
+- Reference to CONTRIBUTING.md
+
+**Commands Documented**:
+- pnpm validate / validate:fast
+- pnpm test / test:coverage
+- pnpm format / format:check
+- pnpm typecheck
+
+Makes quality infrastructure immediately discoverable for new contributors.
+
+**Quality Gates**: All hooks passed (gitleaks 0.05s, typecheck 1.64s, commitlint 0.43s)
+
+**Commit**: 4cefc44 - docs: add quality checks section to README.md
+
+---
+
+**Total Phase 1 Time**: 3.5 hours actual (3-4 hours estimated) ✅
+**Total Phase 2 Time**: 1.0 hour actual (1.5-2.5 hours estimated, Task 14 skipped) ✅
+**Total Upfront**: 4.5 hours to supremely confident deployments
+
+**Phase 2 Complete**: All documentation tasks finished. Ready for Phase 3 (async coverage ratcheting).
