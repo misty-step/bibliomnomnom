@@ -4,13 +4,14 @@ import { applyDecision } from "../../lib/import/dedup";
 import { matchBooks } from "../../lib/import/dedup/core";
 import { normalizeTitleAuthorKey } from "../../lib/import/normalize";
 import type { ParsedBook } from "../../lib/import/types";
-import type { Doc, Id } from "../../convex/_generated/dataModel";
+import type { Doc, Id, TableNames } from "../../convex/_generated/dataModel";
 
-const fakeId = (id: string) => id as Id<"books">;
+const fakeId = <T extends TableNames>(id: string) => id as Id<T>;
 
 const book = (overrides: Partial<Doc<"books">> = {}): Doc<"books"> => ({
-  _id: fakeId(overrides._id ?? "book_1"),
-  userId: overrides.userId as Id<"users">,
+  _id: fakeId<"books">(overrides._id ?? "book_1"),
+  _creationTime: 0,
+  userId: overrides.userId ?? fakeId<"users">("user_default"),
   title: "Dune",
   author: "Frank Herbert",
   description: undefined,
@@ -54,62 +55,98 @@ const incoming = (overrides: Partial<ParsedBook> = {}): ParsedBook => ({
 
 describe("normalizeTitleAuthorKey", () => {
   it("folds diacritics and punctuation", () => {
-    const key = normalizeTitleAuthorKey("Cien años de soledad!", "G. G. Márquez");
+    const key = normalizeTitleAuthorKey(
+      "Cien años de soledad!",
+      "G. G. Márquez",
+    );
     expect(key).toBe("cien anos de soledad|g g marquez");
   });
 });
 
 describe("matchBooks", () => {
   it("prefers isbn over title-author", () => {
-    const docs = [book({ _id: "b1", isbn: "123", apiId: "api-1", userId: fakeId("user_1") })];
-    const rows: ParsedBook[] = [incoming({ tempId: "r1", isbn: "123", author: "Frank Herbert" })];
+    const docs = [
+      book({
+        _id: fakeId<"books">("b1"),
+        isbn: "123",
+        apiId: "api-1",
+        userId: fakeId<"users">("user_1"),
+      }),
+    ];
+    const rows: ParsedBook[] = [
+      incoming({ tempId: "r1", isbn: "123", author: "Frank Herbert" }),
+    ];
 
     const matches = matchBooks(docs, rows);
 
     expect(matches[0].matchType).toBe("isbn");
-    expect(matches[0].existingBookId).toBe("b1" as Id<"books">);
+    expect(matches[0].existingBookId).toBe(fakeId<"books">("b1"));
   });
 
   it("falls back to title-author when isbn missing", () => {
-    const docs = [book({ _id: "b2", isbn: undefined, userId: fakeId("user_1") })];
+    const docs = [
+      book({
+        _id: fakeId<"books">("b2"),
+        isbn: undefined,
+        userId: fakeId<"users">("user_1"),
+      }),
+    ];
     const rows: ParsedBook[] = [incoming({ tempId: "r2", isbn: undefined })];
 
     const matches = matchBooks(docs, rows);
 
     expect(matches[0].matchType).toBe("title-author");
-    expect(matches[0].existingBookId).toBe("b2" as Id<"books">);
+    expect(matches[0].existingBookId).toBe(fakeId<"books">("b2"));
   });
 
   it("uses apiId when provided", () => {
     const docs = [
       book({
-        _id: "b3",
+        _id: fakeId<"books">("b3"),
         isbn: undefined,
-        userId: fakeId("user_1"),
+        userId: fakeId<"users">("user_1"),
         apiId: "gb:dune",
         author: "Different Author",
       }),
     ];
-    const rows: ParsedBook[] = [incoming({ tempId: "r3", isbn: undefined, apiId: "gb:dune" })];
+    const rows: ParsedBook[] = [
+      incoming({ tempId: "r3", isbn: undefined, apiId: "gb:dune" }),
+    ];
 
     const matches = matchBooks(docs, rows);
 
     expect(matches[0].matchType).toBe("apiId");
-    expect(matches[0].existingBookId).toBe("b3" as Id<"books">);
+    expect(matches[0].existingBookId).toBe(fakeId<"books">("b3"));
   });
 });
 
 describe("applyDecision", () => {
   it("merges only empty fields", () => {
-    const existingBook = book({ edition: undefined, pageCount: undefined, userId: "user_1" as Id<"users"> });
-    const patch = applyDecision(existingBook, incoming({ edition: "Special", pageCount: 999 }), "merge");
+    const existingBook = book({
+      edition: undefined,
+      pageCount: undefined,
+      userId: fakeId<"users">("user_1"),
+    });
+    const patch = applyDecision(
+      existingBook,
+      incoming({ edition: "Special", pageCount: 999 }),
+      "merge",
+    );
 
     expect(patch).toMatchObject({ edition: "Special", pageCount: 999 });
   });
 
   it("does not overwrite protected fields", () => {
-    const existingBook = book({ isFavorite: true, coverUrl: "old", userId: "user_1" as Id<"users"> });
-    const patch = applyDecision(existingBook, incoming({ isFavorite: false, coverUrl: "new" }), "merge");
+    const existingBook = book({
+      isFavorite: true,
+      coverUrl: "old",
+      userId: fakeId<"users">("user_1"),
+    });
+    const patch = applyDecision(
+      existingBook,
+      incoming({ isFavorite: false, coverUrl: "new" }),
+      "merge",
+    );
 
     expect(patch).not.toHaveProperty("isFavorite");
     expect(patch).not.toHaveProperty("coverUrl");
