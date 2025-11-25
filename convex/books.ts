@@ -281,3 +281,27 @@ export const updatePrivacy = mutation({
     });
   },
 });
+
+export const updateCoverFromBlob = mutation({
+  args: {
+    bookId: v.id("books"),
+    blobUrl: v.string(),
+    apiSource: v.union(v.literal("open-library"), v.literal("google-books")),
+    apiCoverUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const book = await ctx.db.get(args.bookId);
+
+    if (!book || book.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    await ctx.db.patch(args.bookId, {
+      coverUrl: args.blobUrl,
+      apiSource: args.apiSource,
+      apiCoverUrl: args.apiCoverUrl,
+      updatedAt: Date.now(),
+    });
+  },
+});
