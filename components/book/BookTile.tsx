@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -15,7 +14,6 @@ type BookTileProps = {
 export function BookTile({ book }: BookTileProps) {
   const router = useRouter();
   const shouldReduce = useReducedMotion();
-  const [isHovered, setIsHovered] = useState(false);
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
 
   const navigate = () => {
@@ -42,10 +40,6 @@ export function BookTile({ book }: BookTileProps) {
       }}
       className="group relative cursor-pointer"
       onClick={navigate}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      onFocus={() => setIsHovered(true)}
-      onBlur={() => setIsHovered(false)}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
@@ -53,55 +47,70 @@ export function BookTile({ book }: BookTileProps) {
     >
       {/* Cover Container */}
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm shadow-surface transition-shadow duration-300 group-hover:shadow-raised bg-canvas-boneMuted">
-        
-        {/* 1. The Cover (Visible by default) */}
-        <div className="absolute inset-0 transition-opacity duration-300 ease-out group-hover:opacity-0">
-          {coverSrc ? (
-            <Image
-              src={coverSrc}
-              alt={`${book.title} cover`}
-              fill
-              className="object-cover"
-              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-canvas-boneMuted to-canvas-bone">
-              <span className="font-display text-6xl text-text-ink/10">{book.title[0]}</span>
+
+        {coverSrc ? (
+          <>
+            {/* Cover image with hover fade */}
+            <div className="absolute inset-0 transition-opacity duration-300 ease-out group-hover:opacity-0 group-focus:opacity-0">
+              <Image
+                src={coverSrc}
+                alt={`${book.title} cover`}
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+              />
             </div>
-          )}
-        </div>
 
-        {/* 2. The Index Card (Visible on Hover) */}
-        <div className="absolute inset-0 flex flex-col justify-between p-5 opacity-0 transition-opacity duration-300 ease-out group-hover:opacity-100 bg-canvas-bone/90 backdrop-blur-sm m-1.5 rounded-sm shadow-sm ring-1 ring-inset ring-black/5">
-          
-          {/* Top: Content */}
-          <div className="flex flex-col items-start space-y-3 w-full">
-            
-            {/* Title - Left aligned, balanced, allowing more lines */}
-            <h3 className="font-display text-lg font-medium text-text-ink leading-snug text-balance text-left line-clamp-5">
-              {book.title}
-            </h3>
-
-            {/* Author - Subordinate, Mono */}
-            <p className="font-mono text-xs uppercase tracking-wider text-text-inkMuted text-left line-clamp-2">
-              {book.author}
-            </p>
+            {/* Index card on hover */}
+            <div className="absolute inset-0 m-1.5 flex flex-col justify-between rounded-sm bg-canvas-bone/90 p-5 opacity-0 shadow-sm ring-1 ring-inset ring-black/5 backdrop-blur-sm transition-opacity duration-300 ease-out group-hover:opacity-100 group-focus:opacity-100">
+              <div className="flex w-full flex-col items-start space-y-3">
+                <h3 className="font-display text-lg font-medium leading-snug text-text-ink text-balance text-left line-clamp-5">
+                  {book.title}
+                </h3>
+                {book.author ? (
+                  <p className="font-mono text-xs uppercase tracking-wider text-text-inkMuted text-left line-clamp-2">
+                    {book.author}
+                  </p>
+                ) : null}
+              </div>
+              {(book.publishedYear || book.isAudiobook || book.isFavorite) && (
+                <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
+                  <span className="font-mono text-xs text-text-inkSubtle">
+                    {book.publishedYear ?? ""}
+                  </span>
+                  <div className="flex gap-2">
+                    {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
+                    {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="absolute inset-0 m-1.5 flex flex-col justify-between rounded-sm border border-line-ghost/50 bg-canvas-bone p-5 shadow-sm ring-1 ring-inset ring-black/5">
+            <div className="flex w-full flex-col items-start space-y-3">
+              <h3 className="font-display text-lg font-medium leading-snug text-text-ink text-balance text-left line-clamp-5">
+                {book.title}
+              </h3>
+              {book.author ? (
+                <p className="font-mono text-xs uppercase tracking-wider text-text-inkMuted text-left line-clamp-2">
+                  {book.author}
+                </p>
+              ) : null}
+            </div>
+            {(book.publishedYear || book.isAudiobook || book.isFavorite) && (
+              <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
+                <span className="font-mono text-xs text-text-inkSubtle">
+                  {book.publishedYear}
+                </span>
+                <div className="flex gap-2">
+                  {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
+                  {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                </div>
+              </div>
+            )}
           </div>
-
-          {/* Bottom: Metadata / Status */}
-          <div className="w-full flex items-end justify-between pt-2 border-t border-line-ghost/50 mt-2">
-             {/* Year */}
-             <span className="font-mono text-xs text-text-inkSubtle">
-               {book.publishedYear}
-             </span>
-             
-             {/* Badges (Only visible here now) */}
-             <div className="flex gap-2">
-                {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
-                {book.isFavorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
-             </div>
-          </div>
-        </div>
+        )}
 
       </div>
     </motion.article>

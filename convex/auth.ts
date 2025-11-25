@@ -18,14 +18,77 @@ async function getUserByClerkId(
   return user?._id ?? null;
 }
 
+async function ensureUserExists(
+  ctx: QueryCtx | MutationCtx,
+  identity: NonNullable<Awaited<ReturnType<QueryCtx["auth"]["getUserIdentity"]>>>,
+  existingUserId: Id<"users"> | null
+): Promise<Id<"users"> | null> {
+  if (existingUserId || !("insert" in ctx.db)) {
+    // Already exists or read-only context (queries cannot create users)
+    return existingUserId;
+  }
+
+  const email =
+    typeof identity.email === "string"
+      ? identity.email
+      : typeof identity.emailVerified === "string"
+      ? identity.emailVerified
+      : `no-email-${identity.subject}@placeholder.local`;
+
+  const imageUrl =
+    typeof identity.pictureUrl === "string"
+      ? identity.pictureUrl
+      : typeof identity.picture === "string"
+      ? identity.picture
+      : undefined;
+
+  let insertError: unknown;
+  try {
+    const newId = await (ctx as MutationCtx).db.insert("users", {
+      clerkId: identity.subject,
+      email,
+      name: identity.name,
+      imageUrl,
+    });
+    return newId;
+  } catch (err) {
+    insertError = err;
+    // fall through to re-read & de-duplicate
+  }
+
+  // Best-effort de-duplication: keep the earliest row, delete the rest.
+  const matches = await (ctx as MutationCtx).db
+    .query("users")
+    .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+    .collect();
+
+  if (matches.length > 0) {
+    const [keeper, ...dupes] = matches.sort((a, b) => a._creationTime - b._creationTime);
+    for (const dupe of dupes) {
+      await (ctx as MutationCtx).db.delete(dupe._id);
+    }
+    return keeper._id;
+  }
+
+  // If nothing found, bubble original error for visibility.
+  if (insertError) {
+    throw insertError;
+  }
+
+  return null;
+}
+
 /**
  * Validates authentication and returns the authenticated user's Convex ID.
  *
  * **Required for all mutations** - Call at the start of every mutation handler
  * to ensure only authenticated users can modify data.
  *
+ * Uses lazy user creation for mutations only: If authenticated user doesn't exist in database,
+ * automatically creates them. Queries remain read-only and will return an error if the user row
+ * is missing so callers must provision via mutation first.
+ *
  * @throws {Error} "Unauthenticated" if no Clerk session present
- * @throws {Error} "User not found" if Clerk user not synced to Convex (webhook issue)
  *
  * @example
  * ```typescript
@@ -45,7 +108,9 @@ export async function requireAuth(
     throw new Error("Unauthenticated: User must be signed in");
   }
 
-  const userId = await getUserByClerkId(ctx, identity.subject);
+  const existing = await getUserByClerkId(ctx, identity.subject);
+  const userId = await ensureUserExists(ctx, identity, existing);
+
   if (!userId) {
     throw new Error("User not found in database");
   }
@@ -58,6 +123,9 @@ export async function requireAuth(
  *
  * **Use for optional auth queries** - Returns null if no session instead of throwing.
  * Prefer requireAuth() for mutations (which should always require auth).
+ *
+ * Lazy creation runs only for mutation contexts (queries are read-only). Queries that need
+ * a user row should ensure it exists via a mutation (e.g., ensureUser) before calling.
  *
  * @returns User ID if authenticated, null otherwise
  *
@@ -78,5 +146,6 @@ export async function getAuthOrNull(
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return null;
 
-  return getUserByClerkId(ctx, identity.subject);
+  const existing = await getUserByClerkId(ctx, identity.subject);
+  return ensureUserExists(ctx, identity, existing);
 }

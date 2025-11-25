@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { BookTile, BookTileSkeleton } from "./BookTile";
 import { AddBookSheet } from "./AddBookSheet";
@@ -8,13 +9,21 @@ import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Star, Library } from "lucide-react";
+import { BookOpen, Star, Library, Upload, BookPlus } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type FilterType = "library" | "to-read" | "favorites";
 
 export function BookGrid() {
+  const router = useRouter();
   const allBooks = useAuthedQuery(api.books.list, {});
   const [activeFilter, setActiveFilter] = useState<FilterType>("library");
+  const [manualAddOpen, setManualAddOpen] = useState(false);
 
   // Compute counts and filtered books
   const { counts, libraryBooks, toReadBooks, favoriteBooks } = useMemo(() => {
@@ -55,58 +64,77 @@ export function BookGrid() {
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Filter Bar & Actions */}
-      <div className="flex flex-col items-start justify-between gap-6 border-b border-line-ghost pb-6 sm:flex-row sm:items-center">
-        {/* Filter Pills */}
-        <nav className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
-          {filters.map((filter) => {
-            const Icon = filter.icon;
-            const isActive = activeFilter === filter.type;
-            return (
-              <button
-                key={filter.type}
-                onClick={() => setActiveFilter(filter.type)}
-                className={cn(
-                  "group flex items-center gap-2 rounded-full border px-4 py-1.5 transition-all duration-fast ease-fast",
-                  isActive
-                    ? "border-text-ink bg-text-ink text-canvas-bone shadow-sm"
-                    : "border-transparent bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
-                )}
-              >
-                <Icon className={cn("h-3.5 w-3.5", isActive ? "text-canvas-bone" : "text-text-inkSubtle group-hover:text-text-ink")} />
-                <span className="font-sans text-sm font-medium">{filter.label}</span>
-                {filter.count > 0 && (
-                  <span
-                    className={cn(
-                      "ml-1 font-mono text-xs",
-                      isActive ? "text-canvas-bone/70" : "text-text-inkSubtle group-hover:text-text-ink/70"
-                    )}
-                  >
-                    {filter.count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </nav>
+    <>
+      <div className="space-y-8">
+        {/* Filter Bar & Actions */}
+        <div className="flex flex-col items-start justify-between gap-6 border-b border-line-ghost pb-6 sm:flex-row sm:items-center">
+          {/* Filter Pills */}
+          <nav className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
+            {filters.map((filter) => {
+              const Icon = filter.icon;
+              const isActive = activeFilter === filter.type;
+              return (
+                <button
+                  key={filter.type}
+                  onClick={() => setActiveFilter(filter.type)}
+                  className={cn(
+                    "group flex items-center gap-2 rounded-full border px-4 py-1.5 transition-all duration-fast ease-fast",
+                    isActive
+                      ? "border-text-ink bg-text-ink text-canvas-bone shadow-sm"
+                      : "border-transparent bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
+                  )}
+                >
+                  <Icon className={cn("h-3.5 w-3.5", isActive ? "text-canvas-bone" : "text-text-inkSubtle group-hover:text-text-ink")} />
+                  <span className="font-sans text-sm font-medium">{filter.label}</span>
+                  {filter.count > 0 && (
+                    <span
+                      className={cn(
+                        "ml-1 font-mono text-xs",
+                        isActive ? "text-canvas-bone/70" : "text-text-inkSubtle group-hover:text-text-ink/70"
+                      )}
+                    >
+                      {filter.count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </nav>
 
-        {/* Add Book Button */}
-        <AddBookButton />
-      </div>
-
-      {/* Content */}
-      <div className="min-h-[50vh]">
-        {activeFilter === "library" && (
-          <LibraryView
-            readingBooks={libraryBooks.reading}
-            finishedBooks={libraryBooks.finished}
+          {/* Add Book Dropdown */}
+          <AddBookButton
+            onManualAdd={() => setManualAddOpen(true)}
+            onImport={() => router.push("/import")}
           />
-        )}
-        {activeFilter === "to-read" && <ToReadView books={toReadBooks} />}
-        {activeFilter === "favorites" && <FavoritesView books={favoriteBooks} />}
+        </div>
+
+        {/* Content */}
+        <div className="min-h-[50vh]">
+          {activeFilter === "library" && (
+            <LibraryView
+              readingBooks={libraryBooks.reading}
+              finishedBooks={libraryBooks.finished}
+              onManualAdd={() => setManualAddOpen(true)}
+              onImport={() => router.push("/import")}
+            />
+          )}
+          {activeFilter === "to-read" && (
+            <ToReadView
+              books={toReadBooks}
+              onManualAdd={() => setManualAddOpen(true)}
+              onImport={() => router.push("/import")}
+            />
+          )}
+          {activeFilter === "favorites" && <FavoritesView books={favoriteBooks} />}
+        </div>
       </div>
-    </div>
+
+      {/* Manual Add Dialog */}
+      <AddBookSheet
+        isOpen={manualAddOpen}
+        onOpenChange={setManualAddOpen}
+      />
+    </>
   );
 }
 
@@ -114,9 +142,13 @@ export function BookGrid() {
 function LibraryView({
   readingBooks,
   finishedBooks,
+  onManualAdd,
+  onImport,
 }: {
   readingBooks: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
   finishedBooks: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+  onManualAdd: () => void;
+  onImport: () => void;
 }) {
   const hasReading = readingBooks && readingBooks.length > 0;
   const hasFinished = finishedBooks && finishedBooks.length > 0;
@@ -126,8 +158,17 @@ function LibraryView({
     return (
       <EmptyState
         title="Your shelves are bare."
-        description="A library without books is just a room. Add your first read to bring it to life."
-        action={<AddBookButton variant="primary" />}
+        description="Start your library with a single book or import from Goodreads."
+        action={
+          <div className="flex flex-col gap-3">
+            <Button onClick={onManualAdd} size="lg">
+              Add Your First Book
+            </Button>
+            <Button variant="ghost" onClick={onImport} className="text-text-inkMuted">
+              Or import your library
+            </Button>
+          </div>
+        }
       />
     );
   }
@@ -156,15 +197,28 @@ function LibraryView({
 // To Read View
 function ToReadView({
   books,
+  onManualAdd,
+  onImport,
 }: {
   books: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+  onManualAdd: () => void;
+  onImport: () => void;
 }) {
   if (!books || books.length === 0) {
     return (
       <EmptyState
         title="Your queue is empty."
         description="No books waiting in the wings. Find something new to look forward to."
-        action={<AddBookButton variant="primary" />}
+        action={
+          <div className="flex flex-col gap-3">
+            <Button onClick={onManualAdd} size="lg">
+              Add a Book
+            </Button>
+            <Button variant="ghost" onClick={onImport} className="text-text-inkMuted">
+              Or import books
+            </Button>
+          </div>
+        }
       />
     );
   }
@@ -219,13 +273,30 @@ function BooksGrid({
   );
 }
 
-function AddBookButton({ variant = "ghost" }: { variant?: "primary" | "ghost" }) {
+function AddBookButton({
+  onManualAdd,
+  onImport
+}: {
+  onManualAdd: () => void;
+  onImport: () => void;
+}) {
   return (
     <div className="flex-shrink-0">
-      <AddBookSheet
-        triggerLabel="Add Book"
-        triggerVariant={variant}
-      />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button>Add Book</Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={onManualAdd}>
+            <BookPlus className="mr-2 h-4 w-4" />
+            Add Manually
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={onImport}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import Library
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

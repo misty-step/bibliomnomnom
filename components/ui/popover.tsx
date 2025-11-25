@@ -53,7 +53,7 @@ export function PopoverContent({
     >
       <HeadlessPopover.Panel
         className={cn(
-          "absolute left-0 z-10 mt-2 w-56 origin-top-right rounded-lg bg-canvas-bone shadow-raised ring-1 ring-black/5 focus:outline-none border border-line-ghost",
+          "absolute left-0 z-50 mt-2 w-56 origin-top-right rounded-lg bg-canvas-bone shadow-raised ring-1 ring-black/5 focus:outline-none border border-line-ghost",
           className
         )}
       >

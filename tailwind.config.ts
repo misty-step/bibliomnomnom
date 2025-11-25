@@ -43,6 +43,7 @@ const config: Config = {
           foreground: colorVars.text.inkMuted
         },
         accent: {
+          ...colorVars.accent,
           DEFAULT: colorVars.text.ink,
           foreground: colorVars.surface.dawn
         },

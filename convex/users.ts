@@ -11,6 +11,16 @@ export const getCurrentUser = query({
   },
 });
 
+// Ensure user exists (triggers lazy creation on login)
+export const ensureUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    // Simply calling requireAuth will create user if needed (in mutation context)
+    const userId = await requireAuth(ctx);
+    return await ctx.db.get(userId);
+  },
+});
+
 // Create or update user from Clerk webhook
 export const createOrUpdateUser = mutation({
   args: {

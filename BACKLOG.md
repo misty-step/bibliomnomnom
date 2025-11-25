@@ -7,39 +7,6 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
 
 ## Now (Sprint-Ready, <2 weeks)
 
-### [ADOPTION BLOCKER] Goodreads/CSV Import System
-**File**: New feature - import module
-**Perspectives**: product-visionary, user-experience-advocate
-**Business Case**:
-- **Deal-breaker for 60%+ of target market**: Users with existing Goodreads libraries won't manually retype 50-200 books
-- **Competitive parity**: StoryGraph, Literal, Oku all have this - table stakes feature
-- **Zero-switch-cost trial**: "Import, try for a week, decide" vs. "I'd love to try but not retyping 200 books"
-- **Onboarding speed**: 5 minutes instead of 5 hours
-
-**Implementation** (Phase 1 - CSV):
-```typescript
-// 1. Parse Goodreads export CSV (title, author, ISBN, rating, date read, shelves)
-// 2. Map to bibliomnomnom schema:
-//    - rating 4-5 → isFavorite = true
-//    - shelves "currently-reading" → status = "currently-reading"
-//    - date read → dateFinished
-// 3. Preview import (show what will be created, allow exclude)
-// 4. Batch insert with progress indicator
-// 5. Handle duplicates (ISBN or title+author fuzzy match)
-```
-
-**Acceptance Criteria**:
-- User uploads Goodreads CSV, sees preview of 200 books
-- Click "Import" → books appear in library within 30 seconds
-- Duplicates detected and skipped (or user chooses merge/skip)
-- Status mapping correct (shelves → status)
-- Error handling for malformed CSV
-
-**Effort**: 2d | **Impact**: EXISTENTIAL for adoption
-**ROI**: Without this, product won't scale beyond early adopters. WITH this, removes #1 objection.
-
----
-
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
 **File**: New feature - export module
 **Perspectives**: product-visionary, security-sentinel (data portability)
@@ -1638,6 +1605,335 @@ commit-msg:
 - **[Refactor] Extract Reusable SegmentedControl** - Used in NoteTypeSelector + BookForm (1h effort, DRY principle)
 - **[Refactor] Extract FormField Component** - Consistent label styling across forms (1h effort, single source of truth)
 - **[Infrastructure] Rate Limiting** - Upstash Redis rate limits on API routes + Convex mutations (3h effort, abuse prevention)
+
+### [TESTABILITY] Value Objects for Import Match Keys
+**Scope**: lib/import/dedup/matchKeys.ts (NEW)
+**Perspectives**: complexity-archaeologist, architecture-guardian
+**Context**: Phase 3 of import testability refactoring (optional polish)
+
+**Description**: Encapsulate ISBN, Title-Author, and ApiId matching logic in value object classes with built-in normalization, equality checking, and priority.
+
+**Value**:
+- Type safety for matching (compiler catches misuse)
+- Normalization + equality + priority in single cohesive unit
+- Self-documenting code (IsbnKey.equals(other) clearer than string comparison)
+- Easier to add new match types (SeriesKey, PublisherKey, etc.)
+
+**Implementation**:
+```typescript
+// lib/import/dedup/matchKeys.ts
+class IsbnKey {
+  constructor(private normalized: string | undefined) {}
+
+  static from(raw?: string | null): IsbnKey {
+    return new IsbnKey(normalizeIsbn(raw));
+  }
+
+  equals(other: IsbnKey): boolean {
+    return this.normalized !== undefined &&
+           this.normalized === other.normalized;
+  }
+
+  get priority(): number { return 1.0; }
+  get isValid(): boolean { return this.normalized !== undefined; }
+}
+
+class TitleAuthorKey {
+  constructor(private key: string) {}
+
+  static from(title: string, author: string): TitleAuthorKey {
+    return new TitleAuthorKey(normalizeTitleAuthorKey(title, author));
+  }
+
+  equals(other: TitleAuthorKey): boolean {
+    return this.key === other.key;
+  }
+
+  get priority(): number { return 0.8; }
+}
+
+class ApiIdKey {
+  constructor(private normalized: string | undefined) {}
+
+  static from(raw?: string | null): ApiIdKey {
+    return new ApiIdKey(normalizeApiId(raw));
+  }
+
+  equals(other: ApiIdKey): boolean {
+    return this.normalized !== undefined &&
+           this.normalized === other.normalized;
+  }
+
+  get priority(): number { return 0.6; }
+  get isValid(): boolean { return this.normalized !== undefined; }
+}
+```
+
+**Effort**: 2-3 hours | **Impact**: Better encapsulation, type safety, clearer intent
+
+**Trade-offs**:
+- ✅ Pros: Better encapsulation, type safety, clearer intent
+- ❌ Cons: More classes, indirection, possible over-engineering for current scale
+- ⚖️ Decision: Wait until adding 3+ new match types to justify abstraction
+
+**When to Implement**:
+- When adding SeriesKey, PublisherKey, or other match types
+- When matching logic becomes complex (fuzzy matching, weighted combinations)
+- When tests need to verify normalization + equality together
+
+---
+
+### [TESTABILITY] Comprehensive Import Integration Tests
+**Scope**: __tests__/import/integration.test.ts (NEW)
+**Perspectives**: maintainability-maven, architecture-guardian
+**Context**: Post-Phase 2 validation tests
+
+**Description**: Full workflow tests using in-memory repositories to verify import flows end-to-end (CSV upload → preview → dedup → commit → verify books created).
+
+**Value**:
+- Catch integration bugs between layers (repository + service + handler)
+- Verify complete user workflows (not just unit behavior)
+- Regression protection for multi-step operations
+- Documentation through executable tests
+
+**Implementation**:
+```typescript
+describe("Import workflow integration", () => {
+  it("imports Goodreads CSV with deduplication", async () => {
+    const repos = createInMemoryRepositories();
+    const userId = "user_1" as Id<"users">;
+
+    // Seed existing books
+    repos.books.seed([
+      book({ isbn: "9780441013593", title: "Dune", author: "Frank Herbert" })
+    ]);
+
+    // Parse CSV
+    const csvText = `Title,Author,ISBN\nDune,Frank Herbert,9780441013593\nFoundation,Isaac Asimov,`;
+    const parsed = parseGoodreadsCsv(csvText);
+
+    // Preview (dedup should find 1 match)
+    const preview = await preparePreviewHandler(mockCtx, {
+      importRunId: "run_1",
+      sourceType: "goodreads-csv",
+      rows: parsed.rows,
+      page: 0,
+    });
+
+    expect(preview.dedupMatches).toHaveLength(1);
+    expect(preview.dedupMatches[0].matchType).toBe("isbn");
+
+    // Commit with skip decision on duplicate
+    const result = await commitImportHandler(mockCtx, {
+      importRunId: "run_1",
+      page: 0,
+      decisions: [
+        { tempId: parsed.rows[0].tempId, action: "skip" },
+        { tempId: parsed.rows[1].tempId, action: "create" },
+      ],
+    });
+
+    expect(result.skipped).toBe(1);
+    expect(result.created).toBe(1);
+
+    // Verify final state
+    const books = await repos.books.findByUser(userId);
+    expect(books).toHaveLength(2); // Original + Foundation
+    expect(books.find(b => b.title === "Foundation")).toBeDefined();
+  });
+
+  it("handles LLM extraction with fallback provider", async () => {
+    // Test full LLM flow with primary failure + fallback success
+  });
+
+  it("enforces rate limits across multiple previews", async () => {
+    // Test rate limiting across 6 preview attempts in one day
+  });
+});
+```
+
+**Effort**: 3-4 hours | **Impact**: Catch integration bugs, regression protection
+
+**When to Implement**:
+- After Phase 2 repository refactoring completes
+- When adding new import sources (Storygraph, LibraryThing)
+- Before major refactoring (regression safety net)
+
+---
+
+### [TESTABILITY] Repository Transaction Support
+**Scope**: lib/import/repository interfaces
+**Perspectives**: architecture-guardian, maintainability-maven
+
+**Description**: Add transaction boundaries to repositories for atomic multi-document operations (e.g., create book + update import run + delete preview in single transaction).
+
+**Impact**: Prevents partial state on failure (all-or-nothing commits)
+
+**Effort**: 4-6 hours | **Complexity**: Medium (Convex doesn't expose transaction API directly)
+
+**When to Implement**: When data consistency issues emerge in multi-step operations
+
+---
+
+### [PERFORMANCE] Repository Query Result Caching
+**Scope**: lib/import/repository
+**Perspectives**: performance-pathfinder
+
+**Description**: Cache `findByUser` query results during import workflow (called multiple times per import).
+
+**Impact**: Reduce database round-trips by ~30% during commit phase
+
+**Effort**: 2-3 hours
+
+**When to Implement**: When import performance becomes user-visible issue (>2 second commits)
+
+---
+
+### [RELIABILITY] LLM Provider Retry Logic
+**Scope**: lib/import/llm.ts
+**Perspectives**: architecture-guardian
+
+**Description**: Automatic retry with exponential backoff for transient LLM API failures (rate limits, network errors).
+
+**Impact**: Better reliability for imports using TXT/MD files
+
+**Effort**: 2 hours | **Trade-off**: Adds latency on failure, may hit rate limits faster
+
+---
+
+### [FEATURE] Fuzzy Title Matching for Deduplication
+**Scope**: lib/import/dedup
+**Perspectives**: product-visionary, user-experience-advocate
+
+**Description**: Use Levenshtein distance or fuzzy string matching for title-author dedup (catch typos, minor variations).
+
+**Impact**: Reduce false negatives (books marked as new when they exist with slight title variation)
+
+**Effort**: 3-4 hours | **Complexity**: Medium (tuning similarity thresholds to avoid false positives)
+
+**When to Implement**: When user feedback shows missed duplicates are common
+
+---
+
+### [ARCHITECTURE] Extract Books Module Repository Pattern
+**Scope**: convex/books.ts, convex/notes.ts
+**Perspectives**: architecture-guardian, maintainability-maven
+
+**Description**: Apply same repository pattern to `convex/books.ts` and `convex/notes.ts` (not just import feature).
+
+**Benefit**: Consistent architecture across codebase, testable book/note mutations
+
+**Effort**: 8-10 hours (more modules to refactor)
+
+**When to Address**: After import refactoring proves successful, before adding new major features
+
+---
+
+### [INFRASTRUCTURE] Migrate Rate Limiting to Convex Rate Limiter
+**Scope**: lib/import/rateLimit.ts
+**Perspectives**: architecture-guardian
+
+**Description**: Use Convex's built-in rate limiting primitives instead of custom implementation.
+
+**Benefit**: Distributed rate limiting (works across multiple Convex processes), built-in backoff
+
+**Effort**: 2 hours | **Documentation**: https://docs.convex.dev/production/rate-limiting
+
+**When to Address**: When scaling beyond single Convex deployment, or Convex rate limiter becomes stable
+
+---
+
+### [CONFIGURATION] LLM Provider Configuration Externalization
+**Scope**: lib/import/llm.ts, convex/imports.ts
+**Perspectives**: architecture-guardian
+
+**Description**: Move LLM model selection ("gpt-5.1-mini", "gemini-2.5-flash") to environment variables instead of hardcoded.
+
+**Benefit**: Swap models without code changes, easier A/B testing, cost optimization
+
+**Effort**: 1 hour
+
+**Example**:
+```bash
+# .env.local
+OPENAI_MODEL=gpt-5.1-mini
+GEMINI_MODEL=gemini-2.5-flash
+LLM_TOKEN_CAP=50000
+```
+
+**When to Address**: When experimenting with new models (GPT-4, Claude, etc.)
+
+---
+
+### [PERFORMANCE] Import Preview Pagination
+**Scope**: convex/imports.ts, components/import/*
+**Perspectives**: performance-pathfinder
+
+**Description**: Current implementation loads all books into memory (300/page). Add true cursor-based pagination for previews with >300 books.
+
+**Benefit**: Handle large imports (1000+ books) without memory pressure
+
+**Effort**: 4 hours
+
+**When to Address**: When users report slow previews or memory issues with large CSVs
+
+---
+
+### [HEALTH] Deep dependency checks in health endpoint
+**Scope**: app/api/health/route.ts
+**Description**: Add “deep health” mode that performs lightweight reachability checks to Convex/Clerk/blob rather than only env presence; mirror no-store headers on error responses.
+**Effort**: 1-2 hours | **When**: After current release once monitoring needs clarity.
+
+### [SECURITY] Tighten CSP once safe
+**Scope**: next.config.ts
+**Description**: Remove `unsafe-inline`/`unsafe-eval` from script-src when tooling allows; track third-party domains as they’re added.
+**Effort**: 1 hour | **When**: After verifying production build compatibility.
+
+### [TESTING] Broaden import test coverage
+**Scope**: __tests__/import/*
+**Description**: Add cases for CSV size/10MB limit, malformed CSV, dedup fuzzy/confidence edges (≥/</0.85), commit skip/error/idempotency, LLM text path in useImportJob.
+**Effort**: 3-4 hours | **When**: Next test pass cycle.
+
+### [QUALITY] Raise docstring coverage toward 80%
+**Scope**: lib/import/*, convex/*
+**Description**: Address bot warning (28.57%); add concise docstrings for exported functions/types most used externally.
+**Effort**: 2 hours | **When**: After functional fixes land.
+
+### [FEATURE] Batch Import API
+**Scope**: New endpoints, UI
+**Perspectives**: product-visionary
+
+**Description**: Allow importing multiple files in single workflow (upload folder of CSVs, process sequentially).
+
+**Value**: Power users with multiple export files
+
+**Effort**: 6-8 hours
+
+---
+
+### [FEATURE] Import Templates
+**Scope**: New schema tables, UI
+**Perspectives**: product-visionary, user-experience-advocate
+
+**Description**: Save dedup decision patterns as templates ("always skip duplicates", "always merge metadata", etc.).
+
+**Value**: Faster workflow for repeat imports
+
+**Effort**: 8-10 hours
+
+---
+
+### [FEATURE] Undo Import
+**Scope**: Audit log, version tracking
+**Perspectives**: user-experience-advocate
+
+**Description**: Add ability to undo last import (delete created books, restore merged books to previous state).
+
+**Value**: Safety net for accidental imports
+
+**Effort**: 10-12 hours (requires audit log/versioning)
+
+---
 
 ---
 

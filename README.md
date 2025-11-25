@@ -88,6 +88,15 @@ Convex authentication requires a Clerk JWT template:
 pnpm install
 ```
 
+### 4. Enable Imports (Goodreads/CSV/TXT/MD)
+
+- Feature flag: `NEXT_PUBLIC_IMPORT_ENABLED=true` (defaults to true). Toggle to hide the import UI if needed.
+- LLM providers (for TXT/MD/unknown CSV): set `OPENAI_API_KEY` and/or `GEMINI_API_KEY` in `.env.local`.
+- Schema updates: run `pnpm convex:push` after pulling to apply `importRuns` and `importPreviews` tables and regenerate Convex types.
+- Rate limits: enforced per user (5 imports/day, 2 concurrent previews); adjust constants in `convex/imports.ts` if policy changes.
+- File limits: accepts CSV/TXT/MD up to 10MB; previews paginate at 300 rows/page.
+- Privacy: CSV stays client-side; TXT/MD data sent to LLM only; imported books default to `private`.
+
 ## Getting Started
 
 Now that services and configuration are complete:
@@ -113,12 +122,94 @@ Visit http://localhost:3000 and click "Sign In". If the Clerk modal opens, you'r
 ## Production Build
 
 ```bash
-# Build for production
+# Build for production (runs Convex deploy first)
 pnpm build
 
 # Start production server (after build)
 pnpm start
 ```
+
+**Note**: The build command automatically deploys Convex before building Next.js to ensure type safety.
+
+## Production Deployment
+
+This project is configured for deployment on **Vercel** with **Convex** and **Clerk**.
+
+### Quick Deploy
+
+1. **Push to GitHub** - Vercel auto-deploys from `main` branch
+2. **Set Environment Variables** - Configure in Vercel Dashboard (see [DEPLOYMENT.md](./DEPLOYMENT.md))
+3. **Verify Deployment** - Check `/api/health` endpoint
+
+### Critical Setup Steps
+
+Before deploying to production, you MUST:
+
+- [x] Generate Convex production deploy key
+- [x] Generate Convex preview deploy key (for PR previews)
+- [x] Configure Clerk production application
+- [x] Set up Clerk production webhook (after first deploy)
+- [x] Set all environment variables in Vercel Dashboard
+
+### Environment Variables Required
+
+**Production Environment:**
+```bash
+# Clerk (production)
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+CLERK_SECRET_KEY=sk_live_...
+CLERK_WEBHOOK_SECRET=whsec_...
+
+# Convex (production)
+# Use CONVEX_DEPLOY_KEY for CI/preview/production deploys; CONVEX_DEPLOYMENT is only for local dev.
+NEXT_PUBLIC_CONVEX_URL=https://your-prod.convex.cloud
+CONVEX_DEPLOY_KEY=prod:deployment|token
+
+# Vercel Blob (auto-configured via integration)
+BLOB_READ_WRITE_TOKEN=vercel_blob_...
+
+# LLM (optional - for import feature)
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AI...
+NEXT_PUBLIC_IMPORT_ENABLED=true
+```
+
+**Preview Environment:**
+```bash
+# Convex (preview - creates isolated deployments per branch)
+CONVEX_DEPLOY_KEY=preview:username:project|token
+
+# Clerk (can reuse production or use test keys)
+# + other keys same as production
+```
+
+### Post-Deploy Verification
+
+After deployment, verify:
+
+```bash
+# Health check
+curl https://your-domain.com/api/health
+
+# Should return:
+# {"status":"healthy","environment":"production",...}
+```
+
+Test critical flows:
+- Sign up → creates user in Convex (tests Clerk webhook)
+- Add book → saves to Convex (tests mutations + auth)
+- Upload cover → uploads to Blob (tests file storage)
+
+### Complete Guide
+
+For detailed deployment instructions, see **[DEPLOYMENT.md](./DEPLOYMENT.md)** which covers:
+- Convex production setup
+- Clerk production configuration
+- Vercel environment variables
+- Preview deployments
+- Monitoring & observability
+- Troubleshooting common issues
+- Rollback procedures
 
 ## Using The App
 
@@ -295,6 +386,7 @@ bibliomnomnom/
 ## Documentation
 
 - **[CLAUDE.md](./CLAUDE.md)** - Architecture, patterns, conventions, troubleshooting
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide for Vercel/Convex/Clerk
 - **[DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md)** - Design tokens, colors, typography
 - **[BACKLOG.md](./BACKLOG.md)** - Strategic roadmap with 8-perspective analysis
 - **[TODO.md](./TODO.md)** - Implementation tasks and work logs
