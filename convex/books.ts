@@ -1,4 +1,5 @@
 import { internalQuery, mutation, query, type MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireAuth } from "./auth";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -327,4 +328,61 @@ export async function updateCoverFromBlobHandler(
 export const updateCoverFromBlob = mutation({
   args: updateCoverFromBlobArgs,
   handler: updateCoverFromBlobHandler,
+});
+
+const fetchCoverArgs = {
+  bookId: v.id("books"),
+};
+
+type CoverFetchResult =
+  | {
+      success: true;
+      coverDataUrl: string;
+      apiSource: "open-library" | "google-books";
+      apiCoverUrl: string;
+    }
+  | { success: false; error: string };
+
+export async function fetchCoverHandler(
+  ctx: MutationCtx,
+  args: { bookId: Id<"books"> },
+): Promise<CoverFetchResult> {
+  const coverFetchAction = (internal as any).actions?.coverFetch?.search;
+
+  if (!coverFetchAction) {
+    throw new Error("Cover fetch action not available");
+  }
+
+  const userId = await requireAuth(ctx);
+  const book = await ctx.db.get(args.bookId);
+
+  if (!book || book.userId !== userId) {
+    throw new Error("Access denied");
+  }
+
+  if (book.coverUrl) {
+    return { success: false, error: "Book already has a cover" };
+  }
+
+  const result = (await ctx.scheduler.runAfter(0, coverFetchAction, {
+    bookId: args.bookId,
+  })) as unknown as
+    | { coverDataUrl: string; apiSource: "open-library" | "google-books"; apiCoverUrl: string }
+    | { error: string };
+
+  if ("error" in result) {
+    return { success: false, error: result.error };
+  }
+
+  return {
+    success: true,
+    coverDataUrl: result.coverDataUrl,
+    apiSource: result.apiSource,
+    apiCoverUrl: result.apiCoverUrl,
+  };
+}
+
+export const fetchCover = mutation({
+  args: fetchCoverArgs,
+  handler: fetchCoverHandler,
 });

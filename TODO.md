@@ -77,7 +77,7 @@
 
 ### Module 3: Orchestration Mutation
 
-- [ ] Add mutation to orchestrate cover fetch flow
+- [x] Add mutation to orchestrate cover fetch flow
   ```
   Files: convex/books.ts (modify - add new mutation)
   Architecture: Mutation calls action via scheduler, waits for result, returns to client
