@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
 import { upload } from "@vercel/blob/client";
 import { Globe, Headphones, Lock, Pencil, Star, Trash2 } from "lucide-react";
+import { FetchCoverButton } from "./FetchCoverButton";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
   const [coverHovered, setCoverHovered] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isFetchSuccess, setIsFetchSuccess] = useState(false);
 
   const currentStatus = book?.status;
   const currentPrivacy = book?.privacy;
@@ -238,6 +240,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
       ? "all associated notes"
       : `${noteCount} ${noteCount === 1 ? "note" : "notes"}`;
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
+  const showFetchCoverButton = !book.coverUrl && !isFetchSuccess;
 
   return (
     <motion.article
@@ -276,11 +279,20 @@ export function BookDetail({ bookId }: BookDetailProps) {
                       </p>
                     ) : null}
                   </div>
-                  {book.publishedYear ? (
-                    <span className="font-mono text-xs text-text-inkSubtle">
-                      {book.publishedYear}
-                    </span>
-                  ) : null}
+                  <div className="space-y-4">
+                    {book.publishedYear ? (
+                      <span className="font-mono text-xs text-text-inkSubtle">
+                        {book.publishedYear}
+                      </span>
+                    ) : null}
+                    {showFetchCoverButton && (
+                      <FetchCoverButton
+                        bookId={book._id}
+                        onSuccess={() => setIsFetchSuccess(true)}
+                        className="w-full justify-center"
+                      />
+                    )}
+                  </div>
                 </div>
               )}
 

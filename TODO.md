@@ -172,7 +172,7 @@
 
 ### Module 5: Integration
 
-- [ ] Add FetchCoverButton to BookDetail page
+- [x] Add FetchCoverButton to BookDetail page
   ```
   Files: components/book/BookDetail.tsx (modify)
   Architecture: Conditionally render button if no coverUrl
