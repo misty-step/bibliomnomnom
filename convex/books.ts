@@ -308,6 +308,13 @@ const updateCoverFromBlobArgs = {
   apiCoverUrl: v.string(),
 };
 
+/**
+ * Internal handler for updating a book's cover from an uploaded blob
+ *
+ * @param ctx - Convex mutation context
+ * @param args - Arguments including bookId, blobUrl, apiSource, and apiCoverUrl
+ * @throws Error if book not found or access denied
+ */
 export async function updateCoverFromBlobHandler(
   ctx: MutationCtx,
   args: {
@@ -332,6 +339,14 @@ export async function updateCoverFromBlobHandler(
   });
 }
 
+/**
+ * Mutation to update a book's cover after a successful blob upload
+ *
+ * @param bookId - ID of the book to update
+ * @param blobUrl - URL of the uploaded blob (Vercel Blob)
+ * @param apiSource - Source of the original cover image (open-library or google-books)
+ * @param apiCoverUrl - Original URL of the cover image from the API
+ */
 export const updateCoverFromBlob = mutation({
   args: updateCoverFromBlobArgs,
   handler: updateCoverFromBlobHandler,
@@ -350,6 +365,14 @@ type CoverFetchResult =
     }
   | { success: false; error: string };
 
+/**
+ * Internal handler for the fetch cover action
+ *
+ * @param ctx - Convex action context
+ * @param args - Arguments including bookId
+ * @returns CoverFetchResult with success status and data or error
+ * @throws Error if user is not authenticated or book not found
+ */
 export async function fetchCoverHandler(
   ctx: ActionCtx,
   args: { bookId: Id<"books"> },
@@ -383,6 +406,12 @@ export async function fetchCoverHandler(
   };
 }
 
+/**
+ * Action to fetch a book cover from external APIs (Open Library, Google Books)
+ *
+ * @param bookId - ID of the book to fetch cover for
+ * @returns Object containing success status and cover data (base64 data URL) or error
+ */
 export const fetchCover = action({
   args: fetchCoverArgs,
   handler: fetchCoverHandler,

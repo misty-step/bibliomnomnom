@@ -21,13 +21,22 @@ type CoverResult =
 
 /**
  * Clean ISBN by removing dashes and spaces
+ *
+ * @param isbn - The raw ISBN string (10 or 13 digits)
+ * @returns Cleaned ISBN string containing only numbers (and 'X' for ISBN-10)
  */
 function cleanIsbn(isbn: string): string {
   return isbn.replace(/[-\s]/g, "");
 }
 
 /**
- * Fetch with timeout
+ * Fetch with timeout wrapper
+ *
+ * @param url - The URL to fetch
+ * @param options - Fetch options (method, headers, etc.)
+ * @param timeoutMs - Timeout in milliseconds (default: 5000)
+ * @returns The Response object
+ * @throws Error if fetch fails or times out
  */
 async function fetchWithTimeout(
   url: string,
@@ -50,6 +59,10 @@ async function fetchWithTimeout(
 
 /**
  * Convert ArrayBuffer to base64 data URL
+ *
+ * @param buffer - The binary image data
+ * @param contentType - MIME type (default: "image/jpeg")
+ * @returns A complete data URL string (e.g., "data:image/jpeg;base64,...")
  */
 function arrayBufferToDataUrl(buffer: ArrayBuffer, contentType = "image/jpeg"): string {
   const bytes = new Uint8Array(buffer);
@@ -63,6 +76,9 @@ function arrayBufferToDataUrl(buffer: ArrayBuffer, contentType = "image/jpeg"): 
 
 /**
  * Try to fetch cover from Open Library
+ *
+ * @param isbn - The cleaned ISBN to search for
+ * @returns CoverResult on success, null on failure or no cover found
  */
 async function tryOpenLibrary(isbn: string): Promise<CoverResult | null> {
   try {
@@ -115,6 +131,9 @@ async function tryOpenLibrary(isbn: string): Promise<CoverResult | null> {
 
 /**
  * Try to fetch cover from Google Books
+ *
+ * @param isbn - The cleaned ISBN to search for
+ * @returns CoverResult on success, null on failure or no cover found
  */
 async function tryGoogleBooks(isbn: string): Promise<CoverResult | null> {
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
@@ -183,6 +202,9 @@ async function tryGoogleBooks(isbn: string): Promise<CoverResult | null> {
  * Helper function that contains the core search logic
  * Separated from action wrapper to enable testing
  * This is exported so tests can call it directly
+ *
+ * @param book - The book object containing ISBN
+ * @returns Promise<CoverResult> with success/data or error message
  */
 export async function searchBookCoverHelper(book: { isbn?: string } | null): Promise<CoverResult> {
   if (!book) {
@@ -224,6 +246,10 @@ export async function searchBookCoverHelper(book: { isbn?: string } | null): Pro
  *
  * Note: Actions cannot access ctx.db directly, so we call an internal
  * query to fetch the book. This is the Convex best practice for actions.
+ *
+ * @param ctx - The Convex action context
+ * @param args - Arguments containing the bookId
+ * @returns Promise<CoverResult> with success/data or error message
  */
 export const searchBookCover = internalAction({
   args: {

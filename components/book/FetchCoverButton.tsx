@@ -17,6 +17,12 @@ type FetchCoverButtonProps = {
   className?: string;
 };
 
+/**
+ * Convert a base64 data URL to a Blob object
+ *
+ * @param dataUrl - The base64 string (e.g., "data:image/jpeg;base64,...")
+ * @returns A Blob object representing the image data
+ */
 function dataUrlToBlob(dataUrl: string): Blob {
   const [header, base64] = dataUrl.split(",");
   const mimeMatch = header.match(/data:(.*);base64/);
@@ -30,6 +36,20 @@ function dataUrlToBlob(dataUrl: string): Blob {
   return new Blob([bytes], { type: mime });
 }
 
+/**
+ * Button component to trigger automatic cover fetching
+ *
+ * Handles the entire flow:
+ * 1. Calls Convex action to fetch cover from Open Library/Google Books
+ * 2. Converts returned data URL to Blob
+ * 3. Uploads Blob to Vercel Blob storage
+ * 4. Updates book record with new cover URL
+ *
+ * @param props - Component props
+ * @param props.bookId - ID of the book to fetch cover for
+ * @param props.onSuccess - Callback function invoked after successful update
+ * @param props.className - Optional CSS classes
+ */
 export function FetchCoverButton({ bookId, onSuccess, className }: FetchCoverButtonProps) {
   const fetchCover = useAction(api.books.fetchCover);
   const updateCoverFromBlob = useMutation(api.books.updateCoverFromBlob);
