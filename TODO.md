@@ -107,7 +107,7 @@
 
 ### Module 4: UI Component
 
-- [ ] Build FetchCoverButton component
+- [x] Build FetchCoverButton component
   ```
   Files: components/book/FetchCoverButton.tsx (new)
   Architecture: Button component with loading states, calls mutation + blob upload
