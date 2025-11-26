@@ -6,6 +6,7 @@ import { FetchCoverButton } from "../FetchCoverButton";
 import { api } from "@/convex/_generated/api";
 
 const useMutationMock = vi.hoisted(() => vi.fn());
+const useActionMock = vi.hoisted(() => vi.fn());
 
 const uploadMock = vi.hoisted(() => vi.fn());
 const toastMock = vi.hoisted(() => vi.fn());
@@ -16,6 +17,7 @@ vi.mock("@vercel/blob/client", () => ({
 
 vi.mock("convex/react", () => ({
   useMutation: (...args: unknown[]) => useMutationMock(...(args as any)),
+  useAction: (...args: unknown[]) => useActionMock(...(args as any)),
 }));
 
 vi.mock("@/hooks/use-toast", () => {
@@ -29,12 +31,14 @@ const updateCoverMock = vi.fn();
 
 beforeEach(() => {
   useMutationMock.mockReset();
+  useActionMock.mockReset();
   fetchCoverMock.mockReset();
   updateCoverMock.mockReset();
   uploadMock.mockReset();
   toastMock.mockReset();
 
-  useMutationMock.mockReturnValueOnce(fetchCoverMock).mockReturnValueOnce(updateCoverMock);
+  useActionMock.mockReturnValue(fetchCoverMock);
+  useMutationMock.mockReturnValue(updateCoverMock);
 });
 
 afterEach(() => {

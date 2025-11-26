@@ -7,10 +7,16 @@ const userId = "user_1" as any;
 
 const makeCtx = (book: any | null, actionResult: any = null) => {
   const schedulerCalls: any[] = [];
+  const runActionCalls: any[] = [];
 
   const ctx = {
     db: {
       get: async (_id: any) => book,
+    },
+    runQuery: async () => book,
+    runAction: async (action: any, args: any) => {
+      runActionCalls.push({ action, args });
+      return actionResult;
     },
     scheduler: {
       runAfter: async (delay: number, actionPath: any, payload: any) => {
@@ -20,12 +26,12 @@ const makeCtx = (book: any | null, actionResult: any = null) => {
     },
   } as any;
 
-  return { ctx, schedulerCalls };
+  return { ctx, schedulerCalls, runActionCalls };
 };
 
 describe("books.fetchCover", () => {
   beforeEach(() => {
-    vi.spyOn(authModule, "requireAuth").mockResolvedValue(userId);
+    vi.spyOn(authModule, "requireAuthAction").mockResolvedValue(userId);
   });
 
   afterEach(() => {
@@ -52,14 +58,14 @@ describe("books.fetchCover", () => {
       apiCoverUrl: "https://covers.openlibrary.org/b/id/123-L.jpg",
     };
 
-    const { ctx, schedulerCalls } = makeCtx(book, actionResult);
+    const { ctx, runActionCalls } = makeCtx(book, actionResult);
 
     const result = await fetchCoverHandler(ctx, { bookId: book._id });
 
     expect(result.success).toBe(true);
     expect((result as any).coverDataUrl).toContain("data:image");
     expect((result as any).apiSource).toBe("open-library");
-    expect(schedulerCalls[0]?.payload.bookId).toBe(book._id);
+    expect(runActionCalls[0]?.args.bookId).toBe(book._id);
   });
 
   it("fails gracefully when action returns error", async () => {
