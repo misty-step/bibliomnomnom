@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { CreateNote } from "@/components/notes/CreateNote";
 import { NoteList } from "@/components/notes/NoteList";
+import { Button } from "@/components/ui/button";
 import { BOOK_STATUS_OPTIONS } from "./constants";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -285,13 +286,35 @@ export function BookDetail({ bookId }: BookDetailProps) {
                         {book.publishedYear}
                       </span>
                     ) : null}
-                    {showFetchCoverButton && (
-                      <FetchCoverButton
-                        bookId={book._id}
-                        onSuccess={() => setIsFetchSuccess(true)}
-                        className="w-full justify-center"
-                      />
-                    )}
+                    <div className="flex flex-col gap-2">
+                      {showFetchCoverButton && (
+                        <FetchCoverButton
+                          bookId={book._id}
+                          onSuccess={() => setIsFetchSuccess(true)}
+                          className="w-full justify-center"
+                        />
+                      )}
+                      <div>
+                        <input
+                          id="cover-upload-empty"
+                          type="file"
+                          accept={ALLOWED_TYPES.join(",")}
+                          onChange={handleCoverUpload}
+                          className="hidden"
+                          disabled={isUploadingCover}
+                        />
+                        <label htmlFor="cover-upload-empty" className="w-full">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="w-full justify-center"
+                            disabled={isUploadingCover}
+                          >
+                            {isUploadingCover ? "Uploading…" : "Upload cover"}
+                          </Button>
+                        </label>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
