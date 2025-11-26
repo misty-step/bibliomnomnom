@@ -202,7 +202,7 @@
 
 ### Module 6: Testing
 
-- [ ] Write tests for cover fetch action
+- [x] Write tests for cover fetch action
   ```
   Files: __tests__/convex/actions/coverFetch.test.ts (new)
   Architecture: Unit tests with mocked fetch, integration tests with real APIs
@@ -220,7 +220,7 @@
   Time: 45min
   ```
 
-- [ ] Write tests for cover update mutation
+- [x] Write tests for cover update mutation
   ```
   Files: __tests__/convex/books.test.ts (modify or new)
   Architecture: Unit tests with Convex test helpers
