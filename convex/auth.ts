@@ -1,4 +1,6 @@
-import { QueryCtx, MutationCtx } from "./_generated/server";
+import { QueryCtx, MutationCtx, ActionCtx, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
+import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
 /**
@@ -144,4 +146,59 @@ export async function getAuthOrNull(ctx: QueryCtx | MutationCtx): Promise<Id<"us
 
   const existing = await getUserByClerkId(ctx, identity.subject);
   return ensureUserExists(ctx, identity, existing);
+}
+
+/**
+ * Internal query: Lookup user by Clerk ID (for actions)
+ *
+ * Actions cannot access ctx.db directly, so they call this internal query.
+ */
+export const getUserByClerkIdInternal = internalQuery({
+  args: { clerkId: v.string() },
+  handler: async (ctx, args): Promise<Id<"users"> | null> => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", args.clerkId))
+      .unique();
+    return user?._id ?? null;
+  },
+});
+
+/**
+ * Action-compatible auth validation (no lazy user creation)
+ *
+ * **Use in actions only** - Actions cannot access ctx.db, so this helper
+ * uses ctx.runQuery() to look up the user.
+ *
+ * Unlike requireAuth(), this does NOT create users automatically. User must
+ * already exist in database (created via Clerk webhook or mutation).
+ *
+ * @throws {Error} "Unauthenticated" if no Clerk session
+ * @throws {Error} "User not found" if user doesn't exist in database
+ *
+ * @example
+ * ```typescript
+ * export const fetchData = action({
+ *   handler: async (ctx, args) => {
+ *     const userId = await requireAuthAction(ctx);
+ *     // Make external API call...
+ *   },
+ * });
+ * ```
+ */
+export async function requireAuthAction(ctx: ActionCtx): Promise<Id<"users">> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) {
+    throw new Error("Unauthenticated: User must be signed in");
+  }
+
+  const userId = await ctx.runQuery(internal.auth.getUserByClerkIdInternal, {
+    clerkId: identity.subject,
+  });
+
+  if (!userId) {
+    throw new Error("User not found in database");
+  }
+
+  return userId;
 }

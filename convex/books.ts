@@ -1,6 +1,14 @@
-import { mutation, query } from "./_generated/server";
+import {
+  action,
+  internalQuery,
+  mutation,
+  query,
+  type ActionCtx,
+  type MutationCtx,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import { v } from "convex/values";
-import { requireAuth } from "./auth";
+import { requireAuth, requireAuthAction } from "./auth";
 import type { Doc, Id } from "./_generated/dataModel";
 
 type PublicBook = {
@@ -56,6 +64,17 @@ export const get = query({
     }
 
     return book;
+  },
+});
+
+/**
+ * Internal query for actions to fetch book data
+ * No auth required - ownership validation happens in the calling mutation
+ */
+export const getForAction = internalQuery({
+  args: { bookId: v.id("books") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.bookId);
   },
 });
 
@@ -280,4 +299,120 @@ export const updatePrivacy = mutation({
       updatedAt: Date.now(),
     });
   },
+});
+
+const updateCoverFromBlobArgs = {
+  bookId: v.id("books"),
+  blobUrl: v.string(),
+  apiSource: v.union(v.literal("open-library"), v.literal("google-books")),
+  apiCoverUrl: v.string(),
+};
+
+/**
+ * Internal handler for updating a book's cover from an uploaded blob
+ *
+ * @param ctx - Convex mutation context
+ * @param args - Arguments including bookId, blobUrl, apiSource, and apiCoverUrl
+ * @throws Error if book not found or access denied
+ */
+export async function updateCoverFromBlobHandler(
+  ctx: MutationCtx,
+  args: {
+    bookId: Id<"books">;
+    blobUrl: string;
+    apiSource: "open-library" | "google-books";
+    apiCoverUrl: string;
+  },
+) {
+  const userId = await requireAuth(ctx);
+  const book = await ctx.db.get(args.bookId);
+
+  if (!book || book.userId !== userId) {
+    throw new Error("Access denied");
+  }
+
+  await ctx.db.patch(args.bookId, {
+    coverUrl: args.blobUrl,
+    apiSource: args.apiSource,
+    apiCoverUrl: args.apiCoverUrl,
+    updatedAt: Date.now(),
+  });
+}
+
+/**
+ * Mutation to update a book's cover after a successful blob upload
+ *
+ * @param bookId - ID of the book to update
+ * @param blobUrl - URL of the uploaded blob (Vercel Blob)
+ * @param apiSource - Source of the original cover image (open-library or google-books)
+ * @param apiCoverUrl - Original URL of the cover image from the API
+ */
+export const updateCoverFromBlob = mutation({
+  args: updateCoverFromBlobArgs,
+  handler: updateCoverFromBlobHandler,
+});
+
+const fetchCoverArgs = {
+  bookId: v.id("books"),
+};
+
+type CoverFetchResult =
+  | {
+      success: true;
+      coverDataUrl: string;
+      apiSource: "open-library" | "google-books";
+      apiCoverUrl: string;
+    }
+  | { success: false; error: string };
+
+/**
+ * Internal handler for the fetch cover action
+ *
+ * @param ctx - Convex action context
+ * @param args - Arguments including bookId
+ * @returns CoverFetchResult with success status and data or error
+ * @throws Error if user is not authenticated or book not found
+ */
+export async function fetchCoverHandler(
+  ctx: ActionCtx,
+  args: { bookId: Id<"books"> },
+): Promise<CoverFetchResult> {
+  const userId = await requireAuthAction(ctx);
+  const book = await ctx.runQuery(internal.books.getForAction, {
+    bookId: args.bookId,
+  });
+
+  if (!book || book.userId !== userId) {
+    throw new Error("Access denied");
+  }
+
+  if (book.coverUrl) {
+    return { success: false, error: "Book already has a cover" };
+  }
+
+  const result = await ctx.runAction(internal.actions.coverFetch.search, {
+    bookId: args.bookId,
+  });
+
+  if ("error" in result) {
+    return { success: false, error: result.error };
+  }
+
+  return {
+    success: true,
+    coverDataUrl: result.coverDataUrl,
+    apiSource: result.apiSource,
+    apiCoverUrl: result.apiCoverUrl,
+  };
+}
+
+/**
+ * Action to fetch a book cover from external APIs (Open Library, Google Books)
+ *
+ * @param bookId - ID of the book to fetch cover for
+ * @returns Object containing success status and cover data (base64 data URL) or error
+ */
+export const fetchCover = action({
+  args: fetchCoverArgs,
+  handler: fetchCoverHandler,
 });

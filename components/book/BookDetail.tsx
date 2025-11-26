@@ -7,12 +7,14 @@ import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
 import { upload } from "@vercel/blob/client";
 import { Globe, Headphones, Lock, Pencil, Star, Trash2 } from "lucide-react";
+import { FetchCoverButton } from "./FetchCoverButton";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { CreateNote } from "@/components/notes/CreateNote";
 import { NoteList } from "@/components/notes/NoteList";
+import { Button } from "@/components/ui/button";
 import { BOOK_STATUS_OPTIONS } from "./constants";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -57,6 +59,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
   const [coverHovered, setCoverHovered] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isFetchSuccess, setIsFetchSuccess] = useState(false);
 
   const currentStatus = book?.status;
   const currentPrivacy = book?.privacy;
@@ -238,6 +241,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
       ? "all associated notes"
       : `${noteCount} ${noteCount === 1 ? "note" : "notes"}`;
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
+  const showFetchCoverButton = !book.coverUrl && !isFetchSuccess;
 
   return (
     <motion.article
@@ -276,37 +280,69 @@ export function BookDetail({ bookId }: BookDetailProps) {
                       </p>
                     ) : null}
                   </div>
-                  {book.publishedYear ? (
-                    <span className="font-mono text-xs text-text-inkSubtle">
-                      {book.publishedYear}
-                    </span>
-                  ) : null}
+                  <div className="space-y-4">
+                    {book.publishedYear ? (
+                      <span className="font-mono text-xs text-text-inkSubtle">
+                        {book.publishedYear}
+                      </span>
+                    ) : null}
+                    <div className="flex flex-col gap-2">
+                      {showFetchCoverButton && (
+                        <FetchCoverButton
+                          bookId={book._id}
+                          onSuccess={() => setIsFetchSuccess(true)}
+                          className="w-full justify-center"
+                        />
+                      )}
+                      <div>
+                        <input
+                          id="cover-upload-empty"
+                          type="file"
+                          accept={ALLOWED_TYPES.join(",")}
+                          onChange={handleCoverUpload}
+                          className="hidden"
+                          disabled={isUploadingCover}
+                        />
+                        <label htmlFor="cover-upload-empty" className="w-full">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="w-full justify-center"
+                            disabled={isUploadingCover}
+                          >
+                            {isUploadingCover ? "Uploading…" : "Upload cover"}
+                          </Button>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Hover Overlay for Cover Edit */}
-              <motion.div
-                initial={false}
-                animate={{ opacity: coverHovered ? 1 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70"
-              >
-                <label
-                  className={cn(
-                    "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
-                    isUploadingCover && "pointer-events-none opacity-50",
-                  )}
+              {/* Hover Overlay for Cover Edit (only when a cover exists) */}
+              {coverSrc ? (
+                <motion.div
+                  initial={false}
+                  animate={{ opacity: coverHovered ? 1 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ pointerEvents: coverHovered ? "auto" : "none" }}
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70"
                 >
-                  <input
-                    type="file"
-                    accept={ALLOWED_TYPES.join(",")}
-                    onChange={handleCoverUpload}
-                    className="hidden"
-                    disabled={isUploadingCover}
-                  />
-                  {isUploadingCover ? "Uploading…" : "Change"}
-                </label>
-                {coverSrc && (
+                  <label
+                    className={cn(
+                      "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
+                      isUploadingCover && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <input
+                      type="file"
+                      accept={ALLOWED_TYPES.join(",")}
+                      onChange={handleCoverUpload}
+                      className="hidden"
+                      disabled={isUploadingCover}
+                    />
+                    {isUploadingCover ? "Uploading…" : "Change"}
+                  </label>
                   <button
                     onClick={handleCoverRemove}
                     disabled={isUploadingCover}
@@ -314,8 +350,8 @@ export function BookDetail({ bookId }: BookDetailProps) {
                   >
                     Remove
                   </button>
-                )}
-              </motion.div>
+                </motion.div>
+              ) : null}
             </div>
           </div>
         </div>
