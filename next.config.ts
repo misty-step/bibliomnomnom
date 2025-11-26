@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'", // Next.js requires unsafe-inline for styles
               "img-src 'self' data: blob: https:", // Allow external images from configured sources
               "font-src 'self' data:",
-              "connect-src 'self' https://*.convex.cloud https://*.clerk.accounts.dev https://clerk-telemetry.com https://api.openai.com https://generativelanguage.googleapis.com https://challenges.cloudflare.com wss://*.convex.cloud", // Convex, Clerk, LLM providers
+              "connect-src 'self' https://*.convex.cloud https://*.clerk.accounts.dev https://clerk-telemetry.com https://api.openai.com https://generativelanguage.googleapis.com https://challenges.cloudflare.com https://vercel.com https://*.vercel.com wss://*.convex.cloud", // Convex, Clerk, LLM providers, Vercel Blob
               "frame-src 'self' https://*.clerk.accounts.dev https://challenges.cloudflare.com https://vercel.live https://*.vercel.live", // Clerk auth frames + Vercel overlay
               "object-src 'none'",
               "base-uri 'self'",

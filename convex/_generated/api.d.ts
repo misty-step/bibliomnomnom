@@ -1,4 +1,4 @@
-/* eslint-disable */
+ 
 /**
  * Generated `api` utility.
  *
@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions_coverFetch from "../actions/coverFetch.js";
 import type * as auth from "../auth.js";
 import type * as books from "../books.js";
 import type * as imports from "../imports.js";
@@ -29,6 +30,7 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  "actions/coverFetch": typeof actions_coverFetch;
   auth: typeof auth;
   books: typeof books;
   imports: typeof imports;

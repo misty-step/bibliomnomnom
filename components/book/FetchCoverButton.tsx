@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useMutation, useAction } from "convex/react";
 import { upload } from "@vercel/blob/client";
 import { Loader2, ImageIcon } from "lucide-react";
 
@@ -31,7 +31,7 @@ function dataUrlToBlob(dataUrl: string): Blob {
 }
 
 export function FetchCoverButton({ bookId, onSuccess, className }: FetchCoverButtonProps) {
-  const fetchCover = useMutation(api.books.fetchCover);
+  const fetchCover = useAction(api.books.fetchCover);
   const updateCoverFromBlob = useMutation(api.books.updateCoverFromBlob);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
