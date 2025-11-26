@@ -296,29 +296,30 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 </div>
               )}
 
-              {/* Hover Overlay for Cover Edit */}
-              <motion.div
-                initial={false}
-                animate={{ opacity: coverHovered ? 1 : 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70"
-              >
-                <label
-                  className={cn(
-                    "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
-                    isUploadingCover && "pointer-events-none opacity-50",
-                  )}
+              {/* Hover Overlay for Cover Edit (only when a cover exists) */}
+              {coverSrc ? (
+                <motion.div
+                  initial={false}
+                  animate={{ opacity: coverHovered ? 1 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{ pointerEvents: coverHovered ? "auto" : "none" }}
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70"
                 >
-                  <input
-                    type="file"
-                    accept={ALLOWED_TYPES.join(",")}
-                    onChange={handleCoverUpload}
-                    className="hidden"
-                    disabled={isUploadingCover}
-                  />
-                  {isUploadingCover ? "Uploading…" : "Change"}
-                </label>
-                {coverSrc && (
+                  <label
+                    className={cn(
+                      "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
+                      isUploadingCover && "pointer-events-none opacity-50",
+                    )}
+                  >
+                    <input
+                      type="file"
+                      accept={ALLOWED_TYPES.join(",")}
+                      onChange={handleCoverUpload}
+                      className="hidden"
+                      disabled={isUploadingCover}
+                    />
+                    {isUploadingCover ? "Uploading…" : "Change"}
+                  </label>
                   <button
                     onClick={handleCoverRemove}
                     disabled={isUploadingCover}
@@ -326,8 +327,8 @@ export function BookDetail({ bookId }: BookDetailProps) {
                   >
                     Remove
                   </button>
-                )}
-              </motion.div>
+                </motion.div>
+              ) : null}
             </div>
           </div>
         </div>
