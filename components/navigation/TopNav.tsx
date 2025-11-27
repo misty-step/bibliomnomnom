@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 export function TopNav() {
   const pathname = usePathname();
@@ -39,14 +40,17 @@ export function TopNav() {
           </div>
         </div>
 
-        <UserButton
-          appearance={{
-            elements: {
-              avatarBox:
-                "h-10 w-10 rounded-full border-2 border-line-ghost hover:border-accent-ember transition",
-            },
-          }}
-        />
+        <div className="flex items-center gap-4">
+          <ThemeToggle />
+          <UserButton
+            appearance={{
+              elements: {
+                avatarBox:
+                  "h-10 w-10 rounded-full border-2 border-line-ghost hover:border-accent-ember transition",
+              },
+            }}
+          />
+        </div>
       </div>
     </nav>
   );

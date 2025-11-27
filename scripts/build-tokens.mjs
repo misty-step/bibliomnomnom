@@ -63,14 +63,34 @@ const buildVarObject = (obj, prefixSegments = []) => {
 };
 
 const cssEntries = [];
+const darkCssEntries = [];
 const varRefs = {};
+
 for (const [category, values] of Object.entries(raw)) {
+  // Skip *Dark categories for light theme CSS and TypeScript exports
+  if (category.endsWith("Dark")) {
+    continue;
+  }
+
   const prefix = CATEGORY_PREFIX[category] ?? toKebab(category);
   cssEntries.push(...flattenEntries(values, [prefix]));
   varRefs[category] = buildVarObject(values, [prefix]);
 }
 
+// Process dark mode variants
+for (const [category, values] of Object.entries(raw)) {
+  if (!category.endsWith("Dark")) {
+    continue;
+  }
+
+  // Remove "Dark" suffix to get base category (e.g., "colorsDark" -> "colors")
+  const baseCategory = category.replace(/Dark$/, "");
+  const prefix = CATEGORY_PREFIX[baseCategory] ?? toKebab(baseCategory);
+  darkCssEntries.push(...flattenEntries(values, [prefix]));
+}
+
 cssEntries.sort(([a], [b]) => a.localeCompare(b));
+darkCssEntries.sort(([a], [b]) => a.localeCompare(b));
 
 const cssLines = ["/* Auto-generated from design-tokens.json. Do not edit manually. */", ":root {"];
 for (const [name, value] of cssEntries) {
@@ -78,12 +98,29 @@ for (const [name, value] of cssEntries) {
 }
 cssLines.push("}", "");
 
+// Add dark mode CSS block
+if (darkCssEntries.length > 0) {
+  cssLines.push(".dark {");
+  for (const [name, value] of darkCssEntries) {
+    cssLines.push(`  --${name}: ${value};`);
+  }
+  cssLines.push("}", "");
+}
+
 mkdirSync(path.dirname(CSS_OUTPUT), { recursive: true });
 mkdirSync(path.dirname(TS_OUTPUT), { recursive: true });
 writeFileSync(CSS_OUTPUT, cssLines.join("\n"), "utf8");
 
+// Filter out *Dark objects from TypeScript exports (build-time only)
+const tokensForExport = {};
+for (const [category, values] of Object.entries(raw)) {
+  if (!category.endsWith("Dark")) {
+    tokensForExport[category] = values;
+  }
+}
+
 const banner = `/**\n * Auto-generated from design-tokens.json. Do not edit manually.\n */`;
-const jsonTokens = JSON.stringify(raw, null, 2);
+const jsonTokens = JSON.stringify(tokensForExport, null, 2);
 const jsonVarRefs = JSON.stringify(varRefs, null, 2);
 const tsFile = `${banner}\n\nexport const designTokens = ${jsonTokens} as const;\n\nexport type DesignTokens = typeof designTokens;\n\ntype TokenVars<T> = {\n  [K in keyof T]: T[K] extends string ? string : TokenVars<T[K]>;\n};\n\nexport const tokenVars = ${jsonVarRefs} as TokenVars<DesignTokens>;\n\nexport type TokenVarsMap = typeof tokenVars;\n`;
 

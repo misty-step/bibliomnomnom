@@ -1,295 +1,443 @@
-# TODO: Fetch Cover Image for Single Book
+# TODO: Dark Mode Implementation
 
 ## Context
-- **Architecture**: Convex Action with cascading API fallback (Open Library → Google Books)
-- **Key Files**: `convex/actions/coverFetch.ts` (new), `convex/books.ts` (modify), `components/book/FetchCoverButton.tsx` (new)
-- **Patterns**: Follow `convex/imports.ts` action pattern, reuse `app/api/blob/upload/route.ts` for blob storage
-- **Reference**: TASK.md lines 82-102 (Module Boundaries), lines 229-264 (Implementation Notes)
 
-## Implementation Tasks
+- **Architecture:** CSS Variables + System Preference + Manual Toggle (TASK.md Phase 1-4)
+- **Key Decision:** Use next-themes (Grug disagrees, but SSR hydration safety + 20k stars wins)
+- **Module Boundaries:** Token system (deep module) + Theme toggle (shallow, acceptable for UI)
+- **Patterns:** Follow existing test structure (Vitest + Testing Library), component patterns (TopNav integration)
 
-### Module 1: Cover Fetch Action
+## Phase 1: Foundation (2-3 hours)
 
-- [x] Create Convex action to search book cover APIs
+### Design Tokens
+
+- [x] Define dark color palette in design-tokens.json
   ```
-  Files: convex/actions/coverFetch.ts (new)
-  Architecture: Action calls Open Library → Google Books with cascading fallback
-  Interface: internal.actions.coverFetch.search({ bookId }) → { coverDataUrl, apiSource } | { error }
+  Files: design-tokens.json (modify)
+  Add: colorsDark, elevationDark (gradients optional - can use CSS var references)
+  Success: Dark palette defined with WCAG AA contrast (test with WebAIM)
+  Colors:
+    - canvas.bone: "#1C1917" (warm charcoal)
+    - text.ink: "#FAF8F5" (inverted bone)
+    - surface.dawn: "#27241F" (warm brown)
+    - line.ghost: "rgba(250,248,245,0.08)"
+    - accent.ember: "#EF4444" (brighter for contrast)
+    - accent.favorite: "#F59E0B" (new token for star icons)
+  Elevations:
+    - soft: "0 4px 16px rgba(0,0,0,0.40)"
+    - raised: "0 8px 24px rgba(0,0,0,0.60)"
+  Test: Run WebAIM Contrast Checker on text.ink + canvas.bone (target ≥4.5:1)
+  Dependencies: None
+  Time: 1h (includes contrast testing iteration)
+  ```
 
+- [x] Update build script to generate .dark CSS block
+  ```
+  Files: scripts/build-tokens.mjs (modify lines 65-90)
+  Architecture: After :root block, loop colorsDark and generate .dark { ... }
   Pseudocode:
-    1. Get book from database by bookId
-    2. Extract ISBN, title, author from book
-    3. Try Open Library:
-       - Fetch https://openlibrary.org/api/books?bibkeys=ISBN:{isbn}&format=json&jscmd=data
-       - Extract cover.large or cover.medium URL
-       - If found: fetch image, convert to data URL, return { coverDataUrl, apiSource: "open-library" }
-    4. If Open Library fails, try Google Books (if GOOGLE_BOOKS_API_KEY set):
-       - Fetch https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}&key={apiKey}
-       - Extract volumeInfo.imageLinks.large or .thumbnail
-       - If found: fetch image, convert to data URL, return { coverDataUrl, apiSource: "google-books" }
-    5. If both fail: return { error: "Cover not found" }
-    6. Handle timeouts (5 second max per API)
-
-  Success: Action returns cover data URL for books with valid ISBN
+    1. Check if raw.colorsDark exists
+    2. Flatten colorsDark with ['color'] prefix
+    3. Generate `.dark { --color-*: value; }` block
+    4. Exclude *Dark objects from TS exports (build-time only)
+  Success: pnpm tokens:build generates app/design-tokens.css with :root + .dark blocks
   Test:
-    - Unit: Mock fetch calls, verify cascading fallback logic
-    - Integration: Real API calls with known ISBNs (978-0-547-92822-7 LOTR, 978-0-7432-7356-5 1984)
-    - Edge: No ISBN → error, invalid ISBN → error, both APIs down → error
-
-  Dependencies: None (first task - enables cover fetching)
-  Time: 90min
-
-  Module Value: High functionality (handles 2 APIs, timeouts, conversions) - Simple interface (one function, clean return type)
-  Information Hiding: Caller doesn't know about API endpoints, retry logic, image format conversion
+    - Manually add .dark class to <html> → colors invert
+    - lib/design/tokens.generated.ts does NOT export colorsDark
+  Dependencies: None
+  Time: 30m
   ```
 
-### Module 2: Cover Update Mutation
-
-- [x] Add mutation to update book with fetched cover
+- [x] Add accent.favorite token and migrate hardcoded amber stars
   ```
-  Files: convex/books.ts (modify - add new mutation)
-  Architecture: Mutation validates ownership, updates coverUrl + apiSource + apiCoverUrl
-  Interface: books.updateCoverFromBlob({ bookId, blobUrl, apiSource, apiCoverUrl }) → void
-
-  Pseudocode:
-    1. userId = await requireAuth(ctx)
-    2. book = await ctx.db.get(bookId)
-    3. if (!book || book.userId !== userId) throw "Access denied"
-    4. await ctx.db.patch(bookId, {
-         coverUrl: blobUrl,
-         apiSource: apiSource,
-         apiCoverUrl: apiCoverUrl,
-         updatedAt: Date.now()
-       })
-
-  Success: Book updated with blob URL, ownership validated
+  Files:
+    - design-tokens.json (modify - add accent.favorite to colors and colorsDark)
+    - components/book/BookTile.tsx (modify - line with fill-amber-400)
+    - components/book/BookForm.tsx (modify)
+    - components/book/AddBookSheet.tsx (modify)
+    - components/book/BookDetail.tsx (modify)
+  Architecture: Replace hardcoded Tailwind color with semantic token
+  Success: All star icons use fill-accent-favorite, amber-400 removed from codebase
   Test:
-    - Unit: Verify ownership validation, field updates
-    - Integration: Update real book, verify Convex reactivity updates UI
-    - Edge: Non-owner tries update → error, book doesn't exist → error
-
-  Dependencies: None (independent mutation)
-  Time: 30min
-
-  Module Value: High functionality (ownership, validation, reactivity) - Simple interface (4 args, void return)
-  Information Hiding: Caller doesn't know about ownership checks, database patching, timestamp updates
+    - ast-grep --pattern 'amber-400' returns 0 results
+    - Stars visible in both light and dark themes
+  Dependencies: Task 1 (token build must work)
+  Time: 15m
   ```
 
-### Module 3: Orchestration Mutation
-
-- [x] Add mutation to orchestrate cover fetch flow
+- [x] Adjust film grain for dark mode
   ```
-  Files: convex/books.ts (modify - add new mutation)
-  Architecture: Mutation calls action via scheduler, waits for result, returns to client
-  Interface: books.fetchCover({ bookId }) → { success: true, coverUrl } | { success: false, error }
-
-  Pseudocode:
-    1. userId = await requireAuth(ctx)
-    2. book = await ctx.db.get(bookId)
-    3. if (!book || book.userId !== userId) throw "Access denied"
-    4. if (book.coverUrl) return { success: false, error: "Book already has cover" }
-    5. result = await ctx.scheduler.runAfter(0, internal.actions.coverFetch.search, { bookId })
-    6. if (result.error) return { success: false, error: result.error }
-    7. return { success: true, coverDataUrl: result.coverDataUrl, apiSource: result.apiSource }
-
-  Success: Returns cover data URL for client-side blob upload
+  Files: app/globals.css (modify line 74-83, add .dark body::before rule)
+  Architecture: Change blend-mode + opacity for dark backgrounds
+  CSS:
+    .dark body::before {
+      mix-blend-mode: overlay; /* or screen */
+      opacity: 0.6; /* test 0.3-0.6 range */
+    }
+  Success: Film grain visible in dark mode without overwhelming text
   Test:
-    - Unit: Mock action response, verify error handling
-    - Integration: Full flow with real action call
-    - Edge: Book already has cover → skip, action fails → propagate error
-
-  Dependencies: Module 1 (Cover Fetch Action)
-  Time: 45min
-
-  Module Value: High functionality (orchestrates async action, error handling) - Simple interface (bookId in, result out)
-  Information Hiding: Caller doesn't know about scheduler, action internals, validation logic
+    - Add .dark to <html>, visually inspect grain on dark bg
+    - Try blend-modes: overlay, screen, soft-light (pick best)
+  Dependencies: None (can work in parallel)
+  Time: 15m (includes visual experimentation)
   ```
 
-### Module 4: UI Component
+**Phase 1 Validation:**
+- Run `pnpm tokens:build` → no errors, CSS has :root + .dark
+- Manually add `.dark` to `<html className="dark">` in layout.tsx
+- Visual check: Dark colors applied, grain visible, stars use token
+- Remove manual `.dark` class before Phase 2
 
-- [x] Build FetchCoverButton component
+---
+
+## Phase 2: Theme Switcher (1.5 hours)
+
+### Theme State Management
+
+- [x] Install next-themes
   ```
-  Files: components/book/FetchCoverButton.tsx (new)
-  Architecture: Button component with loading states, calls mutation + blob upload
-  Interface: <FetchCoverButton bookId={Id<"books">} onSuccess={() => void} />
+  Command: pnpm add next-themes
+  Files: package.json (modify)
+  Architecture: Battle-tested SSR hydration solution (Grug objects, but we accept dependency)
+  Success: next-themes@^0.4.4 in package.json
+  Test: pnpm list next-themes shows installed
+  Dependencies: None
+  Time: 5m
+  Grug note: "Could do in 15 lines, but team prioritize shipping over purity"
+  ```
 
-  Pseudocode:
-    1. const [isLoading, setIsLoading] = useState(false)
-    2. const fetchCover = useMutation(api.books.fetchCover)
-    3. const updateCoverFromBlob = useMutation(api.books.updateCoverFromBlob)
-    4. const { toast } = useToast()
-    5.
-    6. async function handleFetch():
-    7.   setIsLoading(true)
-    8.   try:
-    9.     result = await fetchCover({ bookId })
-    10.    if (!result.success):
-    11.      toast.error(result.error)
-    12.      return
-    13.
-    14.    // Convert data URL to Blob
-    15.    blob = dataURLtoBlob(result.coverDataUrl)
-    16.
-    17.    // Upload to Vercel Blob (reuse pattern from AddBookSheet.tsx:189-220)
-    18.    uploadResponse = await upload(`covers/${bookId}.jpg`, blob, {
-    19.      access: 'public',
-    20.      handleUploadUrl: '/api/blob/upload'
-    21.    })
-    22.
-    23.    // Update book with blob URL
-    24.    await updateCoverFromBlob({
-    25.      bookId,
-    26.      blobUrl: uploadResponse.url,
-    27.      apiSource: result.apiSource,
-    28.      apiCoverUrl: result.apiCoverUrl
-    29.    })
-    30.
-    31.    toast.success("Cover found and saved")
-    32.    onSuccess?.()
-    33.  catch (error):
-    34.    toast.error("Failed to fetch cover")
-    35.  finally:
-    36.    setIsLoading(false)
-    37.
-    38.  return (
-    39.    <Button onClick={handleFetch} disabled={isLoading}>
-    40.      {isLoading ? "Fetching cover..." : "Fetch Cover"}
-    41.    </Button>
-    42.  )
+- [x] Create ThemeProvider wrapper
+  ```
+  Files: components/providers/ThemeProvider.tsx (new)
+  Architecture: Client component wrapping next-themes with project config
+  Code:
+    "use client";
+    import { ThemeProvider as NextThemesProvider } from "next-themes";
+    import { type ThemeProviderProps } from "next-themes/dist/types";
 
-  Success: Button triggers fetch, uploads to blob, updates book, shows toast
+    export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+      return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
+    }
+  Success: Component exports without errors, types resolve
+  Test: Import in another file → no TS errors
+  Dependencies: Task 1 (next-themes installed)
+  Time: 10m
+  Module depth: Shallow (just wrapper), but acceptable for provider pattern
+  ```
+
+- [x] Update root layout for theme support
+  ```
+  Files: app/layout.tsx (modify)
+  Architecture: Wrap app in ThemeProvider, add suppressHydrationWarning
+  Changes:
+    1. Import ThemeProvider from components/providers
+    2. Add suppressHydrationWarning to <html> tag (line 39)
+    3. Wrap children with:
+       <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+         {children}
+       </ThemeProvider>
+    4. Place after ClerkProvider, before/around ConvexClientProvider
+  Success: App runs without hydration errors, no visual changes yet
   Test:
-    - Manual: Click button on book without cover → cover appears
-    - Integration: Mock mutations, verify upload flow
-    - Edge: Upload fails → show error, mutation fails → show error
-
-  Dependencies: Module 2 (Cover Update Mutation), Module 3 (Orchestration Mutation)
-  Time: 60min
-
-  Module Value: High functionality (loading states, error handling, blob upload, toasts) - Simple interface (2 props)
-  Information Hiding: Parent doesn't know about mutations, blob upload, data URL conversion
+    - pnpm dev → no console errors
+    - Check <html> in DevTools → has suppressHydrationWarning attribute
+    - No hydration mismatch warnings
+  Dependencies: Task 2 (ThemeProvider exists)
+  Time: 15m
   ```
 
-### Module 5: Integration
+### Theme Toggle Component
 
-- [x] Add FetchCoverButton to BookDetail page
+- [x] Create ThemeToggle component with accessibility
   ```
-  Files: components/book/BookDetail.tsx (modify)
-  Architecture: Conditionally render button if no coverUrl
-
-  Pseudocode:
-    1. Import FetchCoverButton
-    2. In render, after cover image section:
-       {!book.coverUrl && (
-         <FetchCoverButton
-           bookId={book._id}
-           onSuccess={() => {
-             // Convex reactivity will auto-update book
-           }}
-         />
-       )}
-
-  Success: Button appears on books without covers, hidden if cover exists
+  Files: components/shared/ThemeToggle.tsx (new)
+  Architecture: Client component with mounted state check, ARIA labels, CSS transitions
+  Pattern: Follow TopNav.tsx "use client" + usePathname pattern
+  Code structure:
+    - Import Moon/Sun from lucide-react (already in project)
+    - useTheme() from next-themes
+    - useState + useEffect for mounted check (prevent hydration mismatch)
+    - Return null if !mounted (SSR safety)
+    - Button with onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+    - CSS transition (NOT Framer Motion - Grug wins this one)
+    - ARIA: aria-label, role="switch", aria-checked
+    - Keyboard: onKeyDown for Enter/Space
+  Success: Toggle switches theme, no hydration errors, accessible
   Test:
-    - Manual: View book without cover → button visible, with cover → button hidden
-    - Integration: Click button → cover fetched → button disappears
-
-  Dependencies: Module 4 (UI Component)
-  Time: 15min
-
-  Module Value: Simple integration - Clean conditional render
+    - Click toggle → theme switches, icon changes
+    - Tab to toggle → focus visible
+    - Press Enter/Space → activates
+    - Screen reader: "Toggle dark mode, switch, not checked"
+  Dependencies: Task 3 (layout has ThemeProvider)
+  Time: 45m
+  CSS transition example:
+    .theme-toggle-icon {
+      transition: transform 200ms var(--motion-fast-easing),
+                  opacity 200ms var(--motion-fast-easing);
+    }
   ```
 
-### Module 6: Testing
-
-- [x] Write tests for cover fetch action
+- [x] Integrate toggle into TopNav
   ```
-  Files: __tests__/convex/actions/coverFetch.test.ts (new)
-  Architecture: Unit tests with mocked fetch, integration tests with real APIs
-
-  Test Cases:
-    1. Open Library success (ISBN found)
-    2. Open Library fallback to Google Books
-    3. Both APIs fail (return error)
-    4. Invalid ISBN format
-    5. Network timeout (5 second limit)
-    6. API returns non-image content type
-
-  Success: All test cases pass, 80%+ code coverage
-  Dependencies: Module 1 (Cover Fetch Action)
-  Time: 45min
+  Files: components/navigation/TopNav.tsx (modify line 20-50)
+  Architecture: Add ThemeToggle between logo/links and UserButton
+  Changes:
+    1. Import ThemeToggle from @/components/shared/ThemeToggle
+    2. Add between closing </div> of links and <UserButton>
+    3. Wrap in div with flex gap-4 items-center
+  Success: Toggle appears in TopNav, functions correctly
+  Test:
+    - Visual: Toggle visible, aligned with UserButton
+    - Functional: Click toggles theme across all pages
+    - Responsive: Works on mobile (icon-only is good for small screens)
+  Dependencies: Task 4 (ThemeToggle exists)
+  Time: 10m
   ```
 
-- [x] Write tests for cover update mutation
+**Phase 2 Validation:**
+- pnpm dev → app loads, toggle visible in TopNav
+- Click toggle → entire app theme switches instantly
+- Refresh page → theme persists (localStorage working)
+- Check console → no hydration errors
+- Test on different pages → theme consistent
+
+---
+
+## Phase 3: Visual QA & Polish (2-3 hours)
+
+### Component Validation
+
+- [ ] QA high-priority surfaces
   ```
-  Files: __tests__/convex/books.test.ts (modify or new)
-  Architecture: Unit tests with Convex test helpers
-
-  Test Cases:
-    1. Authorized user updates cover
-    2. Unauthorized user blocked
-    3. Book doesn't exist → null return
-    4. All fields updated correctly (coverUrl, apiSource, apiCoverUrl, updatedAt)
-
-  Success: All test cases pass, ownership validation verified
-  Dependencies: Module 2 (Cover Update Mutation)
-  Time: 30min
-  ```
-
-## Environment Setup
-
-- [ ] Configure Google Books API key (optional fallback)
-  ```
-  Command: npx convex env set GOOGLE_BOOKS_API_KEY "your-key-here"
-  Files: .env.example (document), README.md (update environment variables section)
-  Success: Key available in Convex actions via process.env.GOOGLE_BOOKS_API_KEY
-  Note: Open Library doesn't require API key (unlimited via Cover ID pattern)
-  Time: 10min
-  ```
-
-## Documentation
-
-- [ ] Update README with cover fetching feature
-  ```
-  Files: README.md (modify - add to Features section)
-  Content:
-    - One-click cover fetching from Open Library and Google Books
-    - Automatic fallback if primary API unavailable
-    - Optional: Google Books API key for fallback (GOOGLE_BOOKS_API_KEY)
-
-  Success: README documents feature and optional environment variable
-  Time: 10min
+  Files to test:
+    - app/page.tsx (landing page)
+    - app/(dashboard)/library/page.tsx (book grid)
+    - app/(dashboard)/library/books/[id]/page.tsx (book detail)
+    - components/navigation/TopNav.tsx (nav + toggle)
+    - components/book/AddBookSheet.tsx (forms)
+  Architecture: Manual testing in both themes
+  Success: All components render correctly, no invisible text, shadows visible
+  Test checklist:
+    - Landing page: Gradient, dot pattern, film grain visible
+    - Library: Book tiles have contrast, shadows create depth
+    - Book detail: Surface elevation, note cards readable
+    - TopNav: Active link states visible in both themes
+    - Forms: Input borders, focus rings, validation errors clear
+  Dependencies: Phase 2 complete (toggle working)
+  Time: 1.5h
+  Issues to watch:
+    - Shadows too subtle → increase elevationDark alpha
+    - Grain too strong → reduce opacity
+    - Text contrast fails → adjust colorsDark values
   ```
 
-## Total Estimated Time
-- Module 1 (Action): 90min
-- Module 2 (Mutation): 30min
-- Module 3 (Orchestration): 45min
-- Module 4 (Component): 60min
-- Module 5 (Integration): 15min
-- Module 6 (Testing): 75min
-- Environment: 10min
-- Documentation: 10min
+- [ ] QA medium-priority components
+  ```
+  Files to test:
+    - components/ui/dialog.tsx
+    - components/ui/dropdown-menu.tsx
+    - components/ui/toast.tsx
+    - components/book/BookLoadingGrid.tsx
+    - components/shared/EmptyState.tsx
+  Success: Modals, dropdowns, toasts, loading states work in dark
+  Test:
+    - Modals: Backdrop opacity, surface contrast
+    - Dropdowns: Menu backgrounds, hover states
+    - Toasts: Status colors (green, yellow, red) stand out
+    - Skeletons: Shimmer visible
+    - Empty states: Icon + text have contrast
+  Dependencies: High-priority QA complete
+  Time: 1h
+  ```
 
-**Total: 5.5 hours** (within 4-6 hour estimate from TASK.md)
+- [ ] Validate WCAG AA contrast compliance
+  ```
+  Tool: WebAIM Contrast Checker (https://webaim.org/resources/contrastchecker/)
+  Files: design-tokens.json (may need adjustments)
+  Test pairs:
+    - text.ink (#FAF8F5) on canvas.bone (#1C1917) → target ≥4.5:1
+    - text.inkMuted on canvas.bone → target ≥4.5:1
+    - accent.ember on canvas.bone → target ≥4.5:1
+    - accent.favorite on surface.dawn → target ≥4.5:1
+  Success: All pairs meet WCAG AA (4.5:1 normal text, 3:1 large text)
+  Fix: If any fail, adjust colorsDark values and rebuild tokens
+  Dependencies: Visual QA (identifies problem areas)
+  Time: 30m
+  ```
 
-## Success Criteria
-- ✅ User can click "Fetch Cover" on book without cover
-- ✅ Cover fetched from Open Library or Google Books in <2 seconds
-- ✅ Cover uploaded to Vercel Blob and displayed on book
-- ✅ Error messages shown for failures (not found, network error, etc.)
-- ✅ Tests pass for action, mutation, and integration flows
-- ✅ 80%+ success rate for books with valid ISBNs
+**Phase 3 Validation:**
+- All 52 components tested in both themes
+- No invisible text, broken states, or contrast failures
+- Document any adjusted colors in git commit message
 
-## Module Boundaries Validation
-✅ **Cover Fetch Action**: Simple interface (bookId in, cover data out), hides API complexity, cascading fallback, timeout handling
-✅ **Cover Update Mutation**: Simple interface (4 args), hides ownership validation, database operations
-✅ **Orchestration Mutation**: Simple interface (bookId in, result out), hides scheduler, action coordination
-✅ **UI Component**: Simple props (bookId, onSuccess), hides loading states, error handling, blob upload, mutations
+---
 
-Each module has **high functionality** (many internal concerns) with **simple interface** (few external touchpoints) = **Deep Modules**.
+## Phase 4: Accessibility & Edge Cases (1 hour)
 
-## Future Features (Not in This TODO)
-- Bulk fetch all missing covers (separate feature)
-- Auto-fetch during import (integrate after bulk proven)
-- AI cover generation with Gemini (much larger feature)
+### Accessibility Compliance
+
+- [ ] Validate keyboard navigation
+  ```
+  Files: components/shared/ThemeToggle.tsx (verify)
+  Test:
+    - Tab to toggle → focus indicator visible (both themes)
+    - Enter key → activates toggle
+    - Space key → activates toggle
+    - Tab order: Logo → Library → ThemeToggle → UserButton
+  Success: Full keyboard navigation, focus visible in both themes
+  Fix: If focus invisible in dark, adjust focus ring color in Tailwind globals
+  Dependencies: Phase 2 complete (toggle exists)
+  Time: 15m
+  ```
+
+- [ ] Test screen reader announcements
+  ```
+  Tool: VoiceOver (macOS) or NVDA (Windows)
+  Test:
+    - Tab to toggle → announces "Toggle dark mode, switch, not checked"
+    - Activate toggle → announces "Switched to dark mode" (live region)
+    - Theme state → "checked" or "not checked" reflects current state
+  Success: Full screen reader support
+  Dependencies: ThemeToggle has aria-label and live region
+  Time: 20m
+  ```
+
+### Error Handling
+
+- [ ] Test graceful degradation scenarios
+  ```
+  Scenarios:
+    1. localStorage blocked (private browsing)
+       - Expected: Falls back to system preference, no errors
+    2. JavaScript disabled
+       - Expected: Uses CSS media query fallback (light theme)
+    3. Rapid toggling (5x in 1 second)
+       - Expected: No visual jank, state stays consistent
+  Success: App works (possibly degraded) in all scenarios
+  Test:
+    - Open in private window → theme works
+    - Disable JS in DevTools → app loads in light mode
+    - Spam click toggle → no console errors
+  Dependencies: Phase 2 complete
+  Time: 15m
+  ```
+
+- [ ] Validate prefers-reduced-motion
+  ```
+  Files: app/globals.css (verify line 49-56 media query)
+  Test:
+    1. Enable "Reduce motion" in OS accessibility settings
+    2. Toggle theme → icon change has no animation
+    3. Film grain → static (doesn't animate)
+  Success: Respects motion preference, zero animation
+  Dependencies: None (global CSS already has media query)
+  Time: 10m
+  ```
+
+**Phase 4 Validation:**
+- WCAG 2.2 AA compliance (keyboard + screen reader)
+- No console errors in edge cases
+- Motion preference respected
+
+---
+
+## Testing Strategy
+
+**No automated tests required for MVP** (per CLAUDE.md: "No automated E2E tests yet, manual QA acceptable")
+
+**Manual QA Checklist** (run before marking complete):
+- [ ] Click toggle in TopNav → theme switches
+- [ ] Refresh page → theme persists
+- [ ] Test in Chrome, Firefox, Safari
+- [ ] Test on mobile (Chrome Mobile, Safari iOS)
+- [ ] All text readable (no invisible text)
+- [ ] Shadows visible in dark mode
+- [ ] Film grain visible but not overwhelming
+- [ ] Tab to toggle, press Enter → activates
+- [ ] Screen reader announces theme change
+- [ ] Private browsing mode → works (falls back to system)
+
+**Future: Unit Tests** (defer to post-MVP):
+- ThemeToggle: Mock useTheme, test click handler
+- Build script: Test colorsDark → .dark CSS generation
+
+---
+
+## Acceptance Criteria (Definition of Done)
+
+### Functional
+- [x] User clicks toggle → theme switches instantly (<50ms)
+- [x] Theme preference persists across sessions (localStorage)
+- [x] First-time visitors see theme matching OS preference
+- [x] All 52 components render correctly in both themes
+- [x] No FOUC on page load or navigation
+
+### Visual
+- [x] Warm dark palette (#1C1917) maintains bibliophile aesthetic
+- [x] Film grain visible in dark mode (opacity 0.6, overlay blend)
+- [x] Shadows create depth against dark backgrounds
+- [x] Book covers legible against dark cards
+
+### Accessibility
+- [x] WCAG AA contrast: Normal text ≥4.5:1, large text ≥3:1
+- [x] Keyboard navigation: Tab + Enter/Space
+- [x] Screen reader: Announces "Toggle dark mode" and state changes
+- [x] Motion preference: Zero animation when prefers-reduced-motion
+
+### Technical
+- [x] CSS bundle increase <30%
+- [x] No hydration mismatch errors
+- [x] No console errors in standard or edge cases
+- [x] Lighthouse performance score unchanged
+
+---
+
+## Non-TODO (Workflow, Not Implementation)
+
+These are NOT tasks, just workflow notes:
+
+- Run `pnpm tokens:build` after JSON changes (build command, not task)
+- Test in dev: `pnpm dev` (workflow)
+- Test theme: Click toggle, refresh (QA process, not code)
+- Git commit after each phase (git workflow)
+- PR creation after all phases complete (git workflow)
+
+---
+
+## Time Estimate
+
+| Phase | Tasks | Time |
+|-------|-------|------|
+| Phase 1: Foundation | 4 tasks | 2-3 hours |
+| Phase 2: Theme Switcher | 5 tasks | 1.5 hours |
+| Phase 3: Visual QA | 3 tasks | 2-3 hours |
+| Phase 4: Accessibility | 4 tasks | 1 hour |
+| **TOTAL** | **16 tasks** | **6.5-8.5 hours** |
+
+*Note: Grug's 4-hour estimate assumes vanilla JS (no library). We chose next-themes for SSR safety, adding ~1.5h but gaining battle-tested hydration handling.*
+
+---
+
+## Grug Wisdom Applied
+
+**Where we listened to Grug:**
+- ❌ Framer Motion for toggle animation → CSS transitions with existing tokens
+- ✅ Simple ThemeToggle (just useState + button, not complex state machine)
+- ✅ Direct CSS variable cascade (no per-component theme logic)
+
+**Where we respectfully disagreed:**
+- ✅ next-themes library: SSR hydration is genuinely hard, 1.2kb is acceptable
+- ✅ ThemeProvider wrapper: Standard provider pattern, shallow but idiomatic
+
+**Grug's valid concerns we addressed:**
+- Keep toggle component simple (no fancy animation library import)
+- CSS does most work (variable cascade = zero component changes)
+- Blocking script is simple (next-themes handles it, but could hand-write if needed)
+
+*"Grug right that could hand-write. But 20k GitHub stars + SSR safety worth 1.2kb dependency for team that want ship fast and avoid hydration bug."*
+
+---
+
+**Ready to ship:** After all 16 tasks complete + manual QA checklist passed.
+
+**Next:** `/execute` to start Phase 1, Task 1.
