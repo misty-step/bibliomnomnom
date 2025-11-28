@@ -250,7 +250,7 @@
   Time: 1h
   ```
 
-- [ ] Validate WCAG AA contrast compliance
+- [x] Validate WCAG AA contrast compliance (text.ink on canvas.bone 16.5:1, text.inkMuted 11.74:1, accent.ember 4.65:1, accent.favorite 9.26:1)
   ```
   Tool: WebAIM Contrast Checker (https://webaim.org/resources/contrastchecker/)
   Files: design-tokens.json (may need adjustments)
