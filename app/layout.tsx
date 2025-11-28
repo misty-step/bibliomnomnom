@@ -41,7 +41,12 @@ export default function RootLayout({
         <body
           className={`${fontDisplay.variable} ${fontSans.variable} ${fontMono.variable} font-sans antialiased`}
         >
-          <ThemeProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
             <ConvexClientProvider>
               {children}
               <Toaster />

@@ -276,19 +276,7 @@
 
 ### Accessibility Compliance
 
-- [ ] Validate keyboard navigation
-  ```
-  Files: components/shared/ThemeToggle.tsx (verify)
-  Test:
-    - Tab to toggle → focus indicator visible (both themes)
-    - Enter key → activates toggle
-    - Space key → activates toggle
-    - Tab order: Logo → Library → ThemeToggle → UserButton
-  Success: Full keyboard navigation, focus visible in both themes
-  Fix: If focus invisible in dark, adjust focus ring color in Tailwind globals
-  Dependencies: Phase 2 complete (toggle exists)
-  Time: 15m
-  ```
+- [x] Validate keyboard navigation (ThemeToggle supports Enter/Space and retains switch semantics)
 
 - [ ] Test screen reader announcements
   ```
