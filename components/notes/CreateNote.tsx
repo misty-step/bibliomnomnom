@@ -99,7 +99,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
                   value={page}
                   onChange={(e) => setPage(e.target.value)}
                   placeholder="Page #"
-                  className="w-20 rounded-md bg-transparent px-2 py-1 text-sm font-medium text-text-ink placeholder:text-text-inkSubtle/50 focus:bg-white/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-20 rounded-md bg-transparent px-2 py-1 text-sm font-medium text-text-ink placeholder:text-text-inkSubtle/50 focus:bg-canvas-bone/70 focus:outline-none focus:ring-2 focus:ring-text-ink/30 focus:ring-offset-2 focus:ring-offset-canvas-bone dark:focus:bg-surface-dawn/80"
                 />
               </div>
 

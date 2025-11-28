@@ -252,7 +252,12 @@ export function AddBookSheet({
 
                   {/* Hover Overlay */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-sm bg-black/70 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                    <label className="cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30">
+                    <label
+                      className={cn(
+                        "cursor-pointer rounded-md border border-line-ghost bg-canvas-bone/80 px-4 py-2 text-sm font-medium text-text-ink backdrop-blur-sm transition",
+                        "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn",
+                      )}
+                    >
                       <input
                         type="file"
                         accept={ALLOWED_TYPES.join(",")}
@@ -266,7 +271,7 @@ export function AddBookSheet({
                       type="button"
                       onClick={handleRemoveCover}
                       disabled={isSubmitting}
-                      className="text-sm text-white/80 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50"
+                      className="text-sm text-text-ink hover:text-text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
                     >
                       Remove
                     </button>

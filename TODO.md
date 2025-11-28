@@ -207,7 +207,7 @@
 
 ### Component Validation
 
-- [ ] QA high-priority surfaces
+- [x] QA high-priority surfaces (tokenized cover overlay/focus states for dark mode)
   ```
   Files to test:
     - app/page.tsx (landing page)

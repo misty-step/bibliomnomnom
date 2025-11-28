@@ -330,7 +330,8 @@ export function BookDetail({ bookId }: BookDetailProps) {
                 >
                   <label
                     className={cn(
-                      "cursor-pointer rounded-md bg-white/20 px-4 py-2 text-sm font-medium text-white backdrop-blur-sm transition hover:bg-white/30",
+                      "cursor-pointer rounded-md border border-line-ghost bg-canvas-bone/80 px-4 py-2 text-sm font-medium text-text-ink backdrop-blur-sm transition",
+                      "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn",
                       isUploadingCover && "pointer-events-none opacity-50",
                     )}
                   >
@@ -346,7 +347,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
                   <button
                     onClick={handleCoverRemove}
                     disabled={isUploadingCover}
-                    className="text-sm text-white/80 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50"
+                    className="text-sm text-text-ink hover:text-text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
                   >
                     Remove
                   </button>
