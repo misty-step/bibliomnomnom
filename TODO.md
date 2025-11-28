@@ -231,7 +231,7 @@
     - Text contrast fails → adjust colorsDark values
   ```
 
-- [ ] QA medium-priority components
+- [x] QA medium-priority components (dialogs/dropdowns/toasts ok; loading + empty states use tokenized backgrounds)
   ```
   Files to test:
     - components/ui/dialog.tsx
