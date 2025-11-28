@@ -23,11 +23,19 @@ export function ThemeToggle() {
     setTheme(isDark ? "light" : "dark");
   };
 
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggle();
+    }
+  };
+
   return (
     <div>
       <button
         type="button"
         onClick={toggle}
+        onKeyDown={handleKeyDown}
         role="switch"
         aria-label="Toggle dark mode"
         aria-checked={isDark}
