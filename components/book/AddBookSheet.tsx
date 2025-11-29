@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { cn } from "@/lib/utils";
+import { BookSearchInput, type BookSearchResult } from "./BookSearchInput";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -83,6 +84,14 @@ export function AddBookSheet({
     () => EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)],
   );
 
+  // Open Library search result fields
+  const [apiId, setApiId] = useState<string | undefined>();
+  const [apiSource, setApiSource] = useState<"open-library" | "manual">("manual");
+  const [isbn, setIsbn] = useState("");
+  const [publishedYear, setPublishedYear] = useState<number | undefined>();
+  const [pageCount, setPageCount] = useState<number | undefined>();
+  const [apiCoverUrl, setApiCoverUrl] = useState<string | undefined>();
+
   const createBook = useMutation(api.books.create);
   const { toast } = useToast();
 
@@ -102,6 +111,13 @@ export function AddBookSheet({
     setIsFavorite(false);
     setIsAudiobook(false);
     setDateFinished("");
+    // Reset search result fields
+    setApiId(undefined);
+    setApiSource("manual");
+    setIsbn("");
+    setPublishedYear(undefined);
+    setPageCount(undefined);
+    setApiCoverUrl(undefined);
   }, [setIsOpen]);
 
   useEffect(() => {
@@ -128,6 +144,21 @@ export function AddBookSheet({
       setDateFinished(getTodayString());
     }
   };
+
+  const handleBookSelected = useCallback((result: BookSearchResult) => {
+    setTitle(result.title);
+    setAuthor(result.author);
+    setApiId(result.apiId);
+    setApiSource("open-library");
+    if (result.isbn) setIsbn(result.isbn);
+    if (result.publishedYear) setPublishedYear(result.publishedYear);
+    if (result.pageCount) setPageCount(result.pageCount);
+    if (result.coverUrl) {
+      setApiCoverUrl(result.coverUrl);
+      setCoverPreview(result.coverUrl);
+      setCoverFile(null); // Clear any uploaded file since we're using API cover
+    }
+  }, []);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -197,7 +228,12 @@ export function AddBookSheet({
         isAudiobook,
         isFavorite,
         dateFinished: status === "read" ? dateFinishedTimestamp : undefined,
-        apiSource: "manual",
+        apiSource,
+        apiId,
+        apiCoverUrl,
+        isbn: isbn.trim() || undefined,
+        publishedYear,
+        pageCount,
       });
 
       toast({
@@ -237,6 +273,21 @@ export function AddBookSheet({
 
       <SideSheet open={isOpen} onOpenChange={setIsOpen} title="Add Book">
         <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Search Open Library */}
+          <div>
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+              Search Open Library
+            </label>
+            <BookSearchInput
+              onSelect={handleBookSelected}
+              placeholder="Search by title or author..."
+              disabled={isSubmitting}
+            />
+            <p className="mt-2 text-center text-xs text-text-inkSubtle">
+              — or enter manually below —
+            </p>
+          </div>
+
           {/* Cover Upload */}
           <div>
             <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
@@ -328,6 +379,21 @@ export function AddBookSheet({
               onChange={(e) => setAuthor(e.target.value)}
               placeholder={exampleBook.author}
               disabled={isSubmitting}
+            />
+          </div>
+
+          {/* ISBN */}
+          <div>
+            <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+              ISBN
+            </label>
+            <Input
+              type="text"
+              value={isbn}
+              onChange={(e) => setIsbn(e.target.value)}
+              placeholder="9780441013593"
+              disabled={isSubmitting}
+              className="font-mono"
             />
           </div>
 
