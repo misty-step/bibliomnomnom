@@ -17,7 +17,35 @@
       "ember": "rgba(28,25,23,0.15)"
     },
     "accent": {
-      "ember": "#DC2626"
+      "ember": "#DC2626",
+      "favorite": "#F59E0B"
+    },
+    "status": {
+      "positive": "#46D549",
+      "warning": "#FFB347",
+      "danger": "#FF4D4F"
+    }
+  },
+  "colorsDark": {
+    "canvas": {
+      "bone": "#1C1917",
+      "boneMuted": "#27241F"
+    },
+    "text": {
+      "ink": "#FAF8F5",
+      "inkMuted": "#D6D3D1",
+      "inkSubtle": "#A8A29E"
+    },
+    "surface": {
+      "dawn": "#27241F"
+    },
+    "line": {
+      "ghost": "rgba(250,248,245,0.08)",
+      "ember": "rgba(250,248,245,0.15)"
+    },
+    "accent": {
+      "ember": "#EF4444",
+      "favorite": "#FBBF24"
     },
     "status": {
       "positive": "#46D549",
@@ -53,6 +81,11 @@
     "flat": "none",
     "soft": "0 4px 16px rgba(12,22,38,0.06)",
     "raised": "0 8px 24px rgba(5,8,16,0.12)"
+  },
+  "elevationDark": {
+    "flat": "none",
+    "soft": "0 4px 16px rgba(0,0,0,0.40)",
+    "raised": "0 8px 24px rgba(0,0,0,0.60)"
   },
   "textures": {
     "noise": "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E\")"

@@ -81,4 +81,9 @@
     opacity: 1;
     mix-blend-mode: multiply;
   }
+
+  .dark body::before {
+    mix-blend-mode: screen;
+    opacity: 0.5;
+  }
 }

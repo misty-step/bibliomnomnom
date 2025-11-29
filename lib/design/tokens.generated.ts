@@ -22,6 +22,7 @@ export const designTokens = {
     },
     accent: {
       ember: "#DC2626",
+      favorite: "#F59E0B",
     },
     status: {
       positive: "#46D549",
@@ -84,6 +85,7 @@ export const tokenVars = {
   colors: {
     accent: {
       ember: "var(--color-accent-ember)",
+      favorite: "var(--color-accent-favorite)",
     },
     canvas: {
       bone: "var(--color-canvas-bone)",

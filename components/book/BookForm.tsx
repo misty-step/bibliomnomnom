@@ -191,7 +191,10 @@ export function BookForm({
             )}
           >
             <Star
-              className={cn("h-3.5 w-3.5", values.isFavorite && "fill-amber-400 text-amber-400")}
+              className={cn(
+                "h-3.5 w-3.5",
+                values.isFavorite && "fill-accent-favorite text-accent-favorite",
+              )}
             />
             Favorite
           </button>

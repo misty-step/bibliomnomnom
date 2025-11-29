@@ -1,6 +1,7 @@
 /* Auto-generated from design-tokens.json. Do not edit manually. */
 :root {
   --color-accent-ember: #dc2626;
+  --color-accent-favorite: #f59e0b;
   --color-canvas-bone: #faf8f5;
   --color-canvas-bone-muted: #f2ede5;
   --color-line-ember: rgba(28, 25, 23, 0.15);
@@ -37,4 +38,23 @@
   --space-xl: 2rem;
   --space-xs: 0.5rem;
   --texture-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.04'/%3E%3C/svg%3E");
+}
+
+.dark {
+  --color-accent-ember: #ef4444;
+  --color-accent-favorite: #fbbf24;
+  --color-canvas-bone: #1c1917;
+  --color-canvas-bone-muted: #27241f;
+  --color-line-ember: rgba(250, 248, 245, 0.15);
+  --color-line-ghost: rgba(250, 248, 245, 0.08);
+  --color-status-danger: #ff4d4f;
+  --color-status-positive: #46d549;
+  --color-status-warning: #ffb347;
+  --color-surface-dawn: #27241f;
+  --color-text-ink: #faf8f5;
+  --color-text-ink-muted: #d6d3d1;
+  --color-text-ink-subtle: #a8a29e;
+  --elevation-flat: none;
+  --elevation-raised: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --elevation-soft: 0 4px 16px rgba(0, 0, 0, 0.4);
 }

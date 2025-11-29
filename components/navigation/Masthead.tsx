@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 export function Masthead() {
   return (
@@ -20,7 +21,8 @@ export function Masthead() {
       </Link>
 
       {/* Right: User Actions */}
-      <div className="flex w-12 justify-end">
+      <div className="flex items-center gap-3">
+        <ThemeToggle />
         <UserButton
           appearance={{
             elements: {

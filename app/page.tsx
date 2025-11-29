@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 export default async function HomePage() {
   const user = await currentUser();
@@ -22,12 +23,19 @@ export default async function HomePage() {
 
       {/* Dot pattern texture overlay */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-25"
+        className="pointer-events-none absolute inset-0 opacity-25 bg-text-ink"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%231C1917'/%3E%3C/svg%3E")`,
-          backgroundRepeat: "repeat",
+          maskImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='black'/%3E%3C/svg%3E")`,
+          maskRepeat: "repeat",
+          WebkitMaskImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='black'/%3E%3C/svg%3E")`,
+          WebkitMaskRepeat: "repeat",
         }}
       />
+
+      {/* Theme Toggle - Top Right */}
+      <div className="absolute right-6 top-6 z-10">
+        <ThemeToggle />
+      </div>
 
       {/* Main content - asymmetric left alignment */}
       <div className="relative flex min-h-screen items-center">

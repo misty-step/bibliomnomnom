@@ -80,7 +80,7 @@ export function BookTile({ book }: BookTileProps) {
                   <div className="flex gap-2">
                     {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
                     {book.isFavorite && (
-                      <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                      <Star className="h-3.5 w-3.5 fill-accent-favorite text-accent-favorite" />
                     )}
                   </div>
                 </div>
@@ -105,7 +105,7 @@ export function BookTile({ book }: BookTileProps) {
                 <div className="flex gap-2">
                   {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
                   {book.isFavorite && (
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <Star className="h-3.5 w-3.5 fill-accent-favorite text-accent-favorite" />
                   )}
                 </div>
               </div>
