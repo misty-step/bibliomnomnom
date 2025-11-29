@@ -83,7 +83,7 @@
   }
 
   .dark body::before {
-    mix-blend-mode: overlay;
-    opacity: 0.6;
+    mix-blend-mode: screen;
+    opacity: 0.5;
   }
 }

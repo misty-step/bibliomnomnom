@@ -1,6 +1,7 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 
 export default async function HomePage() {
   const user = await currentUser();
@@ -28,6 +29,11 @@ export default async function HomePage() {
           backgroundRepeat: "repeat",
         }}
       />
+
+      {/* Theme Toggle - Top Right */}
+      <div className="absolute right-6 top-6 z-10">
+        <ThemeToggle />
+      </div>
 
       {/* Main content - asymmetric left alignment */}
       <div className="relative flex min-h-screen items-center">
