@@ -271,7 +271,7 @@ export function AddBookSheet({
                       type="button"
                       onClick={handleRemoveCover}
                       disabled={isSubmitting}
-                      className="text-sm text-text-ink hover:text-text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
+                      className="text-sm text-white/90 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50"
                     >
                       Remove
                     </button>

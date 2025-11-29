@@ -23,10 +23,12 @@ export default async function HomePage() {
 
       {/* Dot pattern texture overlay */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-25"
+        className="pointer-events-none absolute inset-0 opacity-25 bg-text-ink"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='%231C1917'/%3E%3C/svg%3E")`,
-          backgroundRepeat: "repeat",
+          maskImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='black'/%3E%3C/svg%3E")`,
+          maskRepeat: "repeat",
+          WebkitMaskImage: `url("data:image/svg+xml,%3Csvg width='4' height='4' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='1' cy='1' r='0.5' fill='black'/%3E%3C/svg%3E")`,
+          WebkitMaskRepeat: "repeat",
         }}
       />
 
