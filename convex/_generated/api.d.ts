@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions_bookSearch from "../actions/bookSearch.js";
 import type * as actions_coverFetch from "../actions/coverFetch.js";
 import type * as auth from "../auth.js";
 import type * as books from "../books.js";
@@ -21,7 +22,16 @@ import type {
   FunctionReference,
 } from "convex/server";
 
+/**
+ * A utility for referencing Convex functions in your app's API.
+ *
+ * Usage:
+ * ```js
+ * const myFunctionReference = api.myModule.myFunction;
+ * ```
+ */
 declare const fullApi: ApiFromModules<{
+  "actions/bookSearch": typeof actions_bookSearch;
   "actions/coverFetch": typeof actions_coverFetch;
   auth: typeof auth;
   books: typeof books;
@@ -29,30 +39,14 @@ declare const fullApi: ApiFromModules<{
   notes: typeof notes;
   users: typeof users;
 }>;
+declare const fullApiWithMounts: typeof fullApi;
 
-/**
- * A utility for referencing Convex functions in your app's public API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = api.myModule.myFunction;
- * ```
- */
 export declare const api: FilterApi<
-  typeof fullApi,
+  typeof fullApiWithMounts,
   FunctionReference<any, "public">
 >;
-
-/**
- * A utility for referencing Convex functions in your app's internal API.
- *
- * Usage:
- * ```js
- * const myFunctionReference = internal.myModule.myFunction;
- * ```
- */
 export declare const internal: FilterApi<
-  typeof fullApi,
+  typeof fullApiWithMounts,
   FunctionReference<any, "internal">
 >;
 
