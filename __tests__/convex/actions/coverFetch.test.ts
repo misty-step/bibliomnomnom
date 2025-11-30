@@ -111,15 +111,21 @@ describe("searchBookCoverHelper", () => {
     }
   });
 
-  it("returns error when both APIs fail", async () => {
+  it("returns error when all lookup methods fail", async () => {
     global.fetch = vi
       .fn()
-      // Open Library returns empty
+      // Open Library ISBN lookup returns empty
       .mockImplementationOnce(() => mockFetchResponse({}))
       // Google Books returns empty (no API key fallback)
       .mockImplementationOnce(() =>
         mockFetchResponse({
           items: [],
+        }),
+      )
+      // Title+author search returns no results
+      .mockImplementationOnce(() =>
+        mockFetchResponse({
+          docs: [],
         }),
       );
 
@@ -129,13 +135,66 @@ describe("searchBookCoverHelper", () => {
     expect((result as any).error).toContain("Cover not found");
   });
 
-  it("returns error when book has no ISBN", async () => {
+  it("falls back to title+author search when no ISBN", async () => {
     const bookWithoutIsbn = { ...mockBook, isbn: undefined };
+
+    global.fetch = vi
+      .fn()
+      // Open Library search returns result with cover_i
+      .mockImplementationOnce(() =>
+        mockFetchResponse({
+          docs: [{ cover_i: 54321 }],
+        }),
+      )
+      // Image fetch returns image data
+      .mockImplementationOnce(() => mockFetchResponse(new ArrayBuffer(100)));
+
+    const result = await searchBookCoverHelper(bookWithoutIsbn);
+
+    expect(result).toHaveProperty("coverDataUrl");
+    expect(result).toHaveProperty("apiSource", "open-library");
+    expect((result as any).apiCoverUrl).toContain("54321-L.jpg");
+  });
+
+  it("falls back to title+author when ISBN lookup fails", async () => {
+    // Note: Google Books is skipped when no API key, so mocks go:
+    // 1. Open Library ISBN -> 2. Title+author search -> 3. Image fetch
+    global.fetch = vi
+      .fn()
+      // Open Library ISBN lookup returns empty
+      .mockImplementationOnce(() => mockFetchResponse({}))
+      // Open Library search (title+author) returns result
+      .mockImplementationOnce(() =>
+        mockFetchResponse({
+          docs: [{ cover_i: 99999 }],
+        }),
+      )
+      // Image fetch returns data
+      .mockImplementationOnce(() => mockFetchResponse(new ArrayBuffer(100)));
+
+    const result = await searchBookCoverHelper(mockBook);
+
+    expect(result).toHaveProperty("coverDataUrl");
+    expect(result).toHaveProperty("apiSource", "open-library");
+    expect((result as any).apiCoverUrl).toContain("99999-L.jpg");
+  });
+
+  it("returns error when title+author search finds no cover", async () => {
+    const bookWithoutIsbn = { ...mockBook, isbn: undefined };
+
+    global.fetch = vi
+      .fn()
+      // Open Library search returns result without cover_i
+      .mockImplementationOnce(() =>
+        mockFetchResponse({
+          docs: [{ title: "Some book" }], // no cover_i
+        }),
+      );
 
     const result = await searchBookCoverHelper(bookWithoutIsbn);
 
     expect(result).toHaveProperty("error");
-    expect((result as any).error).toContain("No ISBN");
+    expect((result as any).error).toContain("Cover not found");
   });
 
   it("returns error when book not found", async () => {

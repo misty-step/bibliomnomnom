@@ -1,37 +1,37 @@
-# Dark Mode Implementation PRD
+# External Book Search via Open Library API
+
+**Status**: Specification complete, ready for implementation
+**Estimated Effort**: 5-6 hours
+**Priority**: ADOPTION BLOCKER — 10x faster book adding vs manual entry
+**Branch**: `feature/open-library-search`
+
+---
 
 ## Executive Summary
 
-**Problem:** Users read in varying lighting conditions (bright daylight, evening low-light, nighttime darkness) but bibliomnomnom only supports a single warm light theme, causing eye strain and reduced usability in darker environments.
+Add book search functionality using Open Library API integrated directly into AddBookSheet. Users search by title/author, select a result to auto-fill the form, edit if needed, then save. This transforms the "add book" workflow from 2-minute manual entry to 3-second search-and-select.
 
-**Solution:** Implement full dark mode with warm "espresso and leather-bound books" aesthetic that maintains brand identity while providing comfortable reading in all lighting conditions. System preference detection with manual override toggle in TopNav.
-
-**User Value:** Voracious readers can use the app comfortably at any time of day without eye strain, improving daily engagement and retention.
-
-**Success Criteria:**
-- WCAG AA contrast compliance in both themes (4.5:1 minimum for normal text)
-- Zero flash of unstyled content (FOUC) on theme switch or page load
-- Theme preference persists across sessions
-- All 52 components render correctly in dark mode
-- <50ms theme switch latency
+**User Value**:
+- 10x faster book adding (search → select → done)
+- Auto-populated metadata (covers, ISBN, page count, year)
+- Higher data quality from authoritative source
+- Users add more books → more engagement → better retention
 
 ---
 
 ## User Context
 
-**Who:** Voracious readers who track books, notes, quotes, and reflections throughout the day.
+**Who**: All bibliomnomnom users adding books to their library
 
-**Problem Being Solved:**
-- **Eye Strain:** Reading white backgrounds at night causes discomfort and fatigue
-- **Lighting Adaptation:** Users switch between bright offices and dim evening reading spaces
-- **Modern Expectation:** 70%+ of apps now support dark mode; absence feels dated
-- **Accessibility:** Some users with light sensitivity require low-luminance interfaces
+**Problem**: Manual entry requires typing 5-10 fields per book. Users with large libraries (100+ books) abandon the app due to friction.
 
-**Measurable Benefits:**
-- Reduced eye strain enables longer app sessions in evening hours
-- Increased daily active usage (users can engage comfortably anytime)
-- Lower bounce rate from users who check app at night and leave due to brightness
-- Improved accessibility for users with photophobia or migraine triggers
+**Solution**: Search external database, auto-fill form fields, let user edit before saving.
+
+**Success Criteria**:
+- Search returns relevant results in <1 second
+- Selected result pre-fills all available fields
+- User can still manually enter if book not found
+- Books saved with `apiSource: "open-library"` for tracking
 
 ---
 
@@ -39,630 +39,1197 @@
 
 ### Functional Requirements
 
-**FR1: System Preference Detection**
-- App detects OS-level theme preference via `prefers-color-scheme` media query
-- First-time visitors see theme matching their OS setting
-- Works on macOS, Windows, iOS, Android, Linux
-
-**FR2: Manual Override Toggle**
-- Icon-only toggle (Moon/Sun) in TopNav, always visible
-- Single click switches between light and dark themes
-- Visual feedback confirms theme change (icon animation)
-- Preference persists across browser sessions
-
-**FR3: Preference Hierarchy**
-- Priority: Manual preference (localStorage) > System preference > Light fallback
-- Once user manually toggles, app remembers choice even if OS preference changes
-- User can reset to "system default" mode (clears manual preference)
-
-**FR4: Warm Dark Aesthetic**
-- Dark mode maintains bibliophile brand identity (warm browns/charcoals, not cold grays)
-- Film grain texture visible in dark mode (adjusted opacity/blend-mode)
-- Shadows and elevation remain perceptible against dark backgrounds
-
-**FR5: Complete Component Coverage**
-- All 52 components render correctly in dark mode
-- Book covers, user uploads, and Clerk authentication UI respect theme
-- No broken states, invisible text, or contrast failures
+| ID | Requirement | Priority |
+|----|-------------|----------|
+| F1 | Search books by title/author query string | Must |
+| F2 | Display search results with covers, titles, authors, year | Must |
+| F3 | Select result to auto-fill AddBookSheet form | Must |
+| F4 | Allow editing pre-filled fields before saving | Must |
+| F5 | Fallback to manual entry when search fails or no results | Must |
+| F6 | Debounced search input (300ms) to prevent API spam | Must |
+| F7 | Loading state during search | Must |
+| F8 | Error state with retry option | Should |
+| F9 | Keyboard navigation in results (arrow keys, enter) | Should |
+| F10 | Add ISBN field to AddBookSheet form | Must |
 
 ### Non-Functional Requirements
 
-**NFR1: Performance**
-- Theme switch completes in <50ms (imperceptible to user)
-- CSS bundle size increase <30% (acceptable for 2x theme coverage)
-- No forced reflow/repaint on toggle
-- Lighthouse performance score does not regress
-
-**NFR2: Accessibility (WCAG 2.2 AA)**
-- Normal text contrast: ≥4.5:1 in both themes
-- Large text (18px+) contrast: ≥3:1
-- Interactive elements: ≥3:1 against background
-- Keyboard navigation: Tab to toggle, Enter/Space to activate
-- Screen reader: Announces "Switched to dark mode" on toggle
-- Motion preference: Respects `prefers-reduced-motion` (no animations)
-
-**NFR3: Zero FOUC**
-- No flash of wrong theme during SSR hydration
-- Blocking script sets theme before first paint
-- CSS media query fallback for JS-disabled users
-
-**NFR4: Reliability**
-- Graceful degradation if localStorage blocked (falls back to system preference)
-- No hydration mismatch errors in console
-- Theme state never corrupts (rapid toggling handled safely)
-
-**NFR5: Maintainability**
-- Single source of truth for colors (`design-tokens.json`)
-- Automated build pipeline regenerates CSS + TypeScript types
-- Adding future themes requires no component changes
+| ID | Requirement | Target |
+|----|-------------|--------|
+| NF1 | Search response time | < 1 second P95 |
+| NF2 | API timeout | 5 seconds max |
+| NF3 | Results limit | 10 items max |
+| NF4 | Debounce delay | 300ms |
+| NF5 | No API key required | Open Library is free |
 
 ---
 
 ## Architecture Decision
 
-### Selected Approach: CSS Variables + next-themes + Warm Dark Palette
+### Selected Approach: Open Library API Only
 
-**Description:**
-- Extend existing design token system with `colorsDark` object in `design-tokens.json`
-- Build script generates dual CSS blocks: `:root { ... }` (light) and `.dark { ... }` (dark)
-- Use `next-themes` library (1.2kb) for theme state management, localStorage persistence, and FOUC prevention
-- Manual toggle in TopNav with system preference as default
-- Components adapt via CSS variable cascade (no code changes required)
+**Rationale**:
+- **Simplicity**: No API key management, no rate limit concerns
+- **Existing Pattern**: Already used in codebase for cover fetching (`coverFetch.ts`)
+- **Cost**: Free, unlimited (with reasonable use)
+- **Coverage**: 50M+ editions, sufficient for most users
 
-**Rationale:**
-- **User Value (Critical):** Enables comfortable reading in all lighting conditions, addressing accessibility need
-- **Simplicity (High):** Leverages existing token system; 99% of components adapt automatically
-- **Explicitness (High):** All theme logic centralized in token JSON and build script; no hidden complexity
+### Alternative Considered: Google Books Fallback
 
-**Tradeoffs Accepted:**
-- **+1.2kb Bundle:** next-themes dependency (acceptable for FOUC prevention + theme management)
-- **+25% CSS Size:** Dual theme definitions (mitigated by shared semantic structure)
-- **2x Testing Surface:** Light + dark states (offset by automated CSS variable cascade)
-
-### Alternatives Considered
-
-| Approach | User Value | Simplicity | Explicitness | Risk | Why Not Chosen |
-|----------|-----------|-----------|--------------|------|----------------|
-| **Pure CSS Media Query** | Medium (system-only) | Very High | Very High | Very Low | Cannot remember manual preference; users who want light mode at night have no override |
-| **Inversion Filter** | Medium (crude aesthetics) | Very High | Medium | Medium | Breaks brand identity; hue rotation makes warm palette unrecognizable; poor control over shadows/textures |
-| **Vanilla React Context** | High | Medium | Medium | Medium | Requires custom FOUC prevention; 3-4h implementation vs 30m with next-themes; reinvents solved problem |
-| **No Dark Mode (Jobs Rec)** | Low (blocks users) | Very High | Very High | High (competitive) | Addresses eye strain need; competitive disadvantage; modern expectation in 2025 |
-
-**Decision:** CSS Variables + next-themes balances user value (full theme control) with simplicity (minimal component changes) and low risk (battle-tested library).
-
-**Jobs Concern Acknowledged:** Jobs review recommended deferring dark mode to focus on book search and export features (higher user acquisition value). **Response:** Dark mode addresses accessibility need and competitive parity; book search remains next priority after this 7-hour sprint.
+**Why Not Chosen**:
+- Adds complexity (two APIs, fallback logic)
+- Requires API key and environment variable management
+- Google Books has daily rate limits (1000 req/day free)
+- Marginal benefit for additional complexity
 
 ---
 
-## Module Boundaries
+## Open Library API Reference
 
-### Module 1: Design Token System (Existing + Extended)
+### Search Endpoint
 
-**Responsibility:** Single source of truth for all color, elevation, gradient, and texture values across light and dark themes.
+```
+GET https://openlibrary.org/search.json
+```
 
-**Interface:**
-- Input: `design-tokens.json` (manual editing)
-- Output: `app/design-tokens.css` (CSS custom properties), `lib/design/tokens.generated.ts` (TypeScript types)
-- Build Command: `pnpm tokens:build`
+**Query Parameters**:
 
-**Hidden Complexity:**
-- Nested JSON parsing and flattening
-- Dual CSS generation (`:root` + `.dark` selectors)
-- TypeScript type generation with exclusions (`colorsDark` not exported)
-- Semantic token naming conventions
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | string | Yes | Search query (title, author, or combined) |
+| `fields` | string | No | Comma-separated fields to return |
+| `limit` | number | No | Max results (default 100, we use 10) |
+| `page` | number | No | Pagination (1-indexed) |
 
-**Changes for Dark Mode:**
-- Add `colorsDark`, `elevationDark`, `gradientsDark` objects to JSON
-- Modify build script to generate `.dark { ... }` CSS block
-- Exclude `*Dark` objects from TypeScript exports (build-time only)
+**Recommended Fields** (minimize response size):
+```
+key,title,author_name,isbn,first_publish_year,number_of_pages_median,cover_i
+```
 
-**Abstraction Layer:** Components consume semantic names (`bg-canvas-bone`), never know hex values or theme logic.
+**Example Request**:
+```bash
+curl "https://openlibrary.org/search.json?q=dune+frank+herbert&fields=key,title,author_name,isbn,first_publish_year,number_of_pages_median,cover_i&limit=10"
+```
 
----
+**Example Response**:
+```json
+{
+  "numFound": 847,
+  "start": 0,
+  "docs": [
+    {
+      "key": "/works/OL893415W",
+      "title": "Dune",
+      "author_name": ["Frank Herbert"],
+      "isbn": ["9780441013593", "0441013597", "9780340960196"],
+      "first_publish_year": 1965,
+      "number_of_pages_median": 604,
+      "cover_i": 8442807
+    }
+  ]
+}
+```
 
-### Module 2: Theme State Management (New)
+### Cover Image URL Construction
 
-**Responsibility:** Manage theme preference (system vs manual), persist across sessions, prevent FOUC, expose theme state to components.
+```
+https://covers.openlibrary.org/b/id/{cover_i}-{size}.jpg
+```
 
-**Interface:**
-- Provider: `<ThemeProvider>` wrapper in `app/layout.tsx`
-- Hook: `const { theme, setTheme } = useTheme()` in client components
-- Attributes: `attribute="class"`, `defaultTheme="system"`, `enableSystem`
+**Sizes**:
+- `S` — Small (~42px width)
+- `M` — Medium (~180px width) ← **Use this**
+- `L` — Large (~360px width)
 
-**Hidden Complexity:**
-- localStorage read/write with error handling
-- System preference detection via `window.matchMedia`
-- Blocking script injection to prevent FOUC
-- Hydration mismatch prevention via `suppressHydrationWarning`
-- Preference hierarchy resolution (manual > system > fallback)
+**Example**:
+```
+https://covers.openlibrary.org/b/id/8442807-M.jpg
+```
 
-**Dependencies:** `next-themes` library (abstracts all complexity above)
+**Missing Cover Handling**:
+- Returns 1x1 transparent pixel if no cover exists
+- Check `cover_i` exists before constructing URL
 
-**Abstraction Layer:** Components call `setTheme("dark")`, library handles persistence and DOM updates.
+### Rate Limits & Best Practices
 
----
+- **No official rate limit** for search API
+- **Recommended**: Include `User-Agent` header identifying your app
+- **Courtesy**: Debounce requests (300ms minimum)
+- **Cover API**: 100 requests per 5 minutes per IP (for non-OLID requests)
 
-### Module 3: Theme Toggle UI (New)
-
-**Responsibility:** Provide accessible, always-visible control for manual theme switching with visual feedback.
-
-**Interface:**
-- Component: `<ThemeToggle />` in `components/shared/ThemeToggle.tsx`
-- Props: None (reads theme from `useTheme()` hook)
-- Placement: TopNav, between Library link and UserButton
-
-**Hidden Complexity:**
-- Mounted state check (prevent hydration mismatch)
-- Icon animation (Sun/Moon swap with Framer Motion)
-- ARIA labels and keyboard handlers
-- Screen reader announcements via live region
-
-**User Interaction:**
-1. User clicks toggle → `setTheme(theme === 'dark' ? 'light' : 'dark')`
-2. Icon animates (Moon → Sun or Sun → Moon)
-3. CSS variables update → entire app re-themes
-4. Preference saved to localStorage
-5. Screen reader announces "Switched to dark mode"
-
-**Abstraction Layer:** Simple button component hides theme state management, persistence, and accessibility logic.
-
----
-
-### Module 4: Component Theming (Existing + No Changes)
-
-**Responsibility:** Render UI with theme-appropriate colors via Tailwind utilities and CSS variables.
-
-**Interface:**
-- Tailwind classes: `bg-canvas-bone`, `text-text-ink`, `border-line-ghost`
-- CSS variable references: `var(--color-canvas-bone)`, `shadow-[var(--elevation-soft)]`
-- No theme props, no conditional logic
-
-**Hidden Complexity:**
-- CSS variable cascade automatically resolves light vs dark values based on `.dark` class on `<html>`
-- Tailwind utilities compile to `background-color: var(--color-canvas-bone)` under the hood
-
-**Changes for Dark Mode:** **None required** (99% of components adapt via CSS variable cascade)
-
-**Exceptions (4 components):**
-- `BookTile.tsx`, `BookForm.tsx`, `AddBookSheet.tsx`, `BookDetail.tsx`: Replace hardcoded `fill-amber-400` with `fill-accent-favorite` token
-
-**Abstraction Layer:** Components consume semantic tokens, theme switching happens transparently via CSS.
+**Required Header**:
+```typescript
+headers: {
+  "User-Agent": "bibliomnomnom/1.0 (book tracking app)"
+}
+```
 
 ---
 
-## Dependencies & Assumptions
+## Detailed Implementation
 
-### External Dependencies
+### File 1: `convex/actions/bookSearch.ts`
 
-| Dependency | Version | Purpose | Risk Mitigation |
-|-----------|---------|---------|-----------------|
-| `next-themes` | ^0.4.4 | Theme state + FOUC prevention | Battle-tested (20k+ GitHub stars), zero breaking changes in 2 years |
-| `lucide-react` | Existing | Moon/Sun icons for toggle | Already in project |
-| Tailwind CSS | 3.4.1 | `darkMode: ["class"]` support | Already configured |
+**Purpose**: Convex action that calls Open Library search API
 
-### Assumptions
+**Full Implementation**:
 
-**Scale Expectations:**
-- User base: <10k concurrent users (no CDN caching complexity)
-- Theme switches: <5 per session per user (not a high-frequency action)
-- CSS bundle: <50kb total (light + dark), acceptable for broadband/4G
+```typescript
+"use node";
 
-**Environment:**
-- Modern browsers supporting CSS custom properties (IE11 not supported, acceptable for 2025)
-- JavaScript enabled (graceful degradation to system preference for JS-disabled)
-- localStorage available (cookie fallback not needed for MVP)
+import { action } from "../_generated/server";
+import { v } from "convex/values";
 
-**Team Constraints:**
-- Single developer implementing (no cross-team coordination)
-- 7-hour sprint allocation (realistic for scope defined)
-- No automated E2E tests yet (manual QA acceptable for MVP)
+const OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json";
+const OPEN_LIBRARY_COVERS_URL = "https://covers.openlibrary.org/b/id";
+const USER_AGENT = "bibliomnomnom/1.0 (book tracking app)";
+const FETCH_TIMEOUT_MS = 5000;
+const MAX_RESULTS = 10;
 
-### Integration Requirements
+/**
+ * Result type returned to frontend
+ * Maps Open Library response to our book schema fields
+ */
+export type BookSearchResult = {
+  /** Open Library work key (e.g., "/works/OL893415W") */
+  apiId: string;
+  /** Book title */
+  title: string;
+  /** Author name(s), joined with ", " if multiple */
+  author: string;
+  /** ISBN-13 preferred, falls back to ISBN-10 */
+  isbn?: string;
+  /** First publication year */
+  publishedYear?: number;
+  /** Median page count across editions */
+  pageCount?: number;
+  /** Cover image URL (Medium size) */
+  coverUrl?: string;
+};
 
-**Next.js 15:**
-- ThemeProvider must be client component (`'use client'` directive)
-- `suppressHydrationWarning` required on `<html>` tag in `app/layout.tsx`
-- Blocking script injected by `next-themes` automatically
+/**
+ * Open Library search document shape (partial)
+ */
+type OpenLibraryDoc = {
+  key: string;
+  title?: string;
+  author_name?: string[];
+  isbn?: string[];
+  first_publish_year?: number;
+  number_of_pages_median?: number;
+  cover_i?: number;
+};
 
-**Clerk Authentication:**
-- UserButton component respects theme automatically (uses CSS variables)
-- No custom Clerk appearance config needed
+/**
+ * Extract best ISBN from array
+ * Prefers ISBN-13 (13 digits) over ISBN-10 (10 digits)
+ */
+function extractBestIsbn(isbns?: string[]): string | undefined {
+  if (!isbns || isbns.length === 0) return undefined;
 
-**Convex Backend:**
-- No backend changes required (theme is client-only)
-- Future: Could persist theme preference in user settings table (deferred)
+  // Find first ISBN-13 (exactly 13 digits)
+  const isbn13 = isbns.find((isbn) => /^\d{13}$/.test(isbn));
+  if (isbn13) return isbn13;
 
----
+  // Fall back to first ISBN-10 (10 chars, last may be X)
+  const isbn10 = isbns.find((isbn) => /^\d{9}[\dX]$/.test(isbn));
+  if (isbn10) return isbn10;
 
-## Implementation Phases
+  // Last resort: first ISBN in array
+  return isbns[0];
+}
 
-### Phase 1: Foundation (2-3 hours) - Sprint Week 1
+/**
+ * Construct cover URL from Open Library cover ID
+ */
+function buildCoverUrl(coverId?: number): string | undefined {
+  if (!coverId) return undefined;
+  return `${OPEN_LIBRARY_COVERS_URL}/${coverId}-M.jpg`;
+}
 
-**Goal:** Establish dark mode design tokens and build infrastructure.
+/**
+ * Map Open Library document to our BookSearchResult type
+ */
+function mapToSearchResult(doc: OpenLibraryDoc): BookSearchResult {
+  return {
+    apiId: doc.key,
+    title: doc.title ?? "Unknown Title",
+    author: doc.author_name?.join(", ") ?? "Unknown Author",
+    isbn: extractBestIsbn(doc.isbn),
+    publishedYear: doc.first_publish_year,
+    pageCount: doc.number_of_pages_median,
+    coverUrl: buildCoverUrl(doc.cover_i),
+  };
+}
 
-**Tasks:**
-1. **Define Dark Palette** (1h)
-   - Add `colorsDark` to `design-tokens.json` with warm palette:
-     - `canvas.bone: #1C1917` (espresso charcoal)
-     - `text.ink: #FAF8F5` (inverted bone)
-     - `surface.dawn: #27241F` (warm brown surface)
-     - `line.ghost: rgba(250,248,245,0.08)` (light lines)
-     - `accent.ember: #EF4444` (brightened red for contrast)
-   - Add `elevationDark` with stronger shadows (alpha: 0.40, 0.60)
-   - Add `gradientsDark` for landing page hero
+/**
+ * Search Open Library for books matching query
+ *
+ * @param query - Search string (title, author, or combined)
+ * @returns Array of BookSearchResult (max 10)
+ * @throws Error if API call fails or times out
+ */
+export const searchBooks = action({
+  args: {
+    query: v.string(),
+  },
+  handler: async (_, { query }): Promise<BookSearchResult[]> => {
+    // Validate query
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length < 2) {
+      return [];
+    }
 
-2. **Update Build Script** (30m)
-   - Modify `scripts/build-tokens.mjs` to generate `.dark { ... }` CSS block
-   - Exclude `*Dark` objects from TypeScript type exports
-   - Test: `pnpm tokens:build` regenerates CSS + types correctly
+    // Build URL with query parameters
+    const params = new URLSearchParams({
+      q: trimmedQuery,
+      fields: "key,title,author_name,isbn,first_publish_year,number_of_pages_median,cover_i",
+      limit: String(MAX_RESULTS),
+    });
 
-3. **Add `accent.favorite` Token** (15m)
-   - Light: `#F59E0B` (amber for favorite stars)
-   - Dark: `#FBBF24` (brighter amber for dark bg contrast)
-   - Migrate 4 hardcoded `fill-amber-400` to `fill-accent-favorite`
+    const url = `${OPEN_LIBRARY_SEARCH_URL}?${params.toString()}`;
 
-4. **Adjust Film Grain** (15m)
-   - Add `.dark body::before` rule to `app/globals.css`
-   - Change blend-mode to `screen`, reduce opacity to `0.6`
-   - Test visibility on dark backgrounds
+    try {
+      // Fetch with timeout
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "User-Agent": USER_AGENT,
+        },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      });
 
-**Deliverable:** Dark mode CSS variables generated, all components theme-ready (no visual changes yet).
+      if (!response.ok) {
+        console.error(`Open Library API error: ${response.status}`);
+        throw new Error(`Search failed: ${response.status}`);
+      }
 
-**Validation:**
-- `app/design-tokens.css` contains `:root` (light) and `.dark` (dark) blocks
-- No TypeScript errors after token rebuild
-- Film grain visible on manually applied `.dark` class to `<html>`
+      const data = await response.json();
+      const docs: OpenLibraryDoc[] = data.docs ?? [];
 
----
+      // Map and return results
+      return docs.map(mapToSearchResult);
+    } catch (error) {
+      // Log error for debugging
+      console.error("Open Library search failed:", error);
 
-### Phase 2: Theme Switcher (2 hours) - Sprint Week 1
+      // Re-throw with user-friendly message
+      if (error instanceof Error && error.name === "TimeoutError") {
+        throw new Error("Search timed out. Please try again.");
+      }
+      throw new Error("Search failed. Please try again.");
+    }
+  },
+});
+```
 
-**Goal:** Enable user-controlled theme switching with persistence.
-
-**Tasks:**
-1. **Install next-themes** (5m)
-   ```bash
-   pnpm add next-themes
-   ```
-
-2. **Create ThemeProvider** (30m)
-   - File: `components/providers/ThemeProvider.tsx`
-   - Wrap `next-themes` provider with config:
-     - `attribute="class"`
-     - `defaultTheme="system"`
-     - `enableSystem`
-     - `disableTransitionOnChange`
-
-3. **Update Root Layout** (15m)
-   - Add `suppressHydrationWarning` to `<html>` tag
-   - Wrap app with `<ThemeProvider>` between `<ClerkProvider>` and `<ConvexClientProvider>`
-
-4. **Create ThemeToggle Component** (1h)
-   - File: `components/shared/ThemeToggle.tsx`
-   - Icon-only button with Moon/Sun icons (Lucide React)
-   - Mounted state check to prevent hydration mismatch
-   - Framer Motion icon animation (rotate 90deg, fade in/out)
-   - ARIA labels: `aria-label="Toggle dark mode"`, `role="switch"`, `aria-checked={theme === 'dark'}`
-   - Keyboard handlers: Enter/Space trigger toggle
-   - Screen reader announcement via live region
-
-5. **Add to TopNav** (15m)
-   - Insert `<ThemeToggle />` in `components/navigation/TopNav.tsx`
-   - Position between Library link and UserButton (right side)
-
-**Deliverable:** Functional theme toggle, theme persists across sessions, zero FOUC.
-
-**Validation:**
-- Clicking toggle switches theme instantly
-- Refreshing page maintains theme choice
-- System preference respected for first-time visitors
-- No hydration errors in console
-
----
-
-### Phase 3: Visual QA & Polish (2-3 hours) - Sprint Week 1
-
-**Goal:** Ensure all components look excellent in dark mode, fix contrast issues.
-
-**Tasks:**
-1. **High-Priority Components** (1.5h)
-   - Landing page (`app/page.tsx`): Test hero gradient, dot pattern, film grain
-   - Library grid (`app/(dashboard)/library/page.tsx`): Book tiles, hover states, shadows
-   - Book detail (`app/(dashboard)/library/books/[id]/page.tsx`): Surface elevation, note cards
-   - TopNav/Masthead: Active link states, UserButton contrast
-   - Forms (Add Book sheet): Input borders, focus rings, validation errors
-
-2. **Medium-Priority Components** (1h)
-   - Modals/Dialogs: Backdrop opacity, surface contrast
-   - Dropdowns: Menu backgrounds, hover states
-   - Toasts: Status colors (positive, warning, danger) on dark bg
-   - Loading skeletons: Shimmer animation visibility
-   - Empty states: Icon and text contrast
-
-3. **Contrast Validation** (30m)
-   - Use WebAIM Contrast Checker on:
-     - Normal text: `text.ink` on `canvas.bone` (target: ≥4.5:1)
-     - Muted text: `text.inkMuted` on `canvas.bone` (target: ≥4.5:1)
-     - Accent red: `accent.ember` on `canvas.bone` (target: ≥4.5:1)
-   - Adjust colors if any fail WCAG AA
-
-4. **Shadow Adjustments** (15m)
-   - Test Surface component elevation in dark mode
-   - If shadows too subtle, increase `elevationDark` alpha values
-   - Target: Clearly visible depth without harsh edges
-
-**Deliverable:** All components render beautifully in dark mode, WCAG AA compliant.
-
-**Validation:**
-- Manual QA checklist: 52 components tested in both themes
-- Contrast ratios documented (screenshot + ratios)
-- No invisible text, broken states, or contrast failures
+**Key Design Decisions**:
+1. Uses `action` (not `internalAction`) — called directly from client
+2. No auth required — search is public
+3. 5s timeout via `AbortSignal.timeout()` — fail fast
+4. ISBN-13 preferred — modern standard
+5. Graceful handling of missing fields
 
 ---
 
-### Phase 4: Accessibility & Edge Cases (1 hour) - Sprint Week 1
+### File 2: `hooks/useBookSearch.ts`
 
-**Goal:** Ensure keyboard navigation, screen reader support, and error handling.
+**Purpose**: React hook managing search state with debouncing
 
-**Tasks:**
-1. **Keyboard Navigation** (15m)
-   - Test Tab order: Library → ThemeToggle → UserButton
-   - Test Enter/Space keys activate toggle
-   - Test focus indicator visible in both themes
+**Full Implementation**:
 
-2. **Screen Reader Testing** (20m)
-   - Test VoiceOver (macOS) or NVDA (Windows)
-   - Verify toggle announced as "Toggle dark mode, switch, checked/unchecked"
-   - Verify theme change announced "Switched to dark mode"
+```typescript
+import { useState, useEffect, useCallback } from "react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { BookSearchResult } from "@/convex/actions/bookSearch";
 
-3. **Error Handling** (15m)
-   - Test localStorage blocked (private browsing): Falls back to system preference
-   - Test JS disabled: Uses CSS media query fallback
-   - Test rapid toggling: No visual jank or state corruption
+// Re-export type for consumers
+export type { BookSearchResult };
 
-4. **Reduced Motion** (10m)
-   - Enable `prefers-reduced-motion` in OS settings
-   - Verify theme toggle has no animation
-   - Verify film grain doesn't animate (static texture)
+const DEBOUNCE_MS = 300;
+const MIN_QUERY_LENGTH = 2;
 
-**Deliverable:** Fully accessible theme switcher, graceful degradation for edge cases.
+/**
+ * Custom debounce hook
+ * Returns debounced value after delay
+ */
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
 
-**Validation:**
-- WCAG 2.2 AA compliance (keyboard + screen reader)
-- No console errors with localStorage blocked
-- Smooth experience for motion-sensitive users
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+/**
+ * Hook return type
+ */
+export type UseBookSearchReturn = {
+  /** Current search query */
+  query: string;
+  /** Update search query */
+  setQuery: (query: string) => void;
+  /** Search results (empty array if none) */
+  results: BookSearchResult[];
+  /** True while API call in progress */
+  isLoading: boolean;
+  /** Error message if search failed */
+  error: string | null;
+  /** Clear query and results */
+  clear: () => void;
+  /** True if query is long enough to trigger search */
+  isQueryValid: boolean;
+};
+
+/**
+ * Hook for searching books via Open Library API
+ *
+ * Features:
+ * - Debounced input (300ms)
+ * - Loading and error states
+ * - Automatic search on query change
+ * - Minimum query length validation
+ *
+ * @example
+ * ```tsx
+ * const { query, setQuery, results, isLoading, error } = useBookSearch();
+ * ```
+ */
+export function useBookSearch(): UseBookSearchReturn {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<BookSearchResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const searchBooks = useAction(api.actions.bookSearch.searchBooks);
+  const debouncedQuery = useDebounce(query, DEBOUNCE_MS);
+
+  const isQueryValid = debouncedQuery.trim().length >= MIN_QUERY_LENGTH;
+
+  // Trigger search when debounced query changes
+  useEffect(() => {
+    // Clear results if query too short
+    if (!isQueryValid) {
+      setResults([]);
+      setError(null);
+      return;
+    }
+
+    // Perform search
+    const performSearch = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const searchResults = await searchBooks({ query: debouncedQuery });
+        setResults(searchResults);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setError(err instanceof Error ? err.message : "Search failed. Please try again.");
+        setResults([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    performSearch();
+  }, [debouncedQuery, isQueryValid, searchBooks]);
+
+  // Clear function
+  const clear = useCallback(() => {
+    setQuery("");
+    setResults([]);
+    setError(null);
+  }, []);
+
+  return {
+    query,
+    setQuery,
+    results,
+    isLoading,
+    error,
+    clear,
+    isQueryValid,
+  };
+}
+```
+
+**Key Design Decisions**:
+1. Custom `useDebounce` — no external dependency
+2. `isQueryValid` exposed — UI can show "type more" hint
+3. `clear()` function — for explicit reset
+4. Error messages preserved — show to user
 
 ---
 
-## Risks & Mitigation
+### File 3: `components/book/BookSearchResultItem.tsx`
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|-----------|--------|------------|
-| **Warm dark palette fails WCAG contrast** | Medium | High | Test all color pairings with WebAIM checker before launch; start with pure inversion (guaranteed AA), warm incrementally |
-| **Film grain too strong in dark mode** | Medium | Low | Test opacity levels (0.3, 0.4, 0.5, 0.6); use `screen` blend-mode; solicit user feedback |
-| **Shadows invisible on dark backgrounds** | Medium | Medium | Increase `elevationDark` alpha values (0.40, 0.60); test on actual dark displays, not bright monitors |
-| **Hydration mismatch errors** | Low | High | Use `suppressHydrationWarning`, mounted state check in toggle; follow next-themes patterns exactly |
-| **Performance regression** | Low | Medium | Measure bundle size increase (<30% acceptable); test theme switch latency (<50ms target) |
-| **Clerk components don't respect theme** | Low | Medium | Clerk uses CSS variables by default; if issues, add custom appearance config |
-| **Hardcoded colors missed in QA** | Medium | Low | Use ast-grep to find remaining hardcoded Tailwind colors; automated search reduces manual review burden |
+**Purpose**: Single search result row component
+
+**Full Implementation**:
+
+```typescript
+import Image from "next/image";
+import { cn } from "@/lib/utils";
+import type { BookSearchResult } from "@/hooks/useBookSearch";
+
+type BookSearchResultItemProps = {
+  /** Search result data */
+  result: BookSearchResult;
+  /** Called when item is clicked/selected */
+  onSelect: (result: BookSearchResult) => void;
+  /** True if this item is currently highlighted (keyboard nav) */
+  isHighlighted?: boolean;
+  /** Index in list (for aria) */
+  index: number;
+};
+
+/**
+ * Placeholder image for books without covers
+ * Simple SVG book icon
+ */
+const PLACEHOLDER_COVER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='60' viewBox='0 0 40 60'%3E%3Crect fill='%23E5E0D5' width='40' height='60'/%3E%3Cpath fill='%23A39E93' d='M10 15h20v2H10zm0 6h20v2H10zm0 6h14v2H10z'/%3E%3C/svg%3E";
+
+/**
+ * Individual search result item
+ * Displays cover thumbnail, title, author, and year
+ */
+export function BookSearchResultItem({
+  result,
+  onSelect,
+  isHighlighted = false,
+  index,
+}: BookSearchResultItemProps) {
+  const handleClick = () => {
+    onSelect(result);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onSelect(result);
+    }
+  };
+
+  return (
+    <div
+      role="option"
+      aria-selected={isHighlighted}
+      id={`search-result-${index}`}
+      tabIndex={-1}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "flex cursor-pointer items-center gap-3 px-3 py-2 transition-colors",
+        isHighlighted
+          ? "bg-canvas-boneMuted"
+          : "hover:bg-canvas-boneMuted/50"
+      )}
+    >
+      {/* Cover Thumbnail */}
+      <div className="relative h-[60px] w-[40px] flex-shrink-0 overflow-hidden rounded-sm bg-canvas-boneMuted">
+        <Image
+          src={result.coverUrl ?? PLACEHOLDER_COVER}
+          alt=""
+          fill
+          sizes="40px"
+          className="object-cover"
+          unoptimized={!result.coverUrl} // Don't optimize placeholder
+        />
+      </div>
+
+      {/* Text Content */}
+      <div className="min-w-0 flex-1">
+        {/* Title */}
+        <p className="truncate font-display text-sm font-medium text-text-ink">
+          {result.title}
+        </p>
+        {/* Author and Year */}
+        <p className="truncate text-xs text-text-inkMuted">
+          {result.author}
+          {result.publishedYear && (
+            <span className="ml-1 text-text-inkSubtle">
+              · {result.publishedYear}
+            </span>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+**Key Design Decisions**:
+1. SVG placeholder — no external image dependency
+2. `aria-selected` and `role="option"` — accessibility
+3. Keyboard support — Enter/Space to select
+4. Truncation — handles long titles gracefully
 
 ---
 
-## Key Decisions
+### File 4: `components/book/BookSearchInput.tsx`
 
-### Decision 1: Warm Dark Mode (vs Pure Inversion)
+**Purpose**: Search input with dropdown results
 
-**What:** Dark mode uses warm charcoals and browns (#1C1917, #292524) instead of pure blacks and grays (#000000, #333333).
+**Full Implementation**:
 
-**Alternatives:**
-- Pure inversion (blacks/grays): Guaranteed WCAG compliance, fast implementation, but loses warm bibliophile brand
-- High-contrast (true black): Maximum accessibility, but feels sterile and un-branded
+```typescript
+"use client";
 
-**Rationale:**
-- **User Value:** Maintains "Tactile Intellectual" brand identity; dark mode feels like extension of light theme, not generic mode
-- **Simplicity:** Reuses warm aesthetic (brown undertones); users recognize brand continuity
-- **Explicitness:** Warm palette documented in design tokens; clear intent
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Search, X, Loader2 } from "lucide-react";
+import { useBookSearch, type BookSearchResult } from "@/hooks/useBookSearch";
+import { BookSearchResultItem } from "./BookSearchResultItem";
+import { cn } from "@/lib/utils";
 
-**Tradeoffs:**
-- Harder to execute (contrast risk requires testing)
-- Slightly longer implementation (color calibration) vs pure inversion
-- **Accepted because:** Brand differentiation > speed of implementation
+type BookSearchInputProps = {
+  /** Called when user selects a search result */
+  onSelect: (result: BookSearchResult) => void;
+  /** Placeholder text */
+  placeholder?: string;
+  /** Auto-focus input on mount */
+  autoFocus?: boolean;
+  /** Disable input */
+  disabled?: boolean;
+};
+
+/**
+ * Book search input with dropdown results
+ *
+ * Features:
+ * - Debounced search (300ms)
+ * - Loading spinner
+ * - Keyboard navigation (↑/↓, Enter, Escape)
+ * - Click outside to close
+ * - Error handling with retry hint
+ */
+export function BookSearchInput({
+  onSelect,
+  placeholder = "Search by title or author...",
+  autoFocus = false,
+  disabled = false,
+}: BookSearchInputProps) {
+  const { query, setQuery, results, isLoading, error, clear, isQueryValid } =
+    useBookSearch();
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Open dropdown when results exist
+  useEffect(() => {
+    if (results.length > 0 || (isQueryValid && (isLoading || error))) {
+      setIsOpen(true);
+      setHighlightedIndex(-1);
+    }
+  }, [results, isQueryValid, isLoading, error]);
+
+  // Close dropdown when query cleared
+  useEffect(() => {
+    if (!query.trim()) {
+      setIsOpen(false);
+    }
+  }, [query]);
+
+  // Handle click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle keyboard navigation
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!isOpen) return;
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setHighlightedIndex((prev) =>
+            prev < results.length - 1 ? prev + 1 : prev
+          );
+          break;
+
+        case "ArrowUp":
+          e.preventDefault();
+          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+          break;
+
+        case "Enter":
+          e.preventDefault();
+          if (highlightedIndex >= 0 && results[highlightedIndex]) {
+            handleSelect(results[highlightedIndex]);
+          }
+          break;
+
+        case "Escape":
+          e.preventDefault();
+          setIsOpen(false);
+          inputRef.current?.focus();
+          break;
+      }
+    },
+    [isOpen, results, highlightedIndex]
+  );
+
+  // Handle selection
+  const handleSelect = (result: BookSearchResult) => {
+    onSelect(result);
+    clear();
+    setIsOpen(false);
+  };
+
+  // Handle clear button
+  const handleClear = () => {
+    clear();
+    setIsOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const showDropdown = isOpen && (results.length > 0 || isLoading || error);
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Input Container */}
+      <div className="relative">
+        {/* Search Icon */}
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-inkSubtle" />
+
+        {/* Input */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
+            if (results.length > 0) setIsOpen(true);
+          }}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoFocus={autoFocus}
+          autoComplete="off"
+          aria-label="Search for books"
+          aria-expanded={showDropdown}
+          aria-haspopup="listbox"
+          aria-controls="search-results"
+          aria-activedescendant={
+            highlightedIndex >= 0 ? `search-result-${highlightedIndex}` : undefined
+          }
+          className={cn(
+            "w-full rounded-md border border-line-ghost bg-canvas-bone py-2.5 pl-10 pr-10 text-sm text-text-ink placeholder:text-text-inkSubtle",
+            "focus:border-text-inkMuted focus:outline-none focus:ring-1 focus:ring-text-inkMuted",
+            "disabled:cursor-not-allowed disabled:opacity-50"
+          )}
+        />
+
+        {/* Loading Spinner or Clear Button */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {isLoading ? (
+            <Loader2 className="h-4 w-4 animate-spin text-text-inkSubtle" />
+          ) : query ? (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-text-inkSubtle hover:text-text-ink"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Dropdown */}
+      {showDropdown && (
+        <div
+          id="search-results"
+          role="listbox"
+          className="absolute z-50 mt-1 max-h-[320px] w-full overflow-auto rounded-md border border-line-ghost bg-canvas-bone shadow-lg"
+        >
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-8 text-sm text-text-inkMuted">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Searching...
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && !isLoading && (
+            <div className="px-4 py-8 text-center text-sm text-text-inkMuted">
+              <p className="text-accent-ember">{error}</p>
+              <p className="mt-1">Try a different search term.</p>
+            </div>
+          )}
+
+          {/* No Results State */}
+          {!isLoading && !error && results.length === 0 && isQueryValid && (
+            <div className="px-4 py-8 text-center text-sm text-text-inkMuted">
+              <p>No books found for "{query}"</p>
+              <p className="mt-1">Try different keywords or add manually below.</p>
+            </div>
+          )}
+
+          {/* Results */}
+          {!isLoading && !error && results.length > 0 && (
+            <div className="py-1">
+              {results.map((result, index) => (
+                <BookSearchResultItem
+                  key={result.apiId}
+                  result={result}
+                  onSelect={handleSelect}
+                  isHighlighted={index === highlightedIndex}
+                  index={index}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+**Key Design Decisions**:
+1. Full keyboard support — arrows, enter, escape
+2. ARIA attributes — screen reader accessible
+3. Click outside closes — standard UX pattern
+4. Three states in dropdown — loading, error, results
+5. "Add manually" hint — guides user when search fails
 
 ---
 
-### Decision 2: next-themes Library (vs Vanilla Implementation)
+### File 5: Modifications to `components/book/AddBookSheet.tsx`
 
-**What:** Use `next-themes` (1.2kb) for theme state management instead of custom React Context.
+**Changes Required**:
 
-**Alternatives:**
-- Vanilla React Context: Zero dependencies, full control, but requires custom FOUC prevention (3-4h extra work)
-- Pure CSS media query: Simplest possible, but no manual override
+#### 1. Add New State Variables (after line 78)
 
-**Rationale:**
-- **User Value:** Zero FOUC, instant theme switching, persistent preferences
-- **Simplicity:** 30m integration vs 4h custom implementation; battle-tested solution
-- **Explicitness:** next-themes API is well-documented; team can reference official docs
+```typescript
+// Search-related state
+const [apiId, setApiId] = useState<string | undefined>(undefined);
+const [apiSource, setApiSource] = useState<"open-library" | "manual">("manual");
+const [isbn, setIsbn] = useState("");
+const [publishedYear, setPublishedYear] = useState("");
+const [pageCount, setPageCount] = useState("");
+const [apiCoverUrl, setApiCoverUrl] = useState<string | undefined>(undefined);
+```
 
-**Tradeoffs:**
-- +1.2kb bundle size (acceptable for FOUC prevention value)
-- External dependency (mitigated by library maturity: 2 years, 20k stars)
-- **Accepted because:** FOUC prevention is critical for polish; reinventing solved problem wastes time
+#### 2. Add Import for BookSearchInput (line 1-15 area)
+
+```typescript
+import { BookSearchInput, type BookSearchResult } from "./BookSearchInput";
+```
+
+#### 3. Add Handler for Book Selection (after handleRemoveCover, ~line 160)
+
+```typescript
+/**
+ * Handle selection of search result
+ * Pre-fills form with book data from Open Library
+ */
+const handleBookSelected = (result: BookSearchResult) => {
+  // Set basic fields
+  setTitle(result.title);
+  setAuthor(result.author);
+
+  // Set optional fields
+  setIsbn(result.isbn ?? "");
+  setPublishedYear(result.publishedYear?.toString() ?? "");
+  setPageCount(result.pageCount?.toString() ?? "");
+
+  // Set API tracking fields
+  setApiId(result.apiId);
+  setApiSource("open-library");
+
+  // Set cover if available
+  if (result.coverUrl) {
+    setCoverPreview(result.coverUrl);
+    setApiCoverUrl(result.coverUrl);
+    setCoverFile(null); // Clear any uploaded file
+  }
+};
+```
+
+#### 4. Update handleClose to Reset New Fields (line ~93-105)
+
+```typescript
+const handleClose = useCallback(() => {
+  setIsOpen(false);
+  // Reset form
+  setTitle("");
+  setAuthor("");
+  setStatus("currently-reading");
+  setCoverFile(null);
+  setCoverPreview(null);
+  setError(null);
+  setIsFavorite(false);
+  setIsAudiobook(false);
+  setDateFinished("");
+  // Reset new fields
+  setIsbn("");
+  setPublishedYear("");
+  setPageCount("");
+  setApiId(undefined);
+  setApiSource("manual");
+  setApiCoverUrl(undefined);
+}, [setIsOpen]);
+```
+
+#### 5. Update handleSubmit to Include New Fields (line ~192-201)
+
+```typescript
+// Create book
+await createBook({
+  title: trimmedTitle,
+  author: trimmedAuthor,
+  status,
+  coverUrl,
+  isAudiobook,
+  isFavorite,
+  dateFinished: status === "read" ? dateFinishedTimestamp : undefined,
+  apiSource,
+  apiId,
+  apiCoverUrl,
+  isbn: isbn.trim() || undefined,
+  publishedYear: publishedYear ? parseInt(publishedYear, 10) : undefined,
+  pageCount: pageCount ? parseInt(pageCount, 10) : undefined,
+});
+```
+
+#### 6. Add BookSearchInput to Form (after SideSheet title, before Cover Upload ~line 240)
+
+```tsx
+<SideSheet open={isOpen} onOpenChange={setIsOpen} title="Add Book">
+  <form onSubmit={handleSubmit} className="space-y-8">
+    {/* Book Search */}
+    <div>
+      <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+        Search
+      </label>
+      <BookSearchInput
+        onSelect={handleBookSelected}
+        disabled={isSubmitting}
+        autoFocus
+      />
+      <p className="mt-2 text-xs text-text-inkSubtle">
+        Search by title or author, or fill in manually below.
+      </p>
+    </div>
+
+    {/* Divider */}
+    <div className="flex items-center gap-4">
+      <div className="h-px flex-1 bg-line-ghost" />
+      <span className="text-xs text-text-inkSubtle">or enter manually</span>
+      <div className="h-px flex-1 bg-line-ghost" />
+    </div>
+
+    {/* Cover Upload */}
+    {/* ... existing code ... */}
+```
+
+#### 7. Add ISBN Field (after Author field, ~line 332)
+
+```tsx
+{/* ISBN */}
+<div>
+  <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+    ISBN
+  </label>
+  <Input
+    type="text"
+    value={isbn}
+    onChange={(e) => setIsbn(e.target.value)}
+    placeholder="9780441013593"
+    disabled={isSubmitting}
+    className="font-mono"
+  />
+</div>
+```
+
+#### 8. Add Page Count and Year Fields (optional, after ISBN)
+
+```tsx
+{/* Additional Metadata (collapsed by default for simplicity) */}
+<div className="grid grid-cols-2 gap-4">
+  <div>
+    <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+      Published Year
+    </label>
+    <Input
+      type="text"
+      inputMode="numeric"
+      value={publishedYear}
+      onChange={(e) => setPublishedYear(e.target.value.replace(/\D/g, ""))}
+      placeholder="1965"
+      disabled={isSubmitting}
+      maxLength={4}
+    />
+  </div>
+  <div>
+    <label className="mb-3 block font-mono text-xs uppercase tracking-wider text-text-inkMuted">
+      Page Count
+    </label>
+    <Input
+      type="text"
+      inputMode="numeric"
+      value={pageCount}
+      onChange={(e) => setPageCount(e.target.value.replace(/\D/g, ""))}
+      placeholder="604"
+      disabled={isSubmitting}
+    />
+  </div>
+</div>
+```
 
 ---
 
-### Decision 3: System Preference as Default (vs Light-Only Default)
+## UI/UX Specifications
 
-**What:** First-time visitors see theme matching their OS preference; manual override takes precedence after first toggle.
+### Search Input Behavior
 
-**Alternatives:**
-- Always light mode: Simpler (no system detection), but ignores accessibility preference
-- Always dark mode: Polarizing (some users dislike dark mode)
+| State | Visual | Behavior |
+|-------|--------|----------|
+| Empty | Placeholder text | No dropdown |
+| Typing (<2 chars) | User input | No dropdown |
+| Typing (≥2 chars) | User input | Wait 300ms, show loading |
+| Loading | Spinner in dropdown | Show "Searching..." |
+| Results | List of books | Show results (max 10) |
+| No Results | Empty state message | Show "No books found" + hint |
+| Error | Error message | Show error + retry hint |
 
-**Rationale:**
-- **User Value:** Respects accessibility choices; users with photophobia get dark mode automatically
-- **Simplicity:** Modern expectation (most apps now support system preference)
-- **Explicitness:** Clear hierarchy: Manual > System > Light fallback
+### Keyboard Navigation
 
-**Tradeoffs:**
-- Slightly complex preference logic (priority hierarchy)
-- **Accepted because:** Accessibility > simplicity; modern UX standard in 2025
+| Key | Action |
+|-----|--------|
+| `↓` Arrow Down | Move highlight down |
+| `↑` Arrow Up | Move highlight up |
+| `Enter` | Select highlighted item |
+| `Escape` | Close dropdown, focus input |
+| `Tab` | Close dropdown, move focus |
 
----
+### Result Item Layout
 
-### Decision 4: TopNav Toggle Placement (vs Settings Page)
+```
+┌─────────────────────────────────────────────────────┐
+│ ┌───────┐                                           │
+│ │       │  Title of the Book                        │
+│ │ Cover │  Author Name · 1965                       │
+│ │       │                                           │
+│ └───────┘                                           │
+└─────────────────────────────────────────────────────┘
+  40x60px    Truncated if too long
+```
 
-**What:** Theme toggle appears in TopNav (always visible) as icon-only button.
+### Form Flow After Selection
 
-**Alternatives:**
-- Settings page: Hidden until user navigates to settings (reduces clutter but adds friction)
-- Dropdown menu: Grouped with user actions (cleaner but requires extra click)
-
-**Rationale:**
-- **User Value:** Zero-click access; users switch themes frequently (morning bright → evening dim)
-- **Simplicity:** No navigation required; toggle visible in all app states
-- **Explicitness:** Icon (Moon/Sun) is universal symbol for dark mode
-
-**Tradeoffs:**
-- Adds one element to TopNav (mitigated by icon-only, no text label)
-- **Accepted because:** Reading apps especially benefit from instant theme access
-
----
-
-### Decision 5: CSS Variable Cascade (vs `dark:` Tailwind Variants)
-
-**What:** Components rely on CSS variable cascade (99% adapt automatically) instead of explicit `dark:` variants on every class.
-
-**Alternatives:**
-- Explicit `dark:` variants: `className="bg-white dark:bg-black text-black dark:text-white"` on every element
-- CSS-only (no JS toggle): Pure media query approach (no manual override)
-
-**Rationale:**
-- **User Value:** Same (both approaches work visually)
-- **Simplicity:** Zero component changes vs 1000+ class additions; maintains deep module architecture
-- **Explicitness:** All theme logic in token JSON, not scattered across 52 components
-
-**Tradeoffs:**
-- Less granular control (can't easily make one component darker than others)
-- **Accepted because:** Consistency > granularity; design system should be cohesive, not piecemeal
+1. User selects result
+2. Search input clears
+3. Form fields populate:
+   - Title ✓
+   - Author ✓
+   - ISBN ✓
+   - Cover preview ✓ (if available)
+   - Published Year ✓
+   - Page Count ✓
+4. User can edit any field
+5. User selects status and flags
+6. User clicks "Add Book"
 
 ---
 
 ## Test Scenarios
 
-### Happy Path
-- ✅ User with dark OS preference visits site → sees dark theme immediately
-- ✅ User with light OS preference visits site → sees light theme immediately
-- ✅ User clicks toggle to dark mode → theme switches instantly (<50ms)
-- ✅ User refreshes page → dark mode persists
-- ✅ User navigates between pages → theme remains consistent
-- ✅ User opens new tab → same theme as original tab (localStorage shared)
+### Unit Tests: `convex/actions/bookSearch.ts`
 
-### System Preference Changes
-- ✅ User changes OS to dark while app open (no manual override) → app updates to dark
-- ✅ User changes OS to light while app open with manual override → app ignores (stays dark)
-- ✅ User clears localStorage → falls back to system preference
+| Test | Input | Expected |
+|------|-------|----------|
+| Valid query returns results | `"dune"` | Array of BookSearchResult |
+| Empty query returns empty | `""` | `[]` |
+| Short query returns empty | `"a"` | `[]` |
+| Whitespace query returns empty | `"   "` | `[]` |
+| Prefers ISBN-13 | `isbns: ["1234567890", "9781234567890"]` | `"9781234567890"` |
+| Falls back to ISBN-10 | `isbns: ["1234567890"]` | `"1234567890"` |
+| Builds cover URL | `cover_i: 12345` | `"https://covers.openlibrary.org/b/id/12345-M.jpg"` |
+| Handles missing cover | `cover_i: undefined` | `undefined` |
+| Joins multiple authors | `author_name: ["A", "B"]` | `"A, B"` |
+| Handles API timeout | Network delay >5s | Throws "Search timed out" |
+| Handles API error | 500 response | Throws "Search failed" |
 
-### Persistence & State
-- ✅ User manually toggles to dark, then changes OS to light → stays dark (manual > system)
-- ✅ User toggles back to "system" mode → respects OS changes again
-- ✅ User with no localStorage visits → uses system preference
-- ✅ User clears browser data → resets to system preference
+### Unit Tests: `hooks/useBookSearch.ts`
 
-### Visual Quality
-- ✅ All text has ≥4.5:1 contrast (WCAG AA normal text)
-- ✅ Film grain visible but not overpowering in dark mode
-- ✅ Shadows create depth on dark backgrounds (cards elevated)
-- ✅ Landing page gradients look intentional (not broken)
-- ✅ Book covers (user uploads) legible against dark cards
-- ✅ Clerk UserButton respects theme
+| Test | Action | Expected |
+|------|--------|----------|
+| Initial state | Mount | `query: "", results: [], isLoading: false` |
+| Query update | `setQuery("dune")` | `query: "dune"` |
+| Debounce | Type "dune" quickly | API called once after 300ms |
+| Loading state | Query changes | `isLoading: true` while fetching |
+| Results populate | API returns | `results: [...]` |
+| Error state | API throws | `error: "message"` |
+| Clear function | `clear()` | `query: "", results: []` |
+| isQueryValid | Query "a" | `isQueryValid: false` |
+| isQueryValid | Query "ab" | `isQueryValid: true` |
 
-### Component Coverage
-- ✅ TopNav/Masthead render correctly in dark mode
-- ✅ BookTile cards have proper contrast (text, borders, shadows)
-- ✅ BookGrid layout works (no invisible elements)
-- ✅ Modals/dialogs have appropriate backdrop opacity
-- ✅ Forms: inputs, labels, validation errors visible
-- ✅ Toasts: status colors stand out (green, yellow, red)
-- ✅ Loading skeletons match theme
-- ✅ Empty states render correctly
+### Component Tests: `BookSearchInput.tsx`
 
-### Edge Cases
-- ✅ `prefers-reduced-motion: reduce` → no toggle animation
-- ✅ JavaScript disabled → CSS media query fallback works
-- ✅ Slow connection → no FOUC during hydration
-- ✅ Rapid toggling (5x in 1 second) → no jank or state corruption
-- ✅ localStorage blocked (private browsing) → falls back to system, no errors
+| Test | Action | Expected |
+|------|--------|----------|
+| Renders input | Mount | Input visible with placeholder |
+| Shows loading | Type query | Spinner appears after debounce |
+| Shows results | API returns | Dropdown with results |
+| Keyboard down | Press ↓ | First result highlighted |
+| Keyboard up | Press ↑ | Previous result highlighted |
+| Keyboard enter | Press Enter on highlighted | `onSelect` called |
+| Keyboard escape | Press Escape | Dropdown closes |
+| Click result | Click item | `onSelect` called, dropdown closes |
+| Click outside | Click outside | Dropdown closes |
+| Clear button | Click X | Query and results clear |
 
-### Browser Compatibility
-- ✅ Chrome/Edge (latest)
-- ✅ Firefox (latest)
-- ✅ Safari macOS (latest)
-- ✅ Safari iOS (latest)
-- ✅ Chrome Mobile (latest)
+### Integration Tests (Manual QA)
 
-### Performance
-- ✅ Theme switch <50ms
-- ✅ No layout shift on toggle
-- ✅ CSS bundle increase <30%
-- ✅ No forced reflow/repaint
-- ✅ Lighthouse performance score unchanged
-
-### Accessibility
-- ✅ Toggle has `aria-label="Toggle dark mode"`
-- ✅ Tab key reaches toggle (keyboard navigation)
-- ✅ Enter/Space activates toggle
-- ✅ Screen reader announces "Switched to dark mode"
-- ✅ Focus indicator visible in both themes
-- ✅ Reduced motion respected (no animations)
+- [ ] Search "Dune" returns results with covers
+- [ ] Search "xyzabc123" returns "no results" message
+- [ ] Selecting result pre-fills all form fields
+- [ ] Cover from search displays in preview
+- [ ] Can change cover after search selection
+- [ ] Can edit title/author after selection
+- [ ] ISBN field shows and is editable
+- [ ] Book saves with `apiSource: "open-library"`
+- [ ] Book saves with `apiId` from search
+- [ ] Manual entry still works (ignore search)
+- [ ] Form resets completely when closed
+- [ ] Works with slow network (loading state shows)
+- [ ] Works with offline (error state shows)
 
 ---
 
-## Jobs Concern: Focus vs Features
+## Accessibility Requirements
 
-**Jobs Review Summary:** Recommended deferring dark mode to focus on higher-value features (Google Books search, JSON export) that drive user acquisition over retention. Dark mode serves existing power users but doesn't solve adoption barriers.
-
-**Response:**
-- **Acknowledged:** Book search and export are next priorities after this sprint
-- **Rationale for Proceeding:** Dark mode addresses accessibility need (photophobia, eye strain), not just aesthetic preference
-- **Competitive Context:** 70%+ of book tracking apps support dark mode; absence feels dated in 2025
-- **Time Boxed:** 7-hour sprint with clear scope; not ongoing distraction from core features
-- **Compounding Value:** Dark mode infrastructure enables instant theming for all future components
-
-**Commitment:** Ship dark mode in 1 week sprint, immediately pivot to book search (10x add speed) and export (removes adoption barrier).
+| Requirement | Implementation |
+|-------------|----------------|
+| Screen reader announces results | `role="listbox"` on dropdown |
+| Screen reader reads selected item | `aria-activedescendant` updates |
+| Keyboard-only usable | Full arrow/enter/escape support |
+| Focus visible | Focus ring on input |
+| Clear button labeled | `aria-label="Clear search"` |
+| Loading announced | Spinner visible, text says "Searching..." |
 
 ---
 
-## Success Metrics (Post-Launch)
+## Error Handling
 
-**1 Week Post-Launch:**
-- Dark mode adoption rate: % of users who manually toggle (target: >30%)
-- Theme preference distribution: system vs manual, light vs dark
-- Error rate: hydration errors, FOUC reports (target: <0.1%)
-
-**1 Month Post-Launch:**
-- Evening engagement: +20% DAU in 7pm-11pm hours (hypothesis: dark mode reduces eye strain)
-- Session duration: +10% average session length in dark mode users
-- Retention: Dark mode users have +5% week-2 retention (comfort → habit formation)
-
-**Accessibility Impact:**
-- User feedback: Survey dark mode users on eye strain reduction (qualitative)
-- Support tickets: -50% "too bright" / "can't read at night" complaints
+| Error | User Message | Recovery |
+|-------|--------------|----------|
+| Network timeout | "Search timed out. Please try again." | Type new query |
+| API 500 error | "Search failed. Please try again." | Type new query |
+| No results | "No books found for 'X'. Try different keywords or add manually below." | Edit query or use form |
+| Rate limited | "Search failed. Please try again." | Wait, then retry |
 
 ---
 
-## Next Steps
+## Performance Considerations
 
-1. ✅ **Spec approved** → Begin Phase 1 (Foundation)
-2. Run `/plan` to break PRD into tactical implementation tasks
-3. Execute 7-hour sprint (Phases 1-4)
-4. Manual QA with checklist (all 52 components tested)
-5. Ship to production (no feature flag, full launch)
-6. Monitor success metrics (1 week check-in)
-7. **Immediately pivot to book search implementation** (Jobs priority)
+1. **Debounce**: 300ms delay prevents API spam during typing
+2. **Limited results**: Max 10 results reduces payload size
+3. **Minimal fields**: Only request needed fields from API
+4. **Lazy cover loading**: Next.js Image handles lazy loading
+5. **No caching**: Fresh results each search (API is fast)
 
 ---
 
-**PRD Version:** 1.0
-**Last Updated:** 2025-11-26
-**Author:** AI Spec (Jobs + UX + Design Systems synthesis)
-**Status:** Ready for Implementation
+## Security Considerations
+
+1. **No API key**: Open Library is public, no secrets to protect
+2. **User-Agent header**: Identifies app, not sensitive
+3. **Input sanitization**: Query is URL-encoded automatically
+4. **No PII**: Search queries not logged
+5. **XSS prevention**: React escapes all rendered text
+
+---
+
+## Files Summary
+
+### New Files
+
+| File | Purpose | Lines Est. |
+|------|---------|------------|
+| `convex/actions/bookSearch.ts` | Open Library search action | ~100 |
+| `hooks/useBookSearch.ts` | Search hook with debounce | ~80 |
+| `components/book/BookSearchInput.tsx` | Search input + dropdown | ~180 |
+| `components/book/BookSearchResultItem.tsx` | Result row component | ~60 |
+
+### Modified Files
+
+| File | Changes |
+|------|---------|
+| `components/book/AddBookSheet.tsx` | +BookSearchInput, +ISBN field, +new state |
+
+---
+
+## Implementation Checklist
+
+### Phase 1: Backend (30 min)
+- [ ] Create `convex/actions/bookSearch.ts`
+- [ ] Test action in Convex dashboard
+- [ ] Verify response mapping
+
+### Phase 2: Hook (30 min)
+- [ ] Create `hooks/useBookSearch.ts`
+- [ ] Test debounce behavior
+- [ ] Verify error handling
+
+### Phase 3: UI Components (2 hours)
+- [ ] Create `BookSearchResultItem.tsx`
+- [ ] Create `BookSearchInput.tsx`
+- [ ] Test keyboard navigation
+- [ ] Test click handling
+- [ ] Verify loading/error states
+
+### Phase 4: Integration (1 hour)
+- [ ] Add imports to `AddBookSheet.tsx`
+- [ ] Add new state variables
+- [ ] Add `handleBookSelected`
+- [ ] Add search input to form
+- [ ] Add ISBN field
+- [ ] Update form submission
+- [ ] Update form reset
+
+### Phase 5: Testing (1 hour)
+- [ ] Run through all manual QA tests
+- [ ] Fix any bugs found
+- [ ] Test accessibility with screen reader
+- [ ] Test on mobile viewport
+
+---
+
+## Open Questions
+
+None — ready for implementation.
+
+---
+
+**Last Updated**: 2025-11-29
+**Author**: Claude (spec generation)
+**Reviewers**: [pending]
