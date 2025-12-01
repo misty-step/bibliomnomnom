@@ -535,6 +535,17 @@ export async function fetchMissingCoversHandler(
     bookIds: args.bookIds,
   });
 
+  // Safety check: If we get an empty page but a cursor, it's a pagination anomaly.
+  // Return null to prevent infinite loops in the client.
+  if (targets.items.length === 0 && targets.nextCursor) {
+    return {
+      processed: 0,
+      updated: 0,
+      failures: [],
+      nextCursor: null,
+    };
+  }
+
   let processed = 0;
   let updated = 0;
   const failures: { bookId: Id<"books">; reason: string }[] = [];
