@@ -1,5 +1,6 @@
 import {
   action,
+  internalMutation,
   internalQuery,
   mutation,
   query,
@@ -418,6 +419,28 @@ export const updateCoverFromBlob = mutation({
   handler: updateCoverFromBlobHandler,
 });
 
+export const setApiCover = internalMutation({
+  args: {
+    bookId: v.id("books"),
+    apiCoverUrl: v.string(),
+    apiSource: v.union(v.literal("open-library"), v.literal("google-books")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const book = await ctx.db.get(args.bookId);
+
+    if (!book || book.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    await ctx.db.patch(args.bookId, {
+      apiCoverUrl: args.apiCoverUrl,
+      apiSource: args.apiSource,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 const fetchCoverArgs = {
   bookId: v.id("books"),
 };
@@ -481,4 +504,77 @@ export async function fetchCoverHandler(
 export const fetchCover = action({
   args: fetchCoverArgs,
   handler: fetchCoverHandler,
+});
+
+type FetchMissingCoversArgs = {
+  limit?: number;
+  cursor?: string | null;
+  bookIds?: Id<"books">[];
+};
+
+type FetchMissingCoversResult = {
+  processed: number;
+  updated: number;
+  failures: { bookId: Id<"books">; reason: string }[];
+  nextCursor?: string | null;
+};
+
+export async function fetchMissingCoversHandler(
+  ctx: ActionCtx,
+  args: FetchMissingCoversArgs,
+): Promise<FetchMissingCoversResult> {
+  const userId = await requireAuthAction(ctx);
+  const numItems = clampLimit(args.limit);
+
+  const targets = await ctx.runQuery(internal.books.listMissingCovers, {
+    userId,
+    limit: numItems,
+    cursor: args.cursor,
+    bookIds: args.bookIds,
+  });
+
+  let processed = 0;
+  let updated = 0;
+  const failures: { bookId: Id<"books">; reason: string }[] = [];
+
+  for (const book of targets.items) {
+    if (!isMissingCover(book)) {
+      continue;
+    }
+
+    processed += 1;
+
+    const result = await ctx.runAction(internal.actions.coverFetch.search, {
+      bookId: book._id,
+    });
+
+    if ("error" in result) {
+      failures.push({ bookId: book._id, reason: result.error });
+      continue;
+    }
+
+    await ctx.runMutation(internal.books.setApiCover, {
+      bookId: book._id,
+      apiCoverUrl: result.apiCoverUrl,
+      apiSource: result.apiSource,
+    });
+
+    updated += 1;
+  }
+
+  return {
+    processed,
+    updated,
+    failures,
+    nextCursor: targets.nextCursor ?? null,
+  };
+}
+
+export const fetchMissingCovers = action({
+  args: {
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    bookIds: v.optional(v.array(v.id("books"))),
+  },
+  handler: fetchMissingCoversHandler,
 });

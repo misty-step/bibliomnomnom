@@ -43,7 +43,7 @@
   Estimate: 1h
   ```
 
-- [ ] 2) Implement action `fetchMissingCovers`
+- [x] 2) Implement action `fetchMissingCovers`
   ```
   Files:
   - convex/books.ts — add action export and handler per DESIGN pseudocode
