@@ -57,26 +57,16 @@ export function FetchMissingCoversButton() {
   };
 
   return (
-    <div className="flex items-center" aria-live="polite">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleClick}
-        disabled={running}
-        className="text-text-inkMuted hover:text-text-ink"
-      >
-        {running ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Fetching covers...
-          </>
-        ) : (
-          <>
-            <RefreshCcw className="mr-2 h-4 w-4" />
-            Fetch missing covers
-          </>
-        )}
-      </Button>
-    </div>
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={handleClick}
+      disabled={running}
+      className="text-text-inkMuted hover:text-text-ink"
+      title="Fetch missing covers"
+      aria-label="Fetch missing covers"
+    >
+      {running ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+    </Button>
   );
 }
