@@ -22,6 +22,7 @@ const baseBook = (id: number, overrides: Record<string, any> = {}) => ({
 const makeCtx = (books: any[]) => {
   return {
     db: {
+      get: async (id: any) => books.find((b) => b._id === id) ?? null,
       getMany: async (ids: any[]) => ids.map((id) => books.find((b) => b._id === id) ?? null),
       query: () => {
         return {

@@ -6,10 +6,7 @@ const createBookMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useMutation: () => createBookMock,
-  useAction: (fn: any) => {
-    if (fn?.replace?.path === "books:fetchMissingCovers") return fetchMissingCoversMock;
-    return vi.fn();
-  },
+  useAction: () => fetchMissingCoversMock,
 }));
 
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: vi.fn() }) }));
@@ -30,12 +27,18 @@ describe("AddBookSheet cover backfill", () => {
   });
 
   it("triggers fetchMissingCovers when no cover provided", async () => {
-    const { getByLabelText, getByText } = render(<AddBookSheet isOpen onOpenChange={() => {}} />);
+    const { getByRole } = render(<AddBookSheet isOpen onOpenChange={() => {}} />);
 
-    fireEvent.change(getByLabelText(/Title/i), { target: { value: "Test Title" } });
-    fireEvent.change(getByLabelText(/Author/i), { target: { value: "Test Author" } });
+    // Get inputs by position (search, title, author, isbn)
+    const inputs = document.querySelectorAll('input[type="text"]');
+    const titleInputEl = inputs[1] as HTMLInputElement; // Title is second input (after search)
+    const authorInputEl = inputs[2] as HTMLInputElement; // Author is third input
 
-    fireEvent.click(getByText(/Add Book/i));
+    fireEvent.change(titleInputEl, { target: { value: "Test Title" } });
+    fireEvent.change(authorInputEl, { target: { value: "Test Author" } });
+
+    // Click submit button specifically
+    fireEvent.click(getByRole("button", { name: /Add Book/i }));
 
     await waitFor(() => expect(createBookMock).toHaveBeenCalled());
     await waitFor(() =>

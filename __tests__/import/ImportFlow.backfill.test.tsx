@@ -5,12 +5,17 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 
+const extractBooksMock = vi.fn();
 const fetchMissingCoversMock = vi.fn();
 
+let useActionCallCount = 0;
+
 vi.mock("convex/react", () => ({
-  useAction: (fn: any) => {
-    if (fn?.replace?.path === "books:fetchMissingCovers") return fetchMissingCoversMock;
-    return vi.fn();
+  useAction: () => {
+    useActionCallCount++;
+    // First useAction call in ImportFlow is extractBooks, second is fetchMissingCovers
+    if (useActionCallCount % 2 === 0) return fetchMissingCoversMock;
+    return extractBooksMock;
   },
   useMutation: () => vi.fn(),
 }));
@@ -56,6 +61,7 @@ import { ImportFlow } from "../../components/import/ImportFlow";
 
 describe("ImportFlow cover backfill", () => {
   beforeEach(() => {
+    useActionCallCount = 0;
     fetchMissingCoversMock.mockResolvedValue({
       processed: 3,
       updated: 2,

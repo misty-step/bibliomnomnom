@@ -117,7 +117,7 @@
   Depends: Task 2
   ```
 
-- [~] 6) Add manual “Fetch missing covers” control
+- [x] 6) Add manual "Fetch missing covers" control
   ```
   Files:
   - components/book/BookGrid.tsx (toolbar overflow) OR app/(dashboard)/settings/tools.tsx (confirm location)
@@ -137,7 +137,7 @@
   Depends: Task 2 (and placement decision)
   ```
 
-- [ ] 7) Update generated Convex types and exports
+- [x] 7) Update generated Convex types and exports
   ```
   Files:
   - convex/_generated/api.d.ts (via pnpm convex:codegen) — not committed if auto-gen
@@ -153,7 +153,7 @@
   Depends: Tasks 1-2
   ```
 
-- [ ] 8) Quality gate + validation sweep
+- [x] 8) Quality gate + validation sweep
   ```
   Files:
   - n/a (commands)
