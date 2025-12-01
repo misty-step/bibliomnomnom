@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { FetchMissingCoversButton } from "./FetchMissingCoversButton";
 
 type FilterType = "library" | "to-read" | "favorites";
 
@@ -111,10 +112,13 @@ export function BookGrid() {
           </nav>
 
           {/* Add Book Dropdown */}
-          <AddBookButton
-            onManualAdd={() => setManualAddOpen(true)}
-            onImport={() => router.push("/import")}
-          />
+          <div className="flex items-center gap-3">
+            <FetchMissingCoversButton />
+            <AddBookButton
+              onManualAdd={() => setManualAddOpen(true)}
+              onImport={() => router.push("/import")}
+            />
+          </div>
         </div>
 
         {/* Content */}

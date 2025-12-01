@@ -117,7 +117,7 @@
   Depends: Task 2
   ```
 
-- [ ] 6) Add manual “Fetch missing covers” control
+- [~] 6) Add manual “Fetch missing covers” control
   ```
   Files:
   - components/book/BookGrid.tsx (toolbar overflow) OR app/(dashboard)/settings/tools.tsx (confirm location)
