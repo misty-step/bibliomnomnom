@@ -5,6 +5,7 @@ import {
   query,
   type ActionCtx,
   type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
@@ -29,6 +30,15 @@ const statusField = v.union(
   v.literal("currently-reading"),
   v.literal("read"),
 );
+
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
+const isMissingCover = (book: Doc<"books"> | null | undefined): book is Doc<"books"> =>
+  book != null && !book.coverUrl && !book.apiCoverUrl;
+
+const clampLimit = (limit: number | undefined) =>
+  Math.min(MAX_LIMIT, Math.max(1, limit ?? DEFAULT_LIMIT));
 
 export const list = query({
   args: {
@@ -76,6 +86,62 @@ export const getForAction = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db.get(args.bookId);
   },
+});
+
+type ListMissingCoversArgs = {
+  userId: Id<"users">;
+  bookId?: Id<"books">;
+  bookIds?: Id<"books">[];
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type ListMissingCoversResult = {
+  items: Doc<"books">[];
+  nextCursor?: string | null;
+};
+
+export async function listMissingCoversHandler(
+  ctx: QueryCtx,
+  args: ListMissingCoversArgs,
+): Promise<ListMissingCoversResult> {
+  const { userId, bookId, bookIds, cursor } = args;
+  const ids = bookIds ?? (bookId ? [bookId] : undefined);
+
+  if (ids?.length) {
+    const books = await Promise.all(ids.map((id) => ctx.db.get(id)));
+    const ownedMissing = books.filter(
+      (book): book is Doc<"books"> => isMissingCover(book) && book.userId === userId,
+    );
+
+    return { items: ownedMissing.slice(0, MAX_LIMIT) };
+  }
+
+  const numItems = clampLimit(args.limit);
+
+  const page = await ctx.db
+    .query("books")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .filter((q) =>
+      q.and(q.eq(q.field("coverUrl"), undefined), q.eq(q.field("apiCoverUrl"), undefined)),
+    )
+    .paginate({ numItems, cursor: cursor ?? null });
+
+  return {
+    items: page.page,
+    nextCursor: page.continueCursor,
+  };
+}
+
+export const listMissingCovers = internalQuery({
+  args: {
+    userId: v.id("users"),
+    bookId: v.optional(v.id("books")),
+    bookIds: v.optional(v.array(v.id("books"))),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    limit: v.optional(v.number()),
+  },
+  handler: listMissingCoversHandler,
 });
 
 export const getPublic = query({
