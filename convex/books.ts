@@ -11,6 +11,7 @@ import {
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireAuth, requireAuthAction } from "./auth";
+import { logCoverEvent } from "../lib/cover/metrics";
 import type { Doc, Id } from "./_generated/dataModel";
 
 type PublicBook = {
@@ -523,6 +524,7 @@ export async function fetchMissingCoversHandler(
   ctx: ActionCtx,
   args: FetchMissingCoversArgs,
 ): Promise<FetchMissingCoversResult> {
+  const startedAt = Date.now();
   const userId = await requireAuthAction(ctx);
   const numItems = clampLimit(args.limit);
 
@@ -561,6 +563,16 @@ export async function fetchMissingCoversHandler(
 
     updated += 1;
   }
+
+  logCoverEvent({
+    phase: "backfill",
+    processed,
+    updated,
+    failures: failures.length,
+    durationMs: Date.now() - startedAt,
+    batchSize: targets.items.length,
+    source: args.bookIds ? "manual" : "import",
+  });
 
   return {
     processed,

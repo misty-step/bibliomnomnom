@@ -65,7 +65,7 @@
   Depends: Task 1
   ```
 
-- [ ] 3) Add logging helper `logCoverEvent`
+- [x] 3) Add logging helper `logCoverEvent`
   ```
   Files:
   - lib/cover/metrics.ts (new)
