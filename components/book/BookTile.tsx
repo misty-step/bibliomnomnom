@@ -16,6 +16,24 @@ export function BookTile({ book }: BookTileProps) {
   const shouldReduce = useReducedMotion();
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
 
+  const isOptimizable = (src: string) => {
+    if (src.startsWith("/")) return true;
+    try {
+      const url = new URL(src);
+      return (
+        [
+          "books.googleusercontent.com",
+          "books.google.com",
+          "covers.openlibrary.org",
+          "lh3.googleusercontent.com",
+          "images.unsplash.com",
+        ].includes(url.hostname) || url.hostname.endsWith(".public.blob.vercel-storage.com")
+      );
+    } catch {
+      return false;
+    }
+  };
+
   const navigate = () => {
     router.push(`/library/books/${book._id}`);
   };
@@ -51,13 +69,22 @@ export function BookTile({ book }: BookTileProps) {
           <>
             {/* Cover image with hover fade */}
             <div className="absolute inset-0 transition-opacity duration-300 ease-out group-hover:opacity-0 group-focus:opacity-0">
-              <Image
-                src={coverSrc}
-                alt={`${book.title} cover`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-              />
+              {isOptimizable(coverSrc) ? (
+                <Image
+                  src={coverSrc}
+                  alt={`${book.title} cover`}
+                  fill
+                  className="object-cover"
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={coverSrc}
+                  alt={`${book.title} cover`}
+                  className="h-full w-full object-cover"
+                />
+              )}
             </div>
 
             {/* Index card on hover */}
