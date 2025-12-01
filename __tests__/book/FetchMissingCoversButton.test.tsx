@@ -27,9 +27,9 @@ describe("FetchMissingCoversButton", () => {
       .mockResolvedValueOnce({ processed: 2, updated: 1, failures: [], nextCursor: "next" })
       .mockResolvedValueOnce({ processed: 1, updated: 1, failures: [], nextCursor: null });
 
-    const { getByText } = render(<FetchMissingCoversButton />);
+    const { getByRole } = render(<FetchMissingCoversButton />);
 
-    fireEvent.click(getByText(/Fetch missing covers/i));
+    fireEvent.click(getByRole("button", { name: /Fetch missing covers/i }));
 
     await waitFor(() => expect(fetchMissingCoversMock).toHaveBeenCalledTimes(2));
     expect(fetchMissingCoversMock).toHaveBeenNthCalledWith(1, { cursor: undefined, limit: 20 });
@@ -51,8 +51,8 @@ describe("FetchMissingCoversButton", () => {
       nextCursor: null,
     });
 
-    const { getByText } = render(<FetchMissingCoversButton />);
-    fireEvent.click(getByText(/Fetch missing covers/i));
+    const { getByRole } = render(<FetchMissingCoversButton />);
+    fireEvent.click(getByRole("button", { name: /Fetch missing covers/i }));
 
     await waitFor(() =>
       expect(toastMock).toHaveBeenCalledWith({
