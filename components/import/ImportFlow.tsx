@@ -16,6 +16,7 @@ import { useImportJob } from "@/hooks/useImportJob";
 import { logImportEvent } from "@/lib/import/metrics";
 
 const IMPORT_ENABLED = process.env.NEXT_PUBLIC_IMPORT_ENABLED !== "false";
+const COVER_BACKFILL_ENABLED = process.env.NEXT_PUBLIC_COVER_BACKFILL_ENABLED !== "false";
 
 export function ImportFlow() {
   const router = useRouter();
@@ -23,10 +24,12 @@ export function ImportFlow() {
   const extractBooks = useAction(api.imports.extractBooks);
   const preparePreview = useMutation(api.imports.preparePreview);
   const commitImport = useMutation(api.imports.commitImport);
+  const fetchMissingCovers = useAction(api.books.fetchMissingCovers);
 
   const startedAtRef = useRef<number | null>(null);
   const lastCommitRef = useRef<number | null>(null);
   const prevStatus = useRef<string>("idle");
+  const backfillTriggeredRef = useRef(false);
 
   const job = useImportJob({
     extractBooks: async (params) => await extractBooks(params),
@@ -105,6 +108,37 @@ export function ImportFlow() {
     job.state.status,
     job.state.summary,
   ]);
+
+  useEffect(() => {
+    if (!COVER_BACKFILL_ENABLED) return;
+    if (job.state.status !== "success") return;
+    if (backfillTriggeredRef.current) return;
+    backfillTriggeredRef.current = true;
+
+    void (async () => {
+      try {
+        const result = await fetchMissingCovers({ limit: 20 });
+
+        if (result.processed === 0 && result.updated === 0) {
+          return;
+        }
+
+        const failureText = result.failures.length ? `, ${result.failures.length} failed` : "";
+
+        toast({
+          title: "Fetched missing covers",
+          description: `Updated ${result.updated} of ${result.processed}${failureText}`,
+        });
+      } catch (err) {
+        console.error("Cover backfill failed", err);
+        toast({
+          title: "Cover backfill failed",
+          description: "Your books were imported; try fetching covers again later.",
+          variant: "destructive",
+        });
+      }
+    })();
+  }, [fetchMissingCovers, job.state.status, toast]);
 
   if (!IMPORT_ENABLED) {
     return (

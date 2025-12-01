@@ -82,7 +82,7 @@
   Depends: Task 2
   ```
 
-- [ ] 4) Wire ImportFlow post-commit backfill
+- [x] 4) Wire ImportFlow post-commit backfill
   ```
   Files:
   - components/import/ImportFlow.tsx
