@@ -33,13 +33,12 @@ export default defineConfig({
         "**/repository/memory.ts", // In-memory test repository
       ],
       // Progressive enforcement: Start low, ratchet up to 75%
-      // Phase 1 baseline: 88% statements, 75% branches, 86% functions, 89% lines
+      // Phase 2: 75% across the board with per-file enforcement
       thresholds: {
-        lines: 50,
-        functions: 50,
-        branches: 30, // Lower due to rateLimit.ts (30%), will ratchet to 50%+ in Phase 2
-        statements: 50,
-        // Per-file thresholds ensure new files start with good coverage
+        lines: 75,
+        functions: 75,
+        branches: 75,
+        statements: 75,
         perFile: true,
       },
       clean: true,
