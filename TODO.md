@@ -100,7 +100,7 @@
   Depends: Task 2
   ```
 
-- [ ] 5) Fire backfill after manual create without cover
+- [x] 5) Fire backfill after manual create without cover
   ```
   Files:
   - components/book/AddBookSheet.tsx
