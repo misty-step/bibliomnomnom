@@ -1,14 +1,17 @@
 import {
   action,
+  internalMutation,
   internalQuery,
   mutation,
   query,
   type ActionCtx,
   type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
 import { requireAuth, requireAuthAction } from "./auth";
+import { logCoverEvent } from "../lib/cover/metrics";
 import type { Doc, Id } from "./_generated/dataModel";
 
 type PublicBook = {
@@ -29,6 +32,15 @@ const statusField = v.union(
   v.literal("currently-reading"),
   v.literal("read"),
 );
+
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
+const isMissingCover = (book: Doc<"books"> | null | undefined): book is Doc<"books"> =>
+  book != null && !book.coverUrl && !book.apiCoverUrl;
+
+const clampLimit = (limit: number | undefined) =>
+  Math.min(MAX_LIMIT, Math.max(1, limit ?? DEFAULT_LIMIT));
 
 export const list = query({
   args: {
@@ -76,6 +88,62 @@ export const getForAction = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db.get(args.bookId);
   },
+});
+
+type ListMissingCoversArgs = {
+  userId: Id<"users">;
+  bookId?: Id<"books">;
+  bookIds?: Id<"books">[];
+  cursor?: string | null;
+  limit?: number;
+};
+
+export type ListMissingCoversResult = {
+  items: Doc<"books">[];
+  nextCursor?: string | null;
+};
+
+export async function listMissingCoversHandler(
+  ctx: QueryCtx,
+  args: ListMissingCoversArgs,
+): Promise<ListMissingCoversResult> {
+  const { userId, bookId, bookIds, cursor } = args;
+  const ids = bookIds ?? (bookId ? [bookId] : undefined);
+
+  if (ids?.length) {
+    const books = await Promise.all(ids.map((id) => ctx.db.get(id)));
+    const ownedMissing = books.filter(
+      (book): book is Doc<"books"> => isMissingCover(book) && book.userId === userId,
+    );
+
+    return { items: ownedMissing.slice(0, MAX_LIMIT) };
+  }
+
+  const numItems = clampLimit(args.limit);
+
+  const page = await ctx.db
+    .query("books")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .filter((q) =>
+      q.and(q.eq(q.field("coverUrl"), undefined), q.eq(q.field("apiCoverUrl"), undefined)),
+    )
+    .paginate({ numItems, cursor: cursor ?? null });
+
+  return {
+    items: page.page,
+    nextCursor: page.continueCursor,
+  };
+}
+
+export const listMissingCovers = internalQuery({
+  args: {
+    userId: v.id("users"),
+    bookId: v.optional(v.id("books")),
+    bookIds: v.optional(v.array(v.id("books"))),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    limit: v.optional(v.number()),
+  },
+  handler: listMissingCoversHandler,
 });
 
 export const getPublic = query({
@@ -352,6 +420,28 @@ export const updateCoverFromBlob = mutation({
   handler: updateCoverFromBlobHandler,
 });
 
+export const setApiCover = internalMutation({
+  args: {
+    bookId: v.id("books"),
+    apiCoverUrl: v.string(),
+    apiSource: v.union(v.literal("open-library"), v.literal("google-books")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const book = await ctx.db.get(args.bookId);
+
+    if (!book || book.userId !== userId) {
+      throw new Error("Access denied");
+    }
+
+    await ctx.db.patch(args.bookId, {
+      apiCoverUrl: args.apiCoverUrl,
+      apiSource: args.apiSource,
+      updatedAt: Date.now(),
+    });
+  },
+});
+
 const fetchCoverArgs = {
   bookId: v.id("books"),
 };
@@ -415,4 +505,108 @@ export async function fetchCoverHandler(
 export const fetchCover = action({
   args: fetchCoverArgs,
   handler: fetchCoverHandler,
+});
+
+type FetchMissingCoversArgs = {
+  limit?: number;
+  cursor?: string | null;
+  bookIds?: Id<"books">[];
+};
+
+type FetchMissingCoversResult = {
+  processed: number;
+  updated: number;
+  failures: { bookId: Id<"books">; reason: string }[];
+  nextCursor?: string | null;
+};
+
+export async function fetchMissingCoversHandler(
+  ctx: ActionCtx,
+  args: FetchMissingCoversArgs,
+): Promise<FetchMissingCoversResult> {
+  const startedAt = Date.now();
+  const userId = await requireAuthAction(ctx);
+  const numItems = clampLimit(args.limit);
+
+  let processed = 0;
+  let updated = 0;
+  const failures: { bookId: Id<"books">; reason: string }[] = [];
+  let cursor = args.cursor;
+
+  // Loop until we process the requested number of items or run out of data.
+  // This "deep module" approach hides the sparse scan from the client.
+  while (processed < numItems) {
+    const targets: ListMissingCoversResult = await ctx.runQuery(internal.books.listMissingCovers, {
+      userId,
+      limit: numItems - processed, // Ask for what we still need
+      cursor,
+      bookIds: args.bookIds,
+    });
+
+    // If no items found and no next page, we are done.
+    if (targets.items.length === 0 && !targets.nextCursor) {
+      break;
+    }
+
+    // If items found, process them
+    for (const book of targets.items) {
+      if (!isMissingCover(book)) {
+        continue;
+      }
+
+      processed += 1;
+
+      const result = await ctx.runAction(internal.actions.coverFetch.search, {
+        bookId: book._id,
+      });
+
+      if ("error" in result) {
+        failures.push({ bookId: book._id, reason: result.error });
+        continue;
+      }
+
+      await ctx.runMutation(internal.books.setApiCover, {
+        bookId: book._id,
+        apiCoverUrl: result.apiCoverUrl,
+        apiSource: result.apiSource,
+      });
+
+      updated += 1;
+    }
+
+    // Advance the cursor
+    cursor = targets.nextCursor;
+
+    // If we didn't find anything in this batch but have a cursor, we loop again.
+    // If we have no cursor left, we break the outer loop (handled by condition next iteration or check above)
+    if (!cursor) {
+      break;
+    }
+  }
+
+  logCoverEvent({
+    phase: "backfill",
+    processed,
+    updated,
+    failures: failures.length,
+    durationMs: Date.now() - startedAt,
+    batchSize: processed, // Log effective batch size
+    source: args.bookIds ? "manual" : "import",
+  });
+
+  return {
+    processed,
+    updated,
+    failures,
+    nextCursor: cursor ?? null,
+  };
+}
+
+export const fetchMissingCovers = action({
+  args: {
+    limit: v.optional(v.number()),
+    cursor: v.optional(v.union(v.string(), v.null())),
+    bookIds: v.optional(v.array(v.id("books"))),
+  },
+  handler: fetchMissingCoversHandler,
 });

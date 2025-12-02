@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, type ChangeEvent } from "react";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
 import { Star, Headphones } from "lucide-react";
@@ -16,6 +16,7 @@ import { BookSearchInput, type BookSearchResult } from "./BookSearchInput";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
+const COVER_BACKFILL_ENABLED = process.env.NEXT_PUBLIC_COVER_BACKFILL_ENABLED !== "false";
 
 // Curated list of exemplary books for form placeholders
 const EXAMPLE_BOOKS = [
@@ -93,6 +94,7 @@ export function AddBookSheet({
   const [apiCoverUrl, setApiCoverUrl] = useState<string | undefined>();
 
   const createBook = useMutation(api.books.create);
+  const fetchMissingCovers = useAction(api.books.fetchMissingCovers);
   const { toast } = useToast();
 
   const handleOpen = () => {
@@ -205,6 +207,7 @@ export function AddBookSheet({
     setError(null);
 
     try {
+      const missingCover = !coverFile && !apiCoverUrl;
       let coverUrl: string | undefined;
 
       // Upload cover if selected
@@ -220,7 +223,7 @@ export function AddBookSheet({
       const dateFinishedTimestamp = dateFinished ? new Date(dateFinished).getTime() : undefined;
 
       // Create book
-      await createBook({
+      const newBookId = await createBook({
         title: trimmedTitle,
         author: trimmedAuthor,
         status,
@@ -235,6 +238,12 @@ export function AddBookSheet({
         publishedYear,
         pageCount,
       });
+
+      if (missingCover && COVER_BACKFILL_ENABLED && newBookId) {
+        void fetchMissingCovers({ bookIds: [newBookId as any] }).catch((err) => {
+          console.error("Fetch missing covers failed", err);
+        });
+      }
 
       toast({
         title: "Book added",

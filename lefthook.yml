@@ -15,7 +15,8 @@ pre-commit:
           echo "   or: https://github.com/trufflesecurity/trufflehog#installation"
           exit 1
         fi
-        trufflehog git file://. --since-commit HEAD --only-verified --fail --no-update
+        repo_dir="$(git rev-parse --git-common-dir)"
+        trufflehog git --bare "file://$repo_dir" --since-commit HEAD --only-verified --fail --no-update
 
     lint:
       glob: "**/*.{ts,tsx,js,jsx}"

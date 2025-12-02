@@ -1,4 +1,283 @@
-# DESIGN.md — Open Library Book Search Architecture
+# DESIGN.md — Search + Cover Backfill Architectures
+
+> This file now holds two designs: (A) existing Open Library search, (B) new Cover Backfill.
+
+---
+
+## Cover Backfill Architecture Overview (New)
+
+**Selected Approach**: Convex action `books.fetchMissingCovers` + internal query + three client triggers (import, create, manual bulk).
+
+**Rationale**: Reuses proven `coverFetch` cascade, avoids schema change, keeps interface tiny (`apiCoverUrl` only), idempotent + retryable with cursorized batching.
+
+**Core Modules**
+- **listMissingCovers** (internal query): fetch IDs lacking `coverUrl` and `apiCoverUrl` for a user; supports pagination or explicit `bookIds`.
+- **fetchMissingCovers** (action): orchestrates batch fetch + patch, returns counts, failures, nextCursor.
+- **UI Triggers**:
+  - Import hook: run backfill post-commit (scoped to created/merged IDs when available, otherwise scan).
+  - AddBookSheet hook: if create saved without cover, fire one-shot backfill for that ID.
+  - Manual “Fetch missing covers” control: tucked-away in Library toolbar overflow (or Settings → Tools) running batches until done.
+- **Logging**: structured `coverBackfill.event` with counts/timing, no PII.
+
+**Data Flow**
+```
+Trigger (import/create/manual) →
+  fetchMissingCovers action →
+    listMissingCovers (user-scoped, limit, cursor or bookIds) →
+    for each: coverFetch.search (Open Library → Google Books → OL search) →
+      on success: db.patch { apiCoverUrl, apiSource, updatedAt }
+      on failure: record failure entry
+→ return { processed, updated, failures[], nextCursor? } → UI toast/progress
+```
+
+**Key Decisions**
+1. Write only `apiCoverUrl`/`apiSource`; never overwrite `coverUrl` → respects user uploads (simplicity, safety).
+2. Sequential batch (default 20, max 50) → predictable runtime, avoids API thrash; cursor to continue.
+3. Optional scoped run via `bookIds` → faster for imports/creates; fallback to scan to keep UX resilient.
+4. Feature-flag capable (`NEXT_PUBLIC_COVER_BACKFILL_ENABLED`, default on) → controlled rollout.
+
+---
+
+## Modules (Cover Backfill)
+
+### Module: internal.books.listMissingCovers (new)
+Responsibility: hide DB selection of books missing covers, with pagination or explicit IDs.
+
+Public Interface (internal query):
+```typescript
+args:
+  userId: Id<"users">
+  limit?: number  // default 20, cap 50
+  cursor?: string // opaque pagination cursor
+  bookIds?: Id<"books">[] // optional hard scope; ignores cursor/limit when provided (still caps at 50)
+returns:
+  items: Array<Pick<Doc<"books">, "_id" | "title" | "author" | "isbn" | "apiId">>
+  nextCursor?: string
+```
+
+Internal Implementation:
+- If `bookIds` supplied: fetch by IDs, filter ownership + missing cover fields, slice to 50.
+- Else: `ctx.db.query("books").withIndex("by_user", q => q.eq("userId", userId)).filter` missing covers; use `paginate` with `limit`; emit `nextCursor`.
+- Missing cover definition: `!coverUrl && !apiCoverUrl`.
+
+Dependencies:
+- Convex DB, `books` table indexes.
+
+Error Handling:
+- Reject non-owner IDs.
+- If cursor invalid → return empty set, no throw (defensive).
+
+### Module: actions.books.fetchMissingCovers (new)
+Responsibility: orchestrate batch fetch + patch for missing covers.
+
+Public Interface (action):
+```typescript
+args:
+  limit?: number // default 20, max 50
+  cursor?: string
+  bookIds?: Id<"books">[]
+returns:
+  {
+    processed: number;
+    updated: number;
+    failures: { bookId: Id<"books">; reason: string }[];
+    nextCursor?: string;
+  }
+```
+
+Internal Implementation:
+- Auth via `requireAuthAction`.
+- Resolve target books via `listMissingCovers` with same pagination semantics.
+- For each book (sequential):
+  1) Call `internal.actions.coverFetch.search` with `bookId`.
+  2) If `result.error` → push failure (no throw).
+  3) On success → `ctx.db.patch(bookId, { apiCoverUrl, apiSource, updatedAt: Date.now() })`.
+- Accumulate counts, return `nextCursor` passthrough.
+- Optional concurrency knob (keep 1 for MVP; allow 3-5 later if perf needed).
+
+Dependencies:
+- `internal.books.listMissingCovers`
+- `internal.actions.coverFetch.search`
+- `requireAuthAction`
+
+Error Handling:
+- Unauthorized → throw (Convex standard).
+- Per-book failures isolated; action always returns summary unless auth fails.
+
+### Module: UI Triggers
+- **ImportFlow hook** (`components/import/ImportFlow.tsx`):
+  - After commit success, call `fetchMissingCovers({ bookIds: summary.createdIds ?? undefined })`.
+  - If IDs unavailable, call without bookIds to scan (one batch or loop until `nextCursor`).
+  - Toast: “Fetching covers…”, completion counts; ignore PII in logs.
+- **AddBookSheet** (`components/book/AddBookSheet.tsx`):
+  - After `books.create` when no `coverUrl`/`apiCoverUrl` passed, fire `fetchMissingCovers({ bookIds: [id] })` fire-and-forget; optional subtle toast.
+- **Manual bulk control** (`components/book/BookGrid.tsx` toolbar overflow or `app/(dashboard)/settings` Tools):
+  - Label: “Fetch missing covers”.
+  - On click: call action, loop while `nextCursor`, show progress (count up), surface failures count.
+
+### Module: Logging (`lib/cover/metrics.ts` or extend `lib/import/metrics.ts`)
+Structured log (no titles/authors):
+```ts
+logCoverEvent({
+  phase: "backfill",
+  processed,
+  updated,
+  failures: failures.length,
+  durationMs,
+  batchSize,
+  source: "import" | "manual" | "create",
+});
+```
+
+---
+
+## Core Algorithms (Cover Backfill)
+
+### fetchMissingCovers (action) — pseudocode
+```
+authUser = requireAuthAction(ctx)
+limit = clamp(args.limit ?? 20, 1, 50)
+targets = await ctx.runQuery(internal.books.listMissingCovers, {
+  userId: authUser,
+  limit,
+  cursor: args.cursor,
+  bookIds: args.bookIds,
+})
+
+processed = 0; updated = 0; failures = []
+for book in targets.items:
+  processed++
+  res = await ctx.runAction(internal.actions.coverFetch.search, { bookId: book._id })
+  if 'error' in res:
+    failures.push({ bookId: book._id, reason: res.error })
+    continue
+  await ctx.db.patch(book._id, {
+    apiCoverUrl: res.apiCoverUrl,
+    apiSource: res.apiSource,
+    updatedAt: Date.now(),
+  })
+  updated++
+
+return { processed, updated, failures, nextCursor: targets.nextCursor }
+```
+
+### listMissingCovers (internal query) — pseudocode
+```
+if bookIds provided:
+  books = await ctx.db.getMany(bookIds)
+  ownedMissing = books.filter(b => b?.userId === userId && !b.coverUrl && !b.apiCoverUrl)
+  return { items: ownedMissing.slice(0,50) }
+
+page = ctx.db.query("books")
+  .withIndex("by_user", q => q.eq("userId", userId))
+  .filter(q => q.and(q.eq(q.field("coverUrl"), undefined), q.eq(q.field("apiCoverUrl"), undefined)))
+  .paginate({ limit, cursor })
+return { items: page.page, nextCursor: page.continueCursor }
+```
+
+### Manual bulk loop (client) — pseudocode
+```
+cursor = undefined
+totalProcessed = totalUpdated = 0
+do {
+  res = await fetchMissingCovers({ cursor, limit: 20 })
+  totalProcessed += res.processed; totalUpdated += res.updated
+  cursor = res.nextCursor
+} while (cursor)
+toast(`Updated ${totalUpdated} of ${totalProcessed} books`)
+```
+
+---
+
+## File Organization (Cover Backfill)
+```
+convex/
+  books.ts                     # add fetchMissingCovers action export + handler
+  internal/books/listMissingCovers.ts  # new internal query (or inline in books.ts internalQuery)
+components/book/
+  FetchMissingCoversButton.tsx # manual trigger (toolbar/Settings)
+  AddBookSheet.tsx             # call backfill post-create when no cover
+components/import/ImportFlow.tsx # invoke backfill after commit success
+lib/cover/metrics.ts           # optional structured logging helper
+```
+
+---
+
+## Integration Points
+- **Convex**: new action + internal query; no schema change.
+- **Env**: reuses optional `GOOGLE_BOOKS_API_KEY`; new flag `NEXT_PUBLIC_COVER_BACKFILL_ENABLED` (client gate).
+- **Routing/UI**: add trigger button to Library toolbar overflow or Settings/Tools; minor UI copy + toast strings.
+- **Observability**: reuse `withObservability` for any Next API wrapper (not strictly needed for Convex); structured console logs only; no titles/authors.
+- **CI/Lefthook**: ensure new files pass eslint, typecheck, vitest; hook already runs `pnpm lint`, `pnpm tsc --noEmit`, `pnpm test`, `pnpm build:local`.
+
+---
+
+## State Management
+- Server state in Convex; client calls action and invalidates book list only if updated? (optional: refetch `api.books.list` after manual bulk or rely on live query updates if subscription active).
+- Cursor maintained client-side for manual loop; one batch for create/import suffices.
+- Idempotent: reruns skip books once `apiCoverUrl` set.
+
+---
+
+## Error Handling Strategy
+- Auth errors bubble (Convex default).
+- Per-book failures returned; UI surfaces count, not titles.
+- Google Books missing key → `coverFetch` already logs/returns null; treated as failure entry if no OL cover.
+- Timeouts (5s) handled inside `coverFetch`; action continues.
+- Invalid cursor → treat as empty result (no throw) to avoid trapping users.
+
+---
+
+## Testing Strategy (Cover Backfill)
+- **Unit (Convex)**:
+  - fetchMissingCovers skips books with coverUrl/apiCoverUrl.
+  - Updates apiCoverUrl/apiSource on success.
+  - Returns failures when coverFetch returns error.
+  - Respects limit cap and cursor passthrough.
+  - bookIds scope filters out non-owner IDs.
+  - listMissingCovers pagination behavior.
+- **Integration**:
+  - ImportFlow triggers backfill once; mock action and assert called with createdIds or without.
+  - AddBookSheet fires backfill when no cover provided.
+  - Manual button loops until no cursor; toasts counts.
+- **E2E/UX** (manual/Playwright later):
+  - Bulk run does not block UI; progress/toast visible; accessibility (aria-live).
+- Coverage: 80%+ new code; branch focus on skip/overwrite rules.
+
+---
+
+## Performance & Security Notes
+- Perf: default batch 20, sequential; target <15s; if slow, raise concurrency to 3–5 with per-call timeout unchanged.
+- Rate limiting: rely on existing `coverFetch` 5s timeout + Open Library generous limits; monitor failures >10%.
+- Security: enforce ownership in query and action; do not log titles/authors/ISBN; secrets untouched.
+- Availability: action retry-safe; worst case no-op when already filled.
+
+---
+
+## Alternative Architectures Considered (Cover Backfill)
+| Option | Pros | Cons | Verdict |
+| --- | --- | --- | --- |
+| Server batch writes apiCoverUrl (selected) | Small surface, reuses coverFetch, no schema change | Depends on remote URLs (not cached) | Chosen |
+| Client batch uploads to Blob | Permanent copies, nicer caching | Huge bandwidth, exposes tokens client-side, slower | Rejected |
+| Scheduler/queue with attempt tracking | Automatic retries, metrics | New infra, complexity not justified | Rejected |
+
+Trigger to revisit: if Open Library reliability drops or users demand offline durability → consider Blob copy + attempt tracking field.
+
+---
+
+## Open Questions / Assumptions (carry from PRD)
+- Bulk button placement: Library toolbar overflow vs Settings → Tools.
+- Is apiCoverUrl-only acceptable, or must we copy to Blob for permanence?
+- Import auto-run: is full scan acceptable, or must we target created IDs (would require commitImport to return IDs)?
+- Add `lastCoverFetchAt/attempts` now for backoff, or defer to hardening?
+- Expected max library size (sets batch size/progress UX)?
+- Enable feature flag (`NEXT_PUBLIC_COVER_BACKFILL_ENABLED`) or always on?
+
+Owners: Product/Eng to confirm before implementation.
+
+---
+
+## Book Search Architecture (Existing)
 
 ## Architecture Overview
 

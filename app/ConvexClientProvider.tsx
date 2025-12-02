@@ -2,14 +2,22 @@
 
 import { useAuth as useClerkAuth } from "@clerk/clerk-react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
-import { ConvexReactClient } from "convex/react";
-import { ReactNode, useEffect } from "react";
-import { useMutation } from "convex/react";
+import { ConvexReactClient, useMutation } from "convex/react";
+import { createContext, ReactNode, useContext, useEffect, useState } from "react";
 import { api } from "@/convex/_generated/api";
 import { useAuth } from "@/lib/hooks/useAuth";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
+
+// Context to track user provisioning status in Convex database
+const UserProvisioningContext = createContext<{ isProvisioned: boolean }>({
+  isProvisioned: false,
+});
+
+export function useUserProvisioning() {
+  return useContext(UserProvisioningContext);
+}
 
 export function ConvexClientProvider({ children }: { children: ReactNode }) {
   if (!convexUrl || !convex) {
@@ -28,30 +36,40 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
 
   return (
     <ConvexProviderWithClerk client={convex} useAuth={useClerkAuth}>
-      <EnsureUser />
-      {children}
+      <UserProvisioningProvider>{children}</UserProvisioningProvider>
     </ConvexProviderWithClerk>
   );
 }
 
 /**
- * Ensures user exists in Convex database on authentication.
+ * Ensures user exists in Convex database before any queries run.
  *
- * Calls ensureUser mutation when user signs in, creating user record
- * if it doesn't exist. This happens before any queries run, preventing
- * "User not found" errors.
+ * Tracks provisioning state so useAuthedQuery can skip queries until
+ * the user record exists, preventing "User not found" race conditions
+ * on first login.
  */
-function EnsureUser() {
+function UserProvisioningProvider({ children }: { children: ReactNode }) {
   const { isLoading, isAuthenticated } = useAuth();
   const ensureUser = useMutation(api.users.ensureUser);
+  const [isProvisioned, setIsProvisioned] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      ensureUser().catch((error) => {
-        console.error("Failed to ensure user exists:", error);
-      });
+    if (!isLoading && isAuthenticated && !isProvisioned) {
+      ensureUser()
+        .then(() => setIsProvisioned(true))
+        .catch((error) => {
+          console.error("Failed to ensure user exists:", error);
+        });
     }
-  }, [isLoading, isAuthenticated, ensureUser]);
+    // Reset on logout
+    if (!isLoading && !isAuthenticated && isProvisioned) {
+      setIsProvisioned(false);
+    }
+  }, [isLoading, isAuthenticated, isProvisioned, ensureUser]);
 
-  return null;
+  return (
+    <UserProvisioningContext.Provider value={{ isProvisioned }}>
+      {children}
+    </UserProvisioningContext.Provider>
+  );
 }

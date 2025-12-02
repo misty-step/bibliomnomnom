@@ -293,6 +293,11 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 **Cause**: Convex types out of sync
 **Fix**: Run `pnpm convex:push` to regenerate types
 
+### Next.js Image Error: "hostname is not configured"
+
+**Cause**: External image domain not whitelisted in `next.config.ts`
+**Fix**: Add hostname to `images.remotePatterns` in `next.config.ts`
+
 ## Testing Strategy
 
 ### Current State (MVP)
