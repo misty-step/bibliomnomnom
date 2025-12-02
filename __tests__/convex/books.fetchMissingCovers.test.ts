@@ -20,15 +20,21 @@ const baseBook = (id: number, overrides: Record<string, any> = {}) => ({
   ...overrides,
 });
 
-const makeCtx = (listResponse: any, actionResults: any[] = []) => {
+const makeCtx = (listResponses: any | any[], actionResults: any[] = []) => {
   const runQueryCalls: any[] = [];
   const runActionCalls: any[] = [];
   const runMutationCalls: any[] = [];
+  // Support single response (legacy) or array of responses for pagination
+  const responses = Array.isArray(listResponses) ? [...listResponses] : [listResponses];
+  let queryCallCount = 0;
 
   const ctx = {
     runQuery: async (query: any, args: any) => {
       runQueryCalls.push({ query, args });
-      return listResponse;
+      // Return next response or empty result for subsequent calls
+      const response = responses[queryCallCount] ?? { items: [], nextCursor: null };
+      queryCallCount++;
+      return response;
     },
     runAction: async (_action: any, args: any) => {
       const next = actionResults.shift() ?? { error: "no result" };
@@ -60,7 +66,8 @@ describe("books.fetchMissingCovers", () => {
 
     const books = [baseBook(1), baseBook(2)];
 
-    const listResponse = { items: books, nextCursor: "cursor-2" };
+    // No nextCursor so processing stops after first batch
+    const listResponse = { items: books, nextCursor: null };
     const actionResults = [
       { apiCoverUrl: "https://covers/1.jpg", apiSource: "open-library" },
       { error: "not found" },
@@ -73,7 +80,7 @@ describe("books.fetchMissingCovers", () => {
     expect(result.processed).toBe(2);
     expect(result.updated).toBe(1);
     expect(result.failures).toEqual([{ bookId: books[1]._id, reason: "not found" }]);
-    expect(result.nextCursor).toBe("cursor-2");
+    expect(result.nextCursor).toBeNull();
 
     expect(runMutationCalls).toHaveLength(1);
     expect(runMutationCalls[0].args.bookId).toBe(books[0]._id);
