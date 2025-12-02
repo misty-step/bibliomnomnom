@@ -28,6 +28,7 @@ const fontMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "bibliomnomnom",
   description: "A digital garden for voracious readers",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({
