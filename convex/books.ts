@@ -528,51 +528,60 @@ export async function fetchMissingCoversHandler(
   const userId = await requireAuthAction(ctx);
   const numItems = clampLimit(args.limit);
 
-  const targets = await ctx.runQuery(internal.books.listMissingCovers, {
-    userId,
-    limit: numItems,
-    cursor: args.cursor,
-    bookIds: args.bookIds,
-  });
-
-  // Safety check: If we get an empty page but a cursor, it's a pagination anomaly.
-  // Return null to prevent infinite loops in the client.
-  if (targets.items.length === 0 && targets.nextCursor) {
-    return {
-      processed: 0,
-      updated: 0,
-      failures: [],
-      nextCursor: null,
-    };
-  }
-
   let processed = 0;
   let updated = 0;
   const failures: { bookId: Id<"books">; reason: string }[] = [];
+  let cursor = args.cursor;
 
-  for (const book of targets.items) {
-    if (!isMissingCover(book)) {
-      continue;
-    }
-
-    processed += 1;
-
-    const result = await ctx.runAction(internal.actions.coverFetch.search, {
-      bookId: book._id,
+  // Loop until we process the requested number of items or run out of data.
+  // This "deep module" approach hides the sparse scan from the client.
+  while (processed < numItems) {
+    const targets: ListMissingCoversResult = await ctx.runQuery(internal.books.listMissingCovers, {
+      userId,
+      limit: numItems - processed, // Ask for what we still need
+      cursor,
+      bookIds: args.bookIds,
     });
 
-    if ("error" in result) {
-      failures.push({ bookId: book._id, reason: result.error });
-      continue;
+    // If no items found and no next page, we are done.
+    if (targets.items.length === 0 && !targets.nextCursor) {
+      break;
     }
 
-    await ctx.runMutation(internal.books.setApiCover, {
-      bookId: book._id,
-      apiCoverUrl: result.apiCoverUrl,
-      apiSource: result.apiSource,
-    });
+    // If items found, process them
+    for (const book of targets.items) {
+      if (!isMissingCover(book)) {
+        continue;
+      }
 
-    updated += 1;
+      processed += 1;
+
+      const result = await ctx.runAction(internal.actions.coverFetch.search, {
+        bookId: book._id,
+      });
+
+      if ("error" in result) {
+        failures.push({ bookId: book._id, reason: result.error });
+        continue;
+      }
+
+      await ctx.runMutation(internal.books.setApiCover, {
+        bookId: book._id,
+        apiCoverUrl: result.apiCoverUrl,
+        apiSource: result.apiSource,
+      });
+
+      updated += 1;
+    }
+
+    // Advance the cursor
+    cursor = targets.nextCursor;
+
+    // If we didn't find anything in this batch but have a cursor, we loop again.
+    // If we have no cursor left, we break the outer loop (handled by condition next iteration or check above)
+    if (!cursor) {
+      break;
+    }
   }
 
   logCoverEvent({
@@ -581,7 +590,7 @@ export async function fetchMissingCoversHandler(
     updated,
     failures: failures.length,
     durationMs: Date.now() - startedAt,
-    batchSize: targets.items.length,
+    batchSize: processed, // Log effective batch size
     source: args.bookIds ? "manual" : "import",
   });
 
@@ -589,7 +598,7 @@ export async function fetchMissingCoversHandler(
     processed,
     updated,
     failures,
-    nextCursor: targets.nextCursor ?? null,
+    nextCursor: cursor ?? null,
   };
 }
 
