@@ -113,7 +113,7 @@ export function BookGrid() {
 
           {/* Add Book Dropdown */}
           <div className="flex items-center gap-3">
-            <FetchMissingCoversButton />
+            <FetchMissingCoversButton hidden={!allBooks || allBooks.length === 0} />
             <AddBookButton
               onManualAdd={() => setManualAddOpen(true)}
               onImport={() => router.push("/import")}
@@ -167,16 +167,17 @@ function LibraryView({
   if (isEmpty) {
     return (
       <EmptyState
-        title="Your shelves are bare."
-        description="Start your library with a single book or import from Goodreads."
+        title="Your shelves await"
+        description="Add your first book to start building your collection."
         action={
-          <div className="flex flex-col gap-3">
-            <Button onClick={onManualAdd} size="lg">
-              Add Your First Book
-            </Button>
-            <Button variant="ghost" onClick={onImport} className="text-text-inkMuted">
-              Or import your library
-            </Button>
+          <div className="flex items-center gap-4">
+            <Button onClick={onManualAdd}>Add a Book</Button>
+            <button
+              onClick={onImport}
+              className="font-sans text-sm text-text-inkMuted hover:text-text-ink transition-colors duration-fast"
+            >
+              or import
+            </button>
           </div>
         }
       />
@@ -217,16 +218,17 @@ function ToReadView({
   if (!books || books.length === 0) {
     return (
       <EmptyState
-        title="Your queue is empty."
-        description="No books waiting in the wings. Find something new to look forward to."
+        title="Nothing in the queue"
+        description="Add books you're curious about—they'll wait here."
         action={
-          <div className="flex flex-col gap-3">
-            <Button onClick={onManualAdd} size="lg">
-              Add a Book
-            </Button>
-            <Button variant="ghost" onClick={onImport} className="text-text-inkMuted">
-              Or import books
-            </Button>
+          <div className="flex items-center gap-4">
+            <Button onClick={onManualAdd}>Add a Book</Button>
+            <button
+              onClick={onImport}
+              className="font-sans text-sm text-text-inkMuted hover:text-text-ink transition-colors duration-fast"
+            >
+              or import
+            </button>
           </div>
         }
       />
@@ -245,8 +247,8 @@ function FavoritesView({
   if (!books || books.length === 0) {
     return (
       <EmptyState
-        title="No favorites yet."
-        description="Mark the books that changed you as favorites. They'll appear here."
+        title="No favorites yet"
+        description="Mark a book as a favorite and it'll appear here."
       />
     );
   }

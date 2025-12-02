@@ -10,12 +10,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const COVER_BACKFILL_ENABLED = process.env.NEXT_PUBLIC_COVER_BACKFILL_ENABLED !== "false";
 
-export function FetchMissingCoversButton() {
+type Props = {
+  hidden?: boolean;
+};
+
+export function FetchMissingCoversButton({ hidden }: Props) {
   const [running, setRunning] = useState(false);
   const { toast } = useToast();
   const fetchMissingCovers = useAction(api.books.fetchMissingCovers);
 
-  if (!COVER_BACKFILL_ENABLED) return null;
+  if (!COVER_BACKFILL_ENABLED || hidden) return null;
 
   const handleClick = async () => {
     if (running) return;

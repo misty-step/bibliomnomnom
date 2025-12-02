@@ -9,17 +9,26 @@ type EmptyStateProps = {
   className?: string;
 };
 
+/**
+ * Empty state with editorial left-aligned typography.
+ * Clean, minimal, inviting.
+ */
 export function EmptyState({ title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex flex-col items-center justify-center py-16 text-center", className)}>
-      <div className="max-w-md space-y-4">
-        <h3 className="font-display text-3xl font-medium text-text-ink">{title}</h3>
+    <div className={cn("py-16", className)}>
+      <div className="max-w-md">
+        {/* Title - elegant serif, left-aligned */}
+        <h3 className="font-display text-3xl text-text-ink tracking-tight">{title}</h3>
+
+        {/* Description - tight spacing */}
         {description ? (
-          <p className="font-sans text-base text-text-inkMuted leading-relaxed max-w-sm mx-auto">
+          <p className="mt-3 font-sans text-base text-text-inkMuted leading-relaxed">
             {description}
           </p>
         ) : null}
-        {action ? <div className="pt-6">{action}</div> : null}
+
+        {/* Actions */}
+        {action ? <div className="mt-8">{action}</div> : null}
       </div>
     </div>
   );
