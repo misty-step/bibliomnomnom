@@ -63,14 +63,10 @@ describe("health route", () => {
   });
 
   it("maps exceptions to unhealthy 503", async () => {
-    const failingHandler = async () => {
-      throw new Error("boom");
-    };
+    const { probeConvex } = await import("@/lib/health/probes");
+    (probeConvex as unknown as Mock).mockRejectedValueOnce(new Error("boom"));
 
-    const { withObservability } = await import("@/lib/api/withObservability");
-    const handler = withObservability(failingHandler, "health-check");
-
-    const res = await handler(new Request("https://example.com/api/health"));
+    const res = await GET(new Request("https://example.com/api/health?mode=deep"));
     const body = await res.json();
 
     expect(res.status).toBe(503);
