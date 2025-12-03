@@ -98,7 +98,7 @@ Total: 3.0h
   depends: Dual-mode health route
   ```
 
-- [ ] Vitest coverage for health endpoint  
+- [x] Vitest coverage for health endpoint  
   ```
   Files:
   - app/api/health/__tests__/route.test.ts (new)

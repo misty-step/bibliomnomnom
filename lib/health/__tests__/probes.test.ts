@@ -21,7 +21,7 @@ describe("probe helpers", () => {
   });
 
   it("marks service up on 200", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch;
 
     const result = await probeConvex("https://convex.cloud");
     expect(result.status).toBe("up");
@@ -29,7 +29,7 @@ describe("probe helpers", () => {
   });
 
   it("marks service down on non-200", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503 });
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503 }) as unknown as typeof fetch;
 
     const result = await probeBlob("https://blob.example.com");
     expect(result).toEqual({
@@ -58,7 +58,9 @@ describe("probe helpers", () => {
   });
 
   it("builds clerk jwks url correctly", async () => {
-    const fetchSpy = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValue({ ok: true, status: 200 }) as unknown as typeof fetch;
     global.fetch = fetchSpy;
 
     await probeClerk("https://clerk.accounts.dev");
