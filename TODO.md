@@ -115,7 +115,7 @@ Total: 3.0h
   depends: Dual-mode health route, Probe helpers
   ```
 
-- [ ] Docs + monitor guidance  
+- [x] Docs + monitor guidance  
   ```
   Files:
   - DEPLOYMENT.md (health section)
