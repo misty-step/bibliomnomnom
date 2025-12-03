@@ -59,7 +59,7 @@ Total: 3.0h
   Estimate: 1.0h
   ```
 
-- [ ] Dual-mode health route  
+- [x] Dual-mode health route  
   ```
   Files:
   - app/api/health/route.ts
