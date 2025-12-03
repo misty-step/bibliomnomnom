@@ -40,7 +40,7 @@ Total: 3.0h
   Estimate: 0.5h
   ```
 
-- [ ] Probe helpers with timeouts  
+- [x] Probe helpers with timeouts  
   ```
   Files:
   - lib/health/probes.ts (new)
