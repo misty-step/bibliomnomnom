@@ -79,7 +79,7 @@ Total: 3.0h
   Estimate: 1.0h
   ```
 
-- [ ] Structured observability for health  
+- [x] Structured observability for health  
   ```
   Files:
   - lib/api/withObservability.ts
