@@ -205,10 +205,14 @@ git push origin main
 Test the health endpoint:
 
 ```bash
+# Shallow (monitor-safe)
 curl https://your-domain.com/api/health
+
+# Deep (manual diagnostics only)
+curl "https://your-domain.com/api/health?mode=deep"
 ```
 
-Expected response:
+Expected shallow response (200):
 
 ```json
 {
@@ -218,12 +222,27 @@ Expected response:
   "environment": "production",
   "version": "abc1234",
   "services": {
-    "convex": true,
-    "clerk": true,
-    "blob": true
+    "convex": { "status": "unknown" },
+    "clerk": { "status": "unknown" },
+    "blob": { "status": "unknown" }
   }
 }
 ```
+
+Expected deep response when all dependencies are reachable (200):
+
+```json
+{
+  "status": "healthy",
+  "services": {
+    "convex": { "status": "up", "latencyMs": 85 },
+    "clerk": { "status": "up", "latencyMs": 70 },
+    "blob": { "status": "up", "latencyMs": 65 }
+  }
+}
+```
+
+If any dependency is down, expect HTTP 503 with `status: "degraded"` and the failing service marked `"down"` with a sanitized error code.
 
 ### 5.2 Authentication Flow
 
@@ -318,7 +337,7 @@ Set up external monitoring:
 **BetterUptime (free tier):**
 
 1. Sign up at [betteruptime.com](https://betteruptime.com)
-2. Add monitor: `https://your-domain.com/api/health`
+2. Add monitor: `https://your-domain.com/api/health` (shallow mode)
 3. Set check interval: 1 minute
 4. Configure alerts (email/Slack)
 
@@ -326,8 +345,13 @@ Set up external monitoring:
 
 1. Sign up at [uptimerobot.com](https://uptimerobot.com)
 2. Add HTTP(s) monitor
-3. URL: `https://your-domain.com/api/health`
+3. URL: `https://your-domain.com/api/health` (do NOT append `mode=deep`)
 4. Interval: 5 minutes (free tier limit)
+
+**Deep checks (manual/ops only):**
+
+- Run `curl "https://your-domain.com/api/health?mode=deep"` during incident triage or deploy verification.
+- Avoid scheduling deep mode on external monitors to prevent unnecessary load and false alerts if dependencies rate-limit probes.
 
 ### 7.3 Error Tracking (Optional - Recommended)
 

@@ -193,11 +193,16 @@ CONVEX_DEPLOY_KEY=preview:username:project|token
 After deployment, verify:
 
 ```bash
-# Health check
+# Shallow health (monitor-safe)
 curl https://your-domain.com/api/health
 
-# Should return:
-# {"status":"healthy","environment":"production",...}
+# Should return 200 with services marked "unknown" (no external probes).
+
+# Deep diagnostics (manual only)
+curl "https://your-domain.com/api/health?mode=deep"
+
+# Should return 200 when dependencies up; 503 when any are down.
+# Response includes git SHA prefix in `version` and per-service status/latency.
 ```
 
 Test critical flows:
