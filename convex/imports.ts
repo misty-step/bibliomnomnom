@@ -127,17 +127,26 @@ export const extractBooks = action({
     const provider = openaiKey ? createOpenAIProvider(openaiKey) : undefined;
     const fallbackProvider = geminiKey ? createGeminiProvider(geminiKey) : undefined;
 
-    const llmResult = await llmExtract(args.rawText ?? "", {
-      tokenCap: LLM_TOKEN_CAP,
-      provider,
-      fallbackProvider,
-    });
+    try {
+      const llmResult = await llmExtract(args.rawText ?? "", {
+        tokenCap: LLM_TOKEN_CAP,
+        provider,
+        fallbackProvider,
+      });
 
-    return {
-      books: llmResult.rows,
-      warnings: llmResult.warnings,
-      errors: llmResult.errors,
-    };
+      return {
+        books: llmResult.rows,
+        warnings: llmResult.warnings,
+        errors: llmResult.errors,
+      };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown extraction error";
+      return {
+        books: [],
+        warnings: [],
+        errors: [{ message }] as ParseError[],
+      };
+    }
   },
 });
 
