@@ -47,8 +47,11 @@ type AddBookSheetProps = {
 
 // Helper to get today's date in YYYY-MM-DD format
 function getTodayString(): string {
-  return new Date().toISOString().split("T")[0];
+  return new Date().toISOString().split("T")[0] ?? "";
 }
+
+// Default example book for placeholders
+const DEFAULT_EXAMPLE_BOOK = EXAMPLE_BOOKS[0] ?? { title: "The Hobbit", author: "J.R.R. Tolkien" };
 
 export function AddBookSheet({
   triggerLabel = "Add Book",
@@ -82,7 +85,7 @@ export function AddBookSheet({
   const [isAudiobook, setIsAudiobook] = useState(false);
   const [dateFinished, setDateFinished] = useState("");
   const [exampleBook, setExampleBook] = useState(
-    () => EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)],
+    () => EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)] ?? DEFAULT_EXAMPLE_BOOK,
   );
 
   // Open Library search result fields
@@ -135,7 +138,9 @@ export function AddBookSheet({
   // Pick new random example book when form opens
   useEffect(() => {
     if (isOpen) {
-      setExampleBook(EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)]);
+      setExampleBook(
+        EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)] ?? DEFAULT_EXAMPLE_BOOK,
+      );
     }
   }, [isOpen]);
 

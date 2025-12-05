@@ -134,7 +134,7 @@ export const parseGoodreadsCsv = (fileText: string): ClientParseResult => {
     };
   }
 
-  const headerRow = rows[0];
+  const headerRow = rows[0]!;
   const headerLookup = buildHeaderLookup(headerRow);
 
   for (const required of REQUIRED_HEADERS) {

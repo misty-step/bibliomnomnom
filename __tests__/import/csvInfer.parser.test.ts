@@ -5,20 +5,20 @@ describe("inferGenericCsv parser internals", () => {
   it("handles quoted fields with commas", () => {
     const csv = 'Title,Author\n"Dune, Messiah",Frank Herbert';
     const result = inferGenericCsv(csv);
-    expect(result.rows[0].title).toBe("Dune, Messiah");
-    expect(result.rows[0].author).toBe("Frank Herbert");
+    expect(result.rows[0]!.title).toBe("Dune, Messiah");
+    expect(result.rows[0]!.author).toBe("Frank Herbert");
   });
 
   it("handles quoted fields with newlines", () => {
     const csv = 'Title,Author\n"Dune\nMessiah",Frank Herbert';
     const result = inferGenericCsv(csv);
-    expect(result.rows[0].title).toBe("Dune Messiah");
+    expect(result.rows[0]!.title).toBe("Dune Messiah");
   });
 
   it("handles escaped quotes", () => {
     const csv = 'Title,Author\n"Dune ""Messiah""",Frank Herbert';
     const result = inferGenericCsv(csv);
-    expect(result.rows[0].title).toBe('Dune "Messiah"');
+    expect(result.rows[0]!.title).toBe('Dune "Messiah"');
   });
 
   it("handles CRLF line endings", () => {
@@ -31,7 +31,7 @@ describe("inferGenericCsv parser internals", () => {
     const csv = "\uFEFFTitle,Author\nDune,Frank Herbert";
     const result = inferGenericCsv(csv);
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].title).toBe("Dune");
+    expect(result.rows[0]!.title).toBe("Dune");
   });
 
   it("handles empty file", () => {
@@ -54,15 +54,15 @@ describe("inferGenericCsv value mapping", () => {
       B9,A9,other
     `;
     const result = inferGenericCsv(csv);
-    expect(result.rows[0].isAudiobook).toBe(true);
-    expect(result.rows[1].isAudiobook).toBe(true);
-    expect(result.rows[2].isAudiobook).toBe(true);
-    expect(result.rows[3].isAudiobook).toBe(true);
-    expect(result.rows[4].isAudiobook).toBe(false);
-    expect(result.rows[5].isAudiobook).toBe(false);
-    expect(result.rows[6].isAudiobook).toBe(false);
-    expect(result.rows[7].isAudiobook).toBe(false);
-    expect(result.rows[8].isAudiobook).toBeUndefined();
+    expect(result.rows[0]!.isAudiobook).toBe(true);
+    expect(result.rows[1]!.isAudiobook).toBe(true);
+    expect(result.rows[2]!.isAudiobook).toBe(true);
+    expect(result.rows[3]!.isAudiobook).toBe(true);
+    expect(result.rows[4]!.isAudiobook).toBe(false);
+    expect(result.rows[5]!.isAudiobook).toBe(false);
+    expect(result.rows[6]!.isAudiobook).toBe(false);
+    expect(result.rows[7]!.isAudiobook).toBe(false);
+    expect(result.rows[8]!.isAudiobook).toBeUndefined();
   });
 
   it("handles number parsing", () => {
@@ -72,9 +72,9 @@ describe("inferGenericCsv value mapping", () => {
       B3,A3,
     `;
     const result = inferGenericCsv(csv);
-    expect(result.rows[0].pageCount).toBe(100);
-    expect(result.rows[1].pageCount).toBeUndefined();
-    expect(result.rows[2].pageCount).toBeUndefined();
+    expect(result.rows[0]!.pageCount).toBe(100);
+    expect(result.rows[1]!.pageCount).toBeUndefined();
+    expect(result.rows[2]!.pageCount).toBeUndefined();
   });
 
   it("handles privacy", () => {
@@ -84,9 +84,9 @@ describe("inferGenericCsv value mapping", () => {
         B3,A3,unknown
       `;
     const result = inferGenericCsv(csv);
-    expect(result.rows[0].privacy).toBe("public");
-    expect(result.rows[1].privacy).toBe("private");
-    expect(result.rows[2].privacy).toBe("private");
+    expect(result.rows[0]!.privacy).toBe("public");
+    expect(result.rows[1]!.privacy).toBe("private");
+    expect(result.rows[2]!.privacy).toBe("private");
   });
 
   it("warns on unused columns", () => {

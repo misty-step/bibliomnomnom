@@ -332,7 +332,11 @@ function toOptionalNumber(value: string): number | null {
 
 function toTimestamp(value: string): number | null {
   if (!value) return null;
-  const [year, month, day] = value.split("-").map(Number);
+  const parts = value.split("-").map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  if (year === undefined || month === undefined || day === undefined) return null;
   // Create date at local noon to avoid timezone shifting issues when displaying back
   // or just create a "local date"
   return new Date(year, month - 1, day).getTime();

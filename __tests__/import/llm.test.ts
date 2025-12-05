@@ -29,7 +29,7 @@ describe("llmExtract", () => {
     }
 
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].title).toBe("The Hobbit");
+    expect(result.rows[0]!.title).toBe("The Hobbit");
     expect(result.errors).toHaveLength(0);
   });
 
@@ -45,7 +45,7 @@ describe("llmExtract", () => {
     }
 
     expect(result.rows).toHaveLength(0);
-    expect(result.errors[0].message).toContain("No LLM provider supplied");
+    expect(result.errors[0]!.message).toContain("No LLM provider supplied");
   });
 
   it("enforces token cap", async () => {
@@ -65,7 +65,7 @@ describe("llmExtract", () => {
     }
 
     expect(result.rows).toHaveLength(0);
-    expect(result.errors[0].message).toContain("Token budget exceeded");
+    expect(result.errors[0]!.message).toContain("Token budget exceeded");
   });
 
   it("falls back to second provider when first fails", async () => {
@@ -112,6 +112,6 @@ describe("llmExtract", () => {
     }
 
     expect(result.rows).toHaveLength(0);
-    expect(result.errors[0].message).toContain("Row missing required title or author");
+    expect(result.errors[0]!.message).toContain("Row missing required title or author");
   });
 });

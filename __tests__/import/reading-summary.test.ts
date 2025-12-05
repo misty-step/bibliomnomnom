@@ -123,8 +123,8 @@ describe("READING_SUMMARY.md import", () => {
         (r) => r.title === "The Sovereign Individual",
       );
       expect(sovereignIndividuals).toHaveLength(2);
-      expect(sovereignIndividuals[0].dateFinished).toBe(new Date("2025-04-17").getTime());
-      expect(sovereignIndividuals[1].dateFinished).toBe(new Date("2021-03-09").getTime());
+      expect(sovereignIndividuals[0]!.dateFinished).toBe(new Date("2025-04-17").getTime());
+      expect(sovereignIndividuals[1]!.dateFinished).toBe(new Date("2021-03-09").getTime());
     });
   });
 
@@ -233,9 +233,9 @@ describe("READING_SUMMARY.md import", () => {
 
       // Both rows should match the existing book
       expect(matches).toHaveLength(2);
-      expect(matches[0].matchType).toBe("title-author");
-      expect(matches[1].matchType).toBe("title-author");
-      expect(matches[0].confidence).toBe(0.8);
+      expect(matches[0]!.matchType).toBe("title-author");
+      expect(matches[1]!.matchType).toBe("title-author");
+      expect(matches[0]!.confidence).toBe(0.8);
 
       // User will need to decide:
       // - Skip (already have it)

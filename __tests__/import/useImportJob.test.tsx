@@ -49,7 +49,7 @@ describe("useImportJob", () => {
     });
 
     expect(result.state.status).toBe("ready");
-    expect(result.state.pages[0][0].title).toBe("A");
+    expect(result.state.pages[0]![0]!.title).toBe("A");
   });
 
   it("records decisions and sends to commit", async () => {
@@ -73,8 +73,8 @@ describe("useImportJob", () => {
     });
 
     expect(commitImport).toHaveBeenCalled();
-    const args = commitImport.mock.calls[0][0];
-    expect(args.decisions[0].action).toBe("create");
+    const args = commitImport.mock.calls[0]![0];
+    expect(args.decisions[0]!.action).toBe("create");
     expect(result.state.summary.created).toBe(1);
   });
 });

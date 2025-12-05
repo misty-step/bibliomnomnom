@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Playfair_Display, Geist, JetBrains_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
@@ -54,6 +56,8 @@ export default function RootLayout({
               <Footer />
               <Toaster />
             </ConvexClientProvider>
+            <Analytics />
+            <SpeedInsights />
           </ThemeProvider>
         </body>
       </html>

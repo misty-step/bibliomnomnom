@@ -24,7 +24,7 @@ type FetchCoverButtonProps = {
  * @returns A Blob object representing the image data
  */
 function dataUrlToBlob(dataUrl: string): Blob {
-  const [header, base64] = dataUrl.split(",");
+  const [header = "", base64 = ""] = dataUrl.split(",");
   const mimeMatch = header.match(/data:(.*);base64/);
   const mime = mimeMatch?.[1] ?? "application/octet-stream";
   const binary = atob(base64);

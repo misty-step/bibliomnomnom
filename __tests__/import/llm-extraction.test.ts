@@ -16,7 +16,7 @@ describe("llmExtract", () => {
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].message).toContain("No LLM provider");
+    expect(result.errors[0]!.message).toContain("No LLM provider");
   });
 
   it("extracts books from static provider response", async () => {
@@ -30,8 +30,8 @@ describe("llmExtract", () => {
     const result = await llmExtract("Book list here", { provider });
 
     expect(result.rows).toHaveLength(2);
-    expect(result.rows[0].title).toBe("The Great Gatsby");
-    expect(result.rows[1].author).toBe("George Orwell");
+    expect(result.rows[0]!.title).toBe("The Great Gatsby");
+    expect(result.rows[1]!.author).toBe("George Orwell");
     expect(result.errors).toHaveLength(0);
   });
 
@@ -56,7 +56,7 @@ describe("llmExtract", () => {
 
     expect(callCount).toBe(3); // Should have retried twice
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].title).toBe("Test Book");
+    expect(result.rows[0]!.title).toBe("Test Book");
   });
 
   it("returns error after max retries on persistent timeout", async () => {
@@ -74,7 +74,7 @@ describe("llmExtract", () => {
     // 3 attempts (1 initial + 2 retries)
     expect(mockProvider.call).toHaveBeenCalledTimes(3);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].message).toContain("timed out");
+    expect(result.errors[0]!.message).toContain("timed out");
   });
 
   it("falls back to fallback provider when primary fails", async () => {
@@ -98,7 +98,7 @@ describe("llmExtract", () => {
     });
 
     expect(result.rows).toHaveLength(1);
-    expect(result.rows[0].title).toBe("Fallback Book");
+    expect(result.rows[0]!.title).toBe("Fallback Book");
   });
 
   it("rejects token budget exceeding files", async () => {
@@ -109,7 +109,7 @@ describe("llmExtract", () => {
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].message).toContain("Token budget exceeded");
+    expect(result.errors[0]!.message).toContain("Token budget exceeded");
   });
 
   it("sanitizes rows with missing required fields", async () => {
@@ -126,7 +126,7 @@ describe("llmExtract", () => {
 
     expect(result.rows).toHaveLength(2); // Only valid rows
     expect(result.errors).toHaveLength(2); // Two rows missing required fields
-    expect(result.rows[0].title).toBe("Valid Book");
-    expect(result.rows[1].title).toBe("Another Valid");
+    expect(result.rows[0]!.title).toBe("Valid Book");
+    expect(result.rows[1]!.title).toBe("Another Valid");
   });
 });

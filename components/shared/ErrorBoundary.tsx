@@ -12,17 +12,17 @@ type State = {
 };
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false };
+  override state: State = { hasError: false };
 
   static getDerivedStateFromError() {
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
+  override componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("ErrorBoundary caught error", error, info);
   }
 
-  render() {
+  override render() {
     if (this.state.hasError) {
       return (
         this.props.fallback ?? (

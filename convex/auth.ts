@@ -65,11 +65,14 @@ async function ensureUserExists(
     .collect();
 
   if (matches.length > 0) {
-    const [keeper, ...dupes] = matches.sort((a, b) => a._creationTime - b._creationTime);
+    const sorted = matches.sort((a, b) => a._creationTime - b._creationTime);
+    const keeper = sorted[0];
+    const dupes = sorted.slice(1);
     for (const dupe of dupes) {
       await (ctx as MutationCtx).db.delete(dupe._id);
     }
-    return keeper._id;
+    // keeper is guaranteed to exist since matches.length > 0
+    return keeper!._id;
   }
 
   // If nothing found, bubble original error for visibility.

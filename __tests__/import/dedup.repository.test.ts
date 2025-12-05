@@ -23,7 +23,9 @@ describe("fetchUserBooks", () => {
     expect(mockQuery.withIndex).toHaveBeenCalledWith("by_user", expect.any(Function));
 
     // Verify the index filter function
-    const filterFn = mockQuery.withIndex.mock.calls[0][1];
+    const filterFn = mockQuery.withIndex.mock.calls[0]![1] as (q: {
+      eq: ReturnType<typeof vi.fn>;
+    }) => void;
     const q = { eq: vi.fn().mockReturnThis() };
     filterFn(q);
     expect(q.eq).toHaveBeenCalledWith("userId", "u1");

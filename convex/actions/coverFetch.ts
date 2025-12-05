@@ -70,7 +70,8 @@ function arrayBufferToDataUrl(buffer: ArrayBuffer, contentType = "image/jpeg"): 
   const bytes = new Uint8Array(buffer);
   let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
+    // bytes[i] is guaranteed to be defined within the array bounds
+    binary += String.fromCharCode(bytes[i]!);
   }
   const base64 = btoa(binary);
   return `data:${contentType};base64,${base64}`;

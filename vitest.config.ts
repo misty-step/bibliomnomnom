@@ -14,6 +14,7 @@ export default defineConfig({
     setupFiles: "./vitest.setup.ts",
     globals: true,
     css: false,
+    exclude: ["**/node_modules/**", "**/e2e/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "html", "lcov"],

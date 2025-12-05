@@ -48,6 +48,7 @@ export function UploadDropzone({
     (files: FileList | null) => {
       if (!files || !files.length) return;
       const file = files[0];
+      if (!file) return;
       if (file.size > maxBytes) {
         setError(`File too large (${formatBytes(file.size)}). Max ${formatBytes(maxBytes)}.`);
         return;
