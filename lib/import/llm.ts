@@ -31,8 +31,9 @@ export type LlmExtractResult = {
   tokenUsage: number;
 };
 
-const DEFAULT_CHUNK_TOKEN_SIZE = 8_000;
+const DEFAULT_CHUNK_TOKEN_SIZE = 100_000; // Large chunks for Gemini's 1M context
 const TOKEN_ESTIMATE_DIVISOR = 4; // rough chars→tokens heuristic
+const PARALLEL_CONCURRENCY = 3; // Process up to 3 chunks at once
 
 const estimateTokens = (text: string): number => Math.ceil(text.length / TOKEN_ESTIMATE_DIVISOR);
 
@@ -132,9 +133,37 @@ const validateAndCollect = (
   return { rows, warnings, errors };
 };
 
-const runProvider = async (provider: LlmProvider, prompt: string): Promise<ParsedBook[]> => {
-  const content = await provider.call(prompt);
-  return parseModelJson(content);
+const MAX_RETRIES = 2;
+
+const runProvider = async (
+  provider: LlmProvider,
+  prompt: string,
+  retries = MAX_RETRIES,
+): Promise<ParsedBook[]> => {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const content = await provider.call(prompt);
+      return parseModelJson(content);
+    } catch (err: any) {
+      lastError = err;
+
+      // Retry on AbortError (timeout) or network errors
+      const isRetryable = err.name === "AbortError" || err.message?.includes("fetch");
+      if (isRetryable && attempt < retries) {
+        console.warn(
+          `[LLM] ${provider.name} attempt ${attempt + 1} failed (${err.name}), retrying...`,
+        );
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError ?? new Error("LLM provider failed after retries");
 };
 
 const buildVerificationPrompt = (
@@ -230,13 +259,14 @@ export const llmExtract = async (
   const collected: ParsedBook[] = [];
   let tokenUsage = 0;
 
-  for (const chunk of chunks) {
-    const prompt = buildPrompt(chunk);
-    const estimated = estimateTokens(prompt);
-    tokenUsage += estimated;
+  const provider = opts.provider;
+  const fallback = opts.fallbackProvider;
 
-    const provider = opts.provider;
-    const fallback = opts.fallbackProvider;
+  // Process a single chunk
+  const processChunk = async (
+    chunk: string,
+  ): Promise<{ parsed: ParsedBook[]; error: Error | null }> => {
+    const prompt = buildPrompt(chunk);
 
     let parsed: ParsedBook[] = [];
     let providerError: Error | null = null;
@@ -257,30 +287,51 @@ export const llmExtract = async (
       }
     }
 
-    if (!parsed.length) {
-      errors.push({ message: providerError?.message ?? "LLM returned no parsable data" });
-      continue;
-    }
+    return { parsed, error: providerError };
+  };
 
-    // Phase 2: Verify extraction completeness using fallback provider (if available)
-    if (fallback && parsed.length > 0) {
-      const verification = await verifyExtraction(fallback, chunk, parsed);
+  // Process chunks in parallel batches
+  for (let i = 0; i < chunks.length; i += PARALLEL_CONCURRENCY) {
+    const batch = chunks.slice(i, i + PARALLEL_CONCURRENCY);
 
-      if (!verification.complete) {
-        warnings.push(
-          `Chunk verification: Extracted ${parsed.length} books, but verifier estimates ${verification.estimatedTotal} total`,
-        );
+    // Track token usage for this batch
+    batch.forEach((chunk) => {
+      tokenUsage += estimateTokens(buildPrompt(chunk));
+    });
+
+    // Process batch in parallel
+    const results = await Promise.all(batch.map(processChunk));
+
+    // Collect results from batch
+    for (let j = 0; j < results.length; j++) {
+      const { parsed, error } = results[j];
+      const chunk = batch[j];
+
+      if (!parsed.length) {
+        errors.push({ message: error?.message ?? "LLM returned no parsable data" });
+        continue;
       }
 
-      if (verification.issues.length > 0) {
-        warnings.push(...verification.issues.map((issue) => `Verification: ${issue}`));
-      }
-    }
+      // Verify extraction completeness (sequential to avoid overloading)
+      if (fallback && parsed.length > 0) {
+        const verification = await verifyExtraction(fallback, chunk, parsed);
 
-    const { rows, warnings: rowWarnings, errors: rowErrors } = validateAndCollect(parsed);
-    warnings.push(...rowWarnings.map((w) => `Chunk: ${w}`));
-    errors.push(...rowErrors.map((e) => ({ ...e, message: `Chunk row error: ${e.message}` })));
-    collected.push(...rows);
+        if (!verification.complete) {
+          warnings.push(
+            `Chunk verification: Extracted ${parsed.length} books, but verifier estimates ${verification.estimatedTotal} total`,
+          );
+        }
+
+        if (verification.issues.length > 0) {
+          warnings.push(...verification.issues.map((issue) => `Verification: ${issue}`));
+        }
+      }
+
+      const { rows, warnings: rowWarnings, errors: rowErrors } = validateAndCollect(parsed);
+      warnings.push(...rowWarnings.map((w) => `Chunk: ${w}`));
+      errors.push(...rowErrors.map((e) => ({ ...e, message: `Chunk row error: ${e.message}` })));
+      collected.push(...rows);
+    }
   }
 
   return { rows: collected, warnings, errors, tokenUsage };
@@ -293,11 +344,15 @@ export const makeStaticProvider = (payload: any): LlmProvider => ({
 });
 
 // OpenAI provider using REST API
+const PROVIDER_TIMEOUT_MS = 300_000; // 5 minutes
+
 export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
   name: "openai",
   call: async (prompt: string) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, PROVIDER_TIMEOUT_MS);
 
     try {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -321,6 +376,11 @@ export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
 
       const data = await response.json();
       return data.choices[0]?.message?.content ?? "{}";
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        throw new Error(`OpenAI request timed out after ${PROVIDER_TIMEOUT_MS / 1000}s`);
+      }
+      throw err;
     } finally {
       clearTimeout(timeoutId);
     }
@@ -332,7 +392,9 @@ export const createGeminiProvider = (apiKey: string): LlmProvider => ({
   name: "gemini",
   call: async (prompt: string) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120_000); // 2 min
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, PROVIDER_TIMEOUT_MS);
 
     try {
       const response = await fetch(
@@ -358,6 +420,11 @@ export const createGeminiProvider = (apiKey: string): LlmProvider => ({
 
       const data = await response.json();
       return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        throw new Error(`Gemini request timed out after ${PROVIDER_TIMEOUT_MS / 1000}s`);
+      }
+      throw err;
     } finally {
       clearTimeout(timeoutId);
     }

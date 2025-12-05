@@ -1,15 +1,5 @@
-import { fileURLToPath } from "node:url";
-import path from "node:path";
-import { FlatCompat } from "@eslint/eslintrc";
+import nextConfig from "eslint-config-next/core-web-vitals";
 import designTokensPlugin from "./eslint/plugins/design-tokens.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  resolvePluginsRelativeTo: __dirname,
-});
 
 const tokenRuleConfig = {
   plugins: {
@@ -27,15 +17,32 @@ const tokenRuleConfig = {
   },
 };
 
-export default [
+const eslintConfig = [
   {
     name: "global-ignores",
-    ignores: ["node_modules/**", ".next/**", "dist/**"],
+    ignores: [
+      "node_modules/**",
+      ".next/**",
+      "dist/**",
+      "coverage/**",
+      "convex/_generated/**",
+    ],
   },
-  ...compat.extends("next/core-web-vitals"),
+  ...nextConfig,
   {
     name: "design-system-enforcement",
     ...tokenRuleConfig,
     files: ["**/*.{js,jsx,ts,tsx}"],
   },
+  {
+    name: "react-hooks-relaxed",
+    files: ["**/*.{jsx,tsx}"],
+    rules: {
+      // These patterns are valid for hydration, localStorage sync, and auth state
+      "react-hooks/set-state-in-effect": "off",
+      "react-hooks/immutability": "off",
+    },
+  },
 ];
+
+export default eslintConfig;

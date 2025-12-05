@@ -4,7 +4,7 @@ if (!issuer) {
   throw new Error("CLERK_JWT_ISSUER_DOMAIN environment variable is required");
 }
 
-export default {
+const authConfig = {
   providers: [
     {
       domain: issuer,
@@ -12,3 +12,5 @@ export default {
     },
   ],
 };
+
+export default authConfig;

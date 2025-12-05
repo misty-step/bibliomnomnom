@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { UploadDropzone } from "./UploadDropzone";
 import { CommitSummary } from "./CommitSummary";
 import { PreviewTable } from "./PreviewTable";
+import { ExtractionProgress } from "./ExtractionProgress";
 import { useImportJob } from "@/hooks/useImportJob";
 import { logImportEvent } from "@/lib/import/metrics";
 
@@ -181,27 +182,10 @@ export function ImportFlow() {
 
           {/* Loading state */}
           {isWorking && (
-            <div className="py-12 space-y-4 text-center motion-fade-in">
-              <Loader2 className="h-6 w-6 animate-spin mx-auto text-text-ink" />
-              <div>
-                <p className="font-display text-lg text-text-ink">
-                  {job.state.status === "parsing" && "Analyzing your file"}
-                  {job.state.status === "previewing" && "Extracting books"}
-                  {job.state.status === "committing" && "Importing books"}
-                </p>
-                <p className="text-sm text-text-inkMuted mt-1">
-                  {job.state.status === "parsing" && "Reading and parsing content..."}
-                  {job.state.status === "previewing" &&
-                    "Using GPT-5.1-mini for extraction and Gemini 2.5 Flash for verification..."}
-                  {job.state.status === "committing" && "Adding to your library..."}
-                </p>
-              </div>
-              {job.state.pages.length > 0 && job.state.status === "previewing" && (
-                <p className="text-xs text-status-positive">
-                  {job.state.pages.flat().length} books found
-                </p>
-              )}
-            </div>
+            <ExtractionProgress
+              phase={job.state.status as "parsing" | "previewing" | "committing"}
+              booksFound={job.state.pages.flat().length}
+            />
           )}
 
           {/* Empty state: no books extracted */}

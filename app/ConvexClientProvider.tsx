@@ -1,14 +1,57 @@
 "use client";
 
-import { useAuth as useClerkAuth } from "@clerk/clerk-react";
+import { useAuth } from "@clerk/nextjs";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import { ConvexReactClient, useMutation } from "convex/react";
-import { createContext, ReactNode, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { api } from "@/convex/_generated/api";
-import { useAuth } from "@/lib/hooks/useAuth";
+import { useAuth as useAppAuth } from "@/lib/hooks/useAuth";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
+
+/**
+ * Custom auth adapter for Convex that uses @clerk/nextjs instead of @clerk/clerk-react.
+ *
+ * In Next.js 16, @clerk/clerk-react hooks fail during hydration because they expect
+ * a different provider context. This adapter wraps @clerk/nextjs's SSR-safe useAuth
+ * to provide the exact interface ConvexProviderWithClerk expects.
+ */
+function useClerkNextjsAuth() {
+  const { isLoaded, isSignedIn, getToken, orgId, orgRole } = useAuth();
+
+  // Wrap getToken to ensure type compatibility
+  const wrappedGetToken = useCallback(
+    async (options: { template?: "convex"; skipCache?: boolean }) => {
+      try {
+        const token = await getToken(options);
+        return token ?? null;
+      } catch {
+        return null;
+      }
+    },
+    [getToken],
+  );
+
+  return useMemo(
+    () => ({
+      isLoaded,
+      isSignedIn,
+      getToken: wrappedGetToken,
+      orgId,
+      orgRole,
+    }),
+    [isLoaded, isSignedIn, wrappedGetToken, orgId, orgRole],
+  );
+}
 
 // Context to track user provisioning status in Convex database
 const UserProvisioningContext = createContext<{ isProvisioned: boolean }>({
@@ -35,7 +78,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ConvexProviderWithClerk client={convex} useAuth={useClerkAuth}>
+    <ConvexProviderWithClerk client={convex} useAuth={useClerkNextjsAuth}>
       <UserProvisioningProvider>{children}</UserProvisioningProvider>
     </ConvexProviderWithClerk>
   );
@@ -49,7 +92,7 @@ export function ConvexClientProvider({ children }: { children: ReactNode }) {
  * on first login.
  */
 function UserProvisioningProvider({ children }: { children: ReactNode }) {
-  const { isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated } = useAppAuth();
   const ensureUser = useMutation(api.users.ensureUser);
   const [isProvisioned, setIsProvisioned] = useState(false);
 

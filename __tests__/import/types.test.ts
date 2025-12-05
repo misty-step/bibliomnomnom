@@ -53,6 +53,6 @@ describe("ids and constants", () => {
 
   it("exposes spec constants", () => {
     expect(IMPORT_PAGE_SIZE).toBe(300);
-    expect(LLM_TOKEN_CAP).toBe(60000);
+    expect(LLM_TOKEN_CAP).toBe(500_000); // Gemini 2.5 Flash handles 1M
   });
 });

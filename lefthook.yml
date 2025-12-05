@@ -20,7 +20,7 @@ pre-commit:
 
     lint:
       glob: "**/*.{ts,tsx,js,jsx}"
-      run: pnpm eslint --fix --max-warnings 0 {staged_files}
+      run: pnpm eslint --fix --max-warnings 0 --no-warn-ignored {staged_files}
       stage_fixed: true
 
     format:

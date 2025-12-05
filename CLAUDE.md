@@ -4,14 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**bibliomnomnom** is a private-first book tracking application for voracious readers. Built with Next.js 15, React 19, Convex (backend), and Clerk (authentication). The architecture follows a "Convex-First with Actions" pattern where Convex is the single source of truth, providing real-time updates, type safety, and clean module boundaries.
+**bibliomnomnom** is a private-first book tracking application for voracious readers. Built with Next.js 16, React 19, Convex (backend), and Clerk (authentication). The architecture follows a "Convex-First with Actions" pattern where Convex is the single source of truth, providing real-time updates, type safety, and clean module boundaries.
 
 ## Essential Commands
 
 ### Development
 
 ```bash
-# Start Next.js dev server (with Turbopack)
+# Start Next.js dev server (Turbopack is default in Next.js 16)
 pnpm dev
 
 # Start Convex dev server (for live backend logs/updates)
@@ -84,8 +84,8 @@ pnpm lint
 
 ### Frontend
 
-- **Framework**: Next.js 15.1.0 with App Router and Turbopack
-- **React**: 19.0.0
+- **Framework**: Next.js 16.0.7 with App Router (Turbopack default)
+- **React**: 19.2.1
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS 3.4.1 with custom bibliophile palette
 - **Components**: Shadcn/UI (Radix UI primitives)
@@ -123,7 +123,7 @@ bibliomnomnom/
 │   ├── books/[id]/             # Public book view
 │   ├── api/
 │   │   ├── blob/upload/        # Vercel Blob upload endpoint
-│   │   └── webhooks/clerk/     # Clerk user sync webhook
+│   │   └── health/             # Health check endpoint
 │   ├── layout.tsx              # Root layout (providers)
 │   ├── page.tsx                # Landing page
 │   ├── globals.css             # Global styles + Tailwind
@@ -166,7 +166,7 @@ bibliomnomnom/
 │   └── hooks/
 │       └── useAuth.ts          # Auth hook
 │
-├── middleware.ts               # Next.js middleware (Clerk route protection)
+├── proxy.ts                    # Next.js 16 proxy (Clerk route protection)
 ├── convex.json                 # Convex config
 ├── next.config.ts              # Next.js config
 ├── tailwind.config.ts          # Tailwind config (custom colors/fonts)
@@ -370,6 +370,6 @@ From global CLAUDE.md and DESIGN.md:
 
 ---
 
-**Last Updated**: 2025-11-10
+**Last Updated**: 2025-12-04
 **Architecture Version**: 1.0 (Complete)
 **Status**: MVP in active development

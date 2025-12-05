@@ -291,9 +291,8 @@ export const commitImportHandler = async (
   const repos = createConvexRepositories(ctx.db as any);
   const importRunRepo = repos.importRuns;
 
-  if (!shouldSkipRateLimits()) {
-    await checkImportRateLimits(importRunRepo, userId);
-  }
+  // Note: Rate limit check removed - already enforced during preparePreview,
+  // and checking here would block the previewed import from committing itself.
 
   const run = await importRunRepo.findByUserAndRun(userId, args.importRunId);
 

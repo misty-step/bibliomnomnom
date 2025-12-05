@@ -3,7 +3,7 @@
  * Enforces Conventional Commits specification
  * Docs: https://commitlint.js.org/
  */
-export default {
+const config = {
   extends: ["@commitlint/config-conventional"],
   rules: {
     // Allow longer subject lines for descriptive commits
@@ -29,3 +29,5 @@ export default {
     ],
   },
 };
+
+export default config;

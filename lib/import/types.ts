@@ -71,7 +71,7 @@ export type CommitSummary = {
 };
 
 export const IMPORT_PAGE_SIZE = 300;
-export const LLM_TOKEN_CAP = 60_000;
+export const LLM_TOKEN_CAP = 500_000; // Gemini 2.5 Flash handles 1M; be conservative
 
 export const collapseWhitespace = (value: string): string => value.trim().replace(/\s+/g, " ");
 
