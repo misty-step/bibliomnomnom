@@ -139,6 +139,21 @@ jobs:
           path: .next
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
+      - name: Start Next.js server
+        run: |
+          pnpm start --hostname 0.0.0.0 --port 3000 >/tmp/next-server.log 2>&1 &
+          for i in {1..40}; do
+            if curl -sSf http://localhost:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Next.js server failed to start" >&2
+          tail -n 200 /tmp/next-server.log || true
+          exit 1
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
       - name: Run E2E tests
         run: pnpm e2e --project=chromium
         env:
