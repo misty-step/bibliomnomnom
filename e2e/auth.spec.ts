@@ -34,10 +34,10 @@ test.describe("Protected Routes", () => {
     expect(url).not.toContain("/library");
   });
 
-  test("404 page displays for unknown routes", async ({ page }) => {
+  test("redirects unknown routes to sign-in", async ({ page }) => {
     await page.goto("/this-page-does-not-exist");
 
-    // Should show 404 content
-    await expect(page.getByText(/404|not found/i)).toBeVisible();
+    // Middleware protects all unknown routes, so it should redirect to sign-in
+    await expect(page).toHaveURL(/sign-in/);
   });
 });

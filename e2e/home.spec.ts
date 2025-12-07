@@ -14,8 +14,8 @@ test.describe("Home Page", () => {
   test("has sign in link", async ({ page }) => {
     await page.goto("/");
 
-    // Look for sign in button/link
-    const signInLink = page.getByRole("link", { name: /sign in/i });
+    // Look for sign in button/link - primary CTA is "Get Started"
+    const signInLink = page.getByRole("link", { name: /get started/i });
     await expect(signInLink).toBeVisible();
   });
 
@@ -33,6 +33,6 @@ test.describe("Home Page", () => {
     // Check footer exists with correct content
     const footer = page.locator("footer");
     await expect(footer).toBeVisible();
-    await expect(footer).toContainText(/bibliomnomnom/i);
+    await expect(footer).toContainText(/misty step/i);
   });
 });
