@@ -139,6 +139,14 @@ jobs:
           path: .next
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
+      - name: Validate secrets
+        run: |
+          if [ -z "$CLERK_SECRET_KEY" ]; then
+            echo "::error::CLERK_SECRET_KEY is missing from repository secrets."
+            exit 1
+          fi
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       - name: Start Next.js server
         run: |
           pnpm start --hostname 0.0.0.0 --port 3000 >/tmp/next-server.log 2>&1 &
