@@ -17,7 +17,7 @@ describe("parseGoodreadsCsv", () => {
     expect(result.errors).toHaveLength(0);
     expect(result.rows).toHaveLength(2);
 
-    const hobbit = result.rows[0];
+    const hobbit = result.rows[0]!;
     expect(hobbit.title).toBe("The Hobbit");
     expect(hobbit.author).toBe("J. R. R. Tolkien");
     expect(hobbit.status).toBe("read");
@@ -26,7 +26,7 @@ describe("parseGoodreadsCsv", () => {
     expect(hobbit.publishedYear).toBe(1937);
     expect(hobbit.dateFinished).toBeDefined();
 
-    const dune = result.rows[1];
+    const dune = result.rows[1]!;
     expect(dune.status).toBe("want-to-read"); // to-read maps to want-to-read
     expect(dune.isbn).toBe("9780441013593");
   });
@@ -36,7 +36,7 @@ describe("parseGoodreadsCsv", () => {
 
     const result = parseGoodreadsCsv(csv);
 
-    expect(result.rows[0].status).toBe("want-to-read");
+    expect(result.rows[0]!.status).toBe("want-to-read");
     expect(result.warnings[0]).toContain("Unrecognized shelf");
   });
 
@@ -47,7 +47,7 @@ describe("parseGoodreadsCsv", () => {
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].line).toBe(2);
+    expect(result.errors[0]!.line).toBe(2);
   });
 
   it("strips BOM and trims whitespace", () => {
@@ -55,8 +55,8 @@ describe("parseGoodreadsCsv", () => {
 
     const result = parseGoodreadsCsv(csv);
 
-    expect(result.rows[0].title).toBe("Title With Spaces");
-    expect(result.rows[0].author).toBe("Author");
+    expect(result.rows[0]!.title).toBe("Title With Spaces");
+    expect(result.rows[0]!.author).toBe("Author");
   });
 
   it("treats empty ISBN cells as undefined", () => {
@@ -64,7 +64,7 @@ describe("parseGoodreadsCsv", () => {
 
     const result = parseGoodreadsCsv(csv);
 
-    expect(result.rows[0].isbn).toBeUndefined();
+    expect(result.rows[0]!.isbn).toBeUndefined();
   });
 
   it("normalizes valid ISBN with spaces and dashes", () => {
@@ -72,6 +72,6 @@ describe("parseGoodreadsCsv", () => {
 
     const result = parseGoodreadsCsv(csv);
 
-    expect(result.rows[0].isbn).toBe("9780441013593");
+    expect(result.rows[0]!.isbn).toBe("9780441013593");
   });
 });

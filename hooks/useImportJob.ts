@@ -274,7 +274,7 @@ export const useImportJob = ({
       if (parsedCsv.errors.length) {
         dispatch({
           type: "PREVIEW_ERROR",
-          message: parsedCsv.errors[0].message,
+          message: parsedCsv.errors[0]?.message ?? "Unknown parsing error",
         });
         return;
       }

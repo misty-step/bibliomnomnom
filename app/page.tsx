@@ -33,9 +33,9 @@ export default async function HomePage() {
       />
 
       {/* Theme Toggle - Top Right */}
-      <div className="absolute right-6 top-6 z-10">
+      <nav className="absolute right-6 top-6 z-10" aria-label="Main">
         <ThemeToggle />
-      </div>
+      </nav>
 
       {/* Main content - asymmetric left alignment */}
       <div className="relative flex min-h-screen items-center">
@@ -44,7 +44,10 @@ export default async function HomePage() {
           <div className="mx-auto max-w-7xl">
             <div className="lg:w-2/5">
               {/* Title */}
-              <h1 className="font-display text-8xl tracking-tight text-text-ink sm:text-9xl lg:text-[10rem]">
+              <h1
+                className="font-display text-8xl tracking-tight text-text-ink sm:text-9xl lg:text-[10rem]"
+                aria-label="bibliomnomnom"
+              >
                 <span className="block">bibliom</span>
                 <span className="block -mt-6 sm:-mt-8 lg:-mt-12">nomnom</span>
               </h1>

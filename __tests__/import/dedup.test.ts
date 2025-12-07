@@ -74,8 +74,8 @@ describe("matchBooks", () => {
 
     const matches = matchBooks(docs, rows);
 
-    expect(matches[0].matchType).toBe("isbn");
-    expect(matches[0].existingBookId).toBe(fakeId<"books">("b1"));
+    expect(matches[0]!.matchType).toBe("isbn");
+    expect(matches[0]!.existingBookId).toBe(fakeId<"books">("b1"));
   });
 
   it("falls back to title-author when isbn missing", () => {
@@ -90,8 +90,8 @@ describe("matchBooks", () => {
 
     const matches = matchBooks(docs, rows);
 
-    expect(matches[0].matchType).toBe("title-author");
-    expect(matches[0].existingBookId).toBe(fakeId<"books">("b2"));
+    expect(matches[0]!.matchType).toBe("title-author");
+    expect(matches[0]!.existingBookId).toBe(fakeId<"books">("b2"));
   });
 
   it("uses apiId when provided", () => {
@@ -108,8 +108,8 @@ describe("matchBooks", () => {
 
     const matches = matchBooks(docs, rows);
 
-    expect(matches[0].matchType).toBe("apiId");
-    expect(matches[0].existingBookId).toBe(fakeId<"books">("b3"));
+    expect(matches[0]!.matchType).toBe("apiId");
+    expect(matches[0]!.existingBookId).toBe(fakeId<"books">("b3"));
   });
 });
 

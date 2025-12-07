@@ -8,6 +8,9 @@
 
 # testing
 /coverage
+/playwright-report/
+/blob-report/
+/test-results/
 
 # quality infrastructure
 lefthook-local.yml

@@ -134,7 +134,7 @@ export const inferGenericCsv = (fileText: string): InferCsvResult => {
     };
   }
 
-  const headerRow = parsedRows[0].map((h) => h.trim());
+  const headerRow = parsedRows[0]!.map((h) => h.trim());
   const lookup = buildHeaderLookup(headerRow);
 
   const titleCol = findColumn(lookup, TITLE_ALIASES);

@@ -304,8 +304,10 @@ export const llmExtract = async (
 
     // Collect results from batch
     for (let j = 0; j < results.length; j++) {
-      const { parsed, error } = results[j];
+      const result = results[j];
       const chunk = batch[j];
+      if (!result || !chunk) continue;
+      const { parsed, error } = result;
 
       if (!parsed.length) {
         errors.push({ message: error?.message ?? "LLM returned no parsable data" });

@@ -14,7 +14,7 @@ describe("inferGenericCsv", () => {
     expect(result.errors).toHaveLength(0);
     expect(result.rows).toHaveLength(1);
 
-    const row = result.rows[0];
+    const row = result.rows[0]!;
     expect(row.title).toBe("The Overstory");
     expect(row.author).toBe("Richard Powers");
     expect(row.isbn).toBe("9780393356687");
@@ -33,7 +33,7 @@ describe("inferGenericCsv", () => {
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].message).toContain("Missing required columns");
+    expect(result.errors[0]!.message).toContain("Missing required columns");
   });
 
   it("flags rows missing required fields as errors", () => {

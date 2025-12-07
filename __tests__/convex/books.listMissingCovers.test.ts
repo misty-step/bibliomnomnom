@@ -95,10 +95,10 @@ describe("listMissingCoversHandler", () => {
 
     const result = await listMissingCoversHandler(ctx, {
       userId,
-      bookIds: [books[0]._id, books[1]._id, books[2]._id],
+      bookIds: [books[0]!._id, books[1]!._id, books[2]!._id],
     });
 
-    expect(result.items.map((b) => b._id)).toEqual([books[0]._id]);
+    expect(result.items.map((b) => b._id)).toEqual([books[0]!._id]);
     expect(result.nextCursor).toBeUndefined();
   });
 
@@ -140,8 +140,8 @@ describe("listMissingCoversHandler", () => {
       limit: 2,
     });
 
-    expect(first.items.map((b) => b._id)).toEqual([books[0]._id, books[1]._id]);
-    expect(second.items.map((b) => b._id)).toEqual([books[2]._id]);
+    expect(first.items.map((b) => b._id)).toEqual([books[0]!._id, books[1]!._id]);
+    expect(second.items.map((b) => b._id)).toEqual([books[2]!._id]);
     expect(second.nextCursor).toBeNull();
   });
 

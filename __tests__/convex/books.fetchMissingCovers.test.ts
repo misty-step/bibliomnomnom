@@ -79,12 +79,12 @@ describe("books.fetchMissingCovers", () => {
 
     expect(result.processed).toBe(2);
     expect(result.updated).toBe(1);
-    expect(result.failures).toEqual([{ bookId: books[1]._id, reason: "not found" }]);
+    expect(result.failures).toEqual([{ bookId: books[1]!._id, reason: "not found" }]);
     expect(result.nextCursor).toBeNull();
 
     expect(runMutationCalls).toHaveLength(1);
-    expect(runMutationCalls[0].args.bookId).toBe(books[0]._id);
-    expect(runMutationCalls[0].args.apiCoverUrl).toContain("covers/1.jpg");
+    expect(runMutationCalls[0]!.args.bookId).toBe(books[0]!._id);
+    expect(runMutationCalls[0]!.args.apiCoverUrl).toContain("covers/1.jpg");
   });
 
   it("clamps limit and passes cursor through", async () => {
