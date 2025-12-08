@@ -1,15 +1,23 @@
 "use node";
 
-import { internalAction } from "../_generated/server";
+import { action, internalAction } from "../_generated/server";
 import { v } from "convex/values";
-import type { Id } from "../_generated/dataModel";
 import { internal } from "../_generated/api";
+import { logger } from "../../lib/logger";
 
 const OPEN_LIBRARY_API = "https://openlibrary.org/api/books";
 const OPEN_LIBRARY_SEARCH_API = "https://openlibrary.org/search.json";
 const OPEN_LIBRARY_COVERS_URL = "https://covers.openlibrary.org/b/id";
 const GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes";
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 8000; // Increased for parallel requests
+
+export type CoverCandidate = {
+  url: string;
+  source: "open-library" | "google-books";
+  apiId?: string;
+  width?: number;
+  height?: number;
+};
 
 type CoverResult =
   | {
@@ -21,25 +29,10 @@ type CoverResult =
       error: string;
     };
 
-/**
- * Clean ISBN by removing dashes and spaces
- *
- * @param isbn - The raw ISBN string (10 or 13 digits)
- * @returns Cleaned ISBN string containing only numbers (and 'X' for ISBN-10)
- */
 function cleanIsbn(isbn: string): string {
   return isbn.replace(/[-\s]/g, "");
 }
 
-/**
- * Fetch with timeout wrapper
- *
- * @param url - The URL to fetch
- * @param options - Fetch options (method, headers, etc.)
- * @param timeoutMs - Timeout in milliseconds (default: 5000)
- * @returns The Response object
- * @throws Error if fetch fails or times out
- */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
@@ -59,219 +52,174 @@ async function fetchWithTimeout(
   }
 }
 
-/**
- * Convert ArrayBuffer to base64 data URL
- *
- * @param buffer - The binary image data
- * @param contentType - MIME type (default: "image/jpeg")
- * @returns A complete data URL string (e.g., "data:image/jpeg;base64,...")
- */
 function arrayBufferToDataUrl(buffer: ArrayBuffer, contentType = "image/jpeg"): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
   for (let i = 0; i < bytes.byteLength; i++) {
-    // bytes[i] is guaranteed to be defined within the array bounds
     binary += String.fromCharCode(bytes[i]!);
   }
   const base64 = btoa(binary);
   return `data:${contentType};base64,${base64}`;
 }
 
-/**
- * Try to fetch cover from Open Library
- *
- * @param isbn - The cleaned ISBN to search for
- * @returns CoverResult on success, null on failure or no cover found
- */
-async function tryOpenLibrary(isbn: string): Promise<CoverResult | null> {
-  try {
-    const cleanedIsbn = cleanIsbn(isbn);
-    const url = `${OPEN_LIBRARY_API}?bibkeys=ISBN:${cleanedIsbn}&format=json&jscmd=data`;
-
-    const response = await fetchWithTimeout(url);
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const data = await response.json();
-    const bookData = data[`ISBN:${cleanedIsbn}`];
-
-    if (!bookData?.cover) {
-      return null;
-    }
-
-    // Prefer large cover, fall back to medium
-    const coverUrl = bookData.cover.large || bookData.cover.medium;
-
-    if (!coverUrl) {
-      return null;
-    }
-
-    // Fetch the actual image
-    const imageResponse = await fetchWithTimeout(coverUrl);
-
-    if (!imageResponse.ok) {
-      return null;
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
-
-    // Convert to data URL
-    const coverDataUrl = arrayBufferToDataUrl(imageBuffer);
-
-    return {
-      coverDataUrl,
-      apiSource: "open-library",
-      apiCoverUrl: coverUrl,
-    };
-  } catch (error) {
-    // Network error or timeout
-    console.error("Open Library fetch failed:", error);
-    return null;
-  }
-}
-
-/**
- * Try to fetch cover from Google Books
- *
- * @param isbn - The cleaned ISBN to search for
- * @returns CoverResult on success, null on failure or no cover found
- */
-async function tryGoogleBooks(isbn: string): Promise<CoverResult | null> {
+async function fetchGoogleBooksCandidates(
+  isbn?: string,
+  title?: string,
+  author?: string,
+): Promise<CoverCandidate[]> {
   const apiKey = process.env.GOOGLE_BOOKS_API_KEY;
 
   if (!apiKey) {
-    console.log("GOOGLE_BOOKS_API_KEY not configured, skipping Google Books");
-    return null;
+    logger.warn("GOOGLE_BOOKS_API_KEY not configured, skipping Google Books");
+    return [];
   }
 
-  try {
-    const cleanedIsbn = cleanIsbn(isbn);
-    const url = `${GOOGLE_BOOKS_API}?q=isbn:${cleanedIsbn}&key=${apiKey}`;
+  const queries: string[] = [];
+  if (isbn) queries.push(`isbn:${cleanIsbn(isbn)}`);
+  if (title && author) queries.push(`intitle:${title}+inauthor:${author}`);
+  else if (title) queries.push(`intitle:${title}`);
 
-    const response = await fetchWithTimeout(url);
+  if (queries.length === 0) return [];
 
-    if (!response.ok) {
-      return null;
+  // Run queries in parallel
+  const results = await Promise.allSettled(
+    queries.map(async (q) => {
+      const url = `${GOOGLE_BOOKS_API}?q=${encodeURIComponent(q)}&key=${apiKey}&maxResults=3`;
+      logger.info({ url }, "Fetching Google Books");
+
+      const res = await fetchWithTimeout(url);
+      if (!res.ok) throw new Error(`Google Books API error: ${res.status}`);
+      return res.json();
+    }),
+  );
+
+  const candidates: CoverCandidate[] = [];
+
+  for (const result of results) {
+    if (result.status === "rejected") {
+      logger.error({ err: result.reason }, "Google Books query failed");
+      continue;
     }
 
-    const data = await response.json();
+    const items = result.value.items || [];
+    for (const item of items) {
+      const links = item.volumeInfo?.imageLinks;
+      if (!links) continue;
 
-    if (!data.items || data.items.length === 0) {
-      return null;
+      // Extract all available sizes
+      const bestUrl = links.extraLarge || links.large || links.medium || links.thumbnail;
+      if (bestUrl) {
+        // Force HTTPS
+        const secureUrl = bestUrl.replace(/^http:/, "https:");
+        candidates.push({
+          url: secureUrl,
+          source: "google-books",
+          apiId: item.id,
+        });
+      }
     }
-
-    const volumeInfo = data.items[0].volumeInfo;
-    const imageLinks = volumeInfo?.imageLinks;
-
-    if (!imageLinks) {
-      return null;
-    }
-
-    // Prefer larger images
-    const coverUrl =
-      imageLinks.extraLarge || imageLinks.large || imageLinks.medium || imageLinks.thumbnail;
-
-    if (!coverUrl) {
-      return null;
-    }
-
-    // Fetch the actual image
-    const imageResponse = await fetchWithTimeout(coverUrl);
-
-    if (!imageResponse.ok) {
-      return null;
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
-
-    // Convert to data URL
-    const coverDataUrl = arrayBufferToDataUrl(imageBuffer);
-
-    return {
-      coverDataUrl,
-      apiSource: "google-books",
-      apiCoverUrl: coverUrl,
-    };
-  } catch (error) {
-    // Network error or timeout
-    console.error("Google Books fetch failed:", error);
-    return null;
   }
+
+  return candidates;
+}
+
+async function fetchOpenLibraryCandidates(
+  isbn?: string,
+  title?: string,
+  author?: string,
+): Promise<CoverCandidate[]> {
+  const candidates: CoverCandidate[] = [];
+
+  // 1. ISBN Lookup
+  if (isbn) {
+    const cleaned = cleanIsbn(isbn);
+    const url = `${OPEN_LIBRARY_API}?bibkeys=ISBN:${cleaned}&format=json&jscmd=data`;
+
+    try {
+      logger.info({ url }, "Fetching Open Library ISBN");
+      const res = await fetchWithTimeout(url);
+      if (res.ok) {
+        const data = await res.json();
+        const book = data[`ISBN:${cleaned}`];
+        if (book?.cover) {
+          if (book.cover.large) {
+            candidates.push({
+              url: book.cover.large,
+              source: "open-library",
+              apiId: `isbn/${cleaned}`,
+            });
+          } else if (book.cover.medium) {
+            candidates.push({
+              url: book.cover.medium,
+              source: "open-library",
+              apiId: `isbn/${cleaned}`,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, "Open Library ISBN fetch failed");
+    }
+  }
+
+  // 2. Search Lookup (Title + Author)
+  if (title) {
+    const q = `${title} ${author || ""}`.trim();
+    const url = `${OPEN_LIBRARY_SEARCH_API}?q=${encodeURIComponent(q)}&fields=cover_i,title,author_name&limit=5`;
+
+    try {
+      logger.info({ url }, "Fetching Open Library Search");
+      const res = await fetchWithTimeout(url);
+      if (res.ok) {
+        const data = await res.json();
+        for (const doc of data.docs || []) {
+          if (doc.cover_i) {
+            candidates.push({
+              url: `${OPEN_LIBRARY_COVERS_URL}/${doc.cover_i}-L.jpg`,
+              source: "open-library",
+              apiId: `olid/${doc.cover_i}`,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, "Open Library Search fetch failed");
+    }
+  }
+
+  return candidates;
 }
 
 /**
- * Try to fetch cover from Open Library by searching title + author
- * Used as fallback when no ISBN is available
- *
- * @param title - Book title
- * @param author - Book author
- * @returns CoverResult on success, null on failure or no cover found
+ * Public action to search for covers
  */
-export async function tryOpenLibrarySearch(
-  title: string,
-  author: string,
-): Promise<CoverResult | null> {
-  try {
-    const query = `${title} ${author}`.trim();
-    if (!query) return null;
+export const searchCovers = action({
+  args: {
+    title: v.string(),
+    author: v.optional(v.string()),
+    isbn: v.optional(v.string()),
+  },
+  handler: async (ctx, args): Promise<CoverCandidate[]> => {
+    logger.info(args, "Starting federated cover search");
 
-    const params = new URLSearchParams({
-      q: query,
-      fields: "cover_i",
-      limit: "1",
-    });
+    const [googleResults, openLibResults] = await Promise.all([
+      fetchGoogleBooksCandidates(args.isbn, args.title, args.author),
+      fetchOpenLibraryCandidates(args.isbn, args.title, args.author),
+    ]);
 
-    const url = `${OPEN_LIBRARY_SEARCH_API}?${params.toString()}`;
-    const response = await fetchWithTimeout(url);
+    const all = [...googleResults, ...openLibResults];
 
-    if (!response.ok) {
-      return null;
-    }
+    // Deduplicate by URL
+    const unique = Array.from(new Map(all.map((c) => [c.url, c])).values());
 
-    const data = await response.json();
-    const coverId = data.docs?.[0]?.cover_i;
-
-    if (!coverId) {
-      return null;
-    }
-
-    // Build cover URL (prefer large size)
-    const coverUrl = `${OPEN_LIBRARY_COVERS_URL}/${coverId}-L.jpg`;
-
-    // Fetch the actual image
-    const imageResponse = await fetchWithTimeout(coverUrl);
-
-    if (!imageResponse.ok) {
-      return null;
-    }
-
-    const imageBuffer = await imageResponse.arrayBuffer();
-
-    // Convert to data URL
-    const coverDataUrl = arrayBufferToDataUrl(imageBuffer);
-
-    return {
-      coverDataUrl,
-      apiSource: "open-library",
-      apiCoverUrl: coverUrl,
-    };
-  } catch (error) {
-    // Network error or timeout
-    console.error("Open Library search failed:", error);
-    return null;
-  }
-}
+    logger.info({ count: unique.length }, "Cover search complete");
+    return unique;
+  },
+});
 
 /**
  * Helper function that contains the core search logic
  * Separated from action wrapper to enable testing
- * This is exported so tests can call it directly
- *
- * Cascade strategy:
- * 1. If ISBN available: Open Library (ISBN) → Google Books (ISBN)
- * 2. If no ISBN or ISBN lookup fails: Open Library Search (title + author)
  *
  * @param book - The book object containing ISBN, title, and author
  * @returns Promise<CoverResult> with success/data or error message
@@ -283,62 +231,47 @@ export async function searchBookCoverHelper(
     return { error: "Book not found" };
   }
 
-  // Try ISBN-based search first if ISBN is available
-  if (book.isbn) {
-    // Try Open Library first (free, unlimited)
-    console.log(`Searching Open Library for ISBN: ${book.isbn}`);
-    const openLibraryResult = await tryOpenLibrary(book.isbn);
+  const [googleResults, openLibResults] = await Promise.all([
+    fetchGoogleBooksCandidates(book.isbn, book.title, book.author),
+    fetchOpenLibraryCandidates(book.isbn, book.title, book.author),
+  ]);
 
-    if (openLibraryResult) {
-      console.log("Cover found on Open Library (ISBN)");
-      return openLibraryResult;
-    }
+  const candidates = [...googleResults, ...openLibResults];
 
-    // Fall back to Google Books (requires API key, rate limited)
-    console.log("Open Library failed, trying Google Books");
-    const googleBooksResult = await tryGoogleBooks(book.isbn);
-
-    if (googleBooksResult) {
-      console.log("Cover found on Google Books");
-      return googleBooksResult;
-    }
+  if (candidates.length === 0) {
+    return { error: "Cover not found for this book. Try uploading manually." };
   }
 
-  // Fallback: Search by title + author (works when no ISBN or ISBN lookup fails)
-  if (book.title) {
-    console.log(`Searching Open Library by title+author: "${book.title}" "${book.author || ""}"`);
-    const searchResult = await tryOpenLibrarySearch(book.title, book.author || "");
+  // Heuristic: Prefer Google Books (usually higher res) -> Open Library
+  // Prefer the first result as they are usually sorted by relevance from the APIs
+  const best = candidates.find((c) => c.source === "google-books") || candidates[0];
 
-    if (searchResult) {
-      console.log("Cover found on Open Library (title+author search)");
-      return searchResult;
-    }
+  if (!best) return { error: "Cover not found" };
+
+  try {
+    const response = await fetchWithTimeout(best.url);
+    if (!response.ok) throw new Error("Failed to download image");
+
+    const buffer = await response.arrayBuffer();
+    return {
+      coverDataUrl: arrayBufferToDataUrl(buffer),
+      apiSource: best.source,
+      apiCoverUrl: best.url,
+    };
+  } catch (err) {
+    logger.error({ err, url: best.url }, "Failed to process best cover");
+    return { error: "Failed to download selected cover" };
   }
-
-  // All methods failed
-  console.log("Cover not found on any API");
-  return {
-    error: "Cover not found for this book. Try uploading manually.",
-  };
 }
 
 /**
- * Search for book cover across multiple APIs with cascading fallback
- * Internal action - callable only from other Convex functions
- *
- * Note: Actions cannot access ctx.db directly, so we call an internal
- * query to fetch the book. This is the Convex best practice for actions.
- *
- * @param ctx - The Convex action context
- * @param args - Arguments containing the bookId
- * @returns Promise<CoverResult> with success/data or error message
+ * Internal action to fetch best cover (legacy support + background jobs)
  */
 export const searchBookCover = internalAction({
   args: {
     bookId: v.id("books"),
   },
   handler: async (ctx, args): Promise<CoverResult> => {
-    // Actions can't access database directly - call internal query to get book
     const book = await ctx.runQuery(internal.books.getForAction, {
       bookId: args.bookId,
     });
@@ -347,8 +280,4 @@ export const searchBookCover = internalAction({
   },
 });
 
-/**
- * Export the internal action for testing
- * In production, this is accessed via internal.actions.coverFetch.searchBookCover
- */
 export const search = searchBookCover;

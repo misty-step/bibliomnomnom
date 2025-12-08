@@ -710,6 +710,23 @@ updates:
 
 ## Next (This Quarter, <3 months)
 
+### [FEATURE] "Magic Add" Book Input
+
+**Scope**: AddBookSheet.tsx, convex/actions/analyze.ts
+**Perspectives**: user-experience-advocate, product-visionary
+**Problem**: Adding books is high friction (manual entry or precise search).
+**Solution**: Single "Magic Input" that accepts natural language ("Finished Project Hail Mary 5 stars"), messy copy-paste, or ISBNs. Uses LLM to parse intent and data, then auto-fills the form.
+
+**Implementation**:
+
+1.  **Backend (`convex/actions/analyze.ts`)**: New action using existing `llmExtract` logic to parse raw text into a `Partial<Book>`.
+2.  **Frontend (`AddBookSheet.tsx`)**: Replace "Search Open Library" with "Magic Input".
+3.  **Integration**: Wire analyzer result to pre-fill form fields and trigger cover fetch.
+
+**Effort**: 2d | **Impact**: drastic reduction in friction, high "delight" factor.
+
+---
+
 ### [BUNDLE OPTIMIZATION] Replace Framer Motion with CSS Animations
 
 **Scope**: BookTile, BookDetail, StatusBadge, FadeInContent

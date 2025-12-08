@@ -1,18 +1,22 @@
 "use client";
 
+/* eslint-disable design-tokens/no-raw-design-values */
+
 import { useState, useEffect, useCallback, type ChangeEvent } from "react";
 import { useAction, useMutation } from "convex/react";
 import Image from "next/image";
 import { upload } from "@vercel/blob/client";
-import { Star, Headphones } from "lucide-react";
+import { Star, Headphones, Search, Globe } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { SideSheet } from "@/components/ui/SideSheet";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { cn } from "@/lib/utils";
 import { BookSearchInput, type BookSearchResult } from "./BookSearchInput";
+import { CoverPicker } from "./CoverPicker";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -88,9 +92,11 @@ export function AddBookSheet({
     () => EXAMPLE_BOOKS[Math.floor(Math.random() * EXAMPLE_BOOKS.length)] ?? DEFAULT_EXAMPLE_BOOK,
   );
 
+  const [showCoverPicker, setShowCoverPicker] = useState(false);
+
   // Open Library search result fields
   const [apiId, setApiId] = useState<string | undefined>();
-  const [apiSource, setApiSource] = useState<"open-library" | "manual">("manual");
+  const [apiSource, setApiSource] = useState<"open-library" | "manual" | "google-books">("manual");
   const [isbn, setIsbn] = useState("");
   const [publishedYear, setPublishedYear] = useState<number | undefined>();
   const [pageCount, setPageCount] = useState<number | undefined>();
@@ -123,17 +129,18 @@ export function AddBookSheet({
     setPublishedYear(undefined);
     setPageCount(undefined);
     setApiCoverUrl(undefined);
+    setShowCoverPicker(false);
   }, [setIsOpen]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape" && isOpen && !showCoverPicker) {
         handleClose();
       }
     };
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
-  }, [isOpen, handleClose]);
+  }, [isOpen, handleClose, showCoverPicker]);
 
   // Pick new random example book when form opens
   useEffect(() => {
@@ -183,6 +190,8 @@ export function AddBookSheet({
 
     setError(null);
     setCoverFile(file);
+    setApiCoverUrl(undefined); // Clear API cover
+    setApiSource("manual");
 
     // Create preview
     const reader = new FileReader();
@@ -195,6 +204,16 @@ export function AddBookSheet({
   const handleRemoveCover = () => {
     setCoverFile(null);
     setCoverPreview(null);
+    setApiCoverUrl(undefined);
+  };
+
+  const handleCoverSelectedFromPicker = (url: string, source: string, id?: string) => {
+    setApiCoverUrl(url);
+    setApiSource(source as any);
+    if (id) setApiId(id);
+    setCoverPreview(url);
+    setCoverFile(null);
+    setShowCoverPicker(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -222,6 +241,8 @@ export function AddBookSheet({
           handleUploadUrl: "/api/blob/upload",
         });
         coverUrl = blob.url;
+      } else if (apiCoverUrl) {
+        coverUrl = undefined; // convex will use apiCoverUrl field
       }
 
       // Convert date string to timestamp if provided
@@ -232,13 +253,13 @@ export function AddBookSheet({
         title: trimmedTitle,
         author: trimmedAuthor,
         status,
-        coverUrl,
+        coverUrl, // User uploaded
         isAudiobook,
         isFavorite,
         dateFinished: status === "read" ? dateFinishedTimestamp : undefined,
-        apiSource,
+        apiSource: apiSource as any,
         apiId,
-        apiCoverUrl,
+        apiCoverUrl, // API selected
         isbn: isbn.trim() || undefined,
         publishedYear,
         pageCount,
@@ -311,15 +332,34 @@ export function AddBookSheet({
               <div className="flex justify-center">
                 <div className="group relative w-40">
                   {/* Cover Image */}
-                  <div className="aspect-[2/3] overflow-hidden rounded-sm shadow-md">
-                    <Image src={coverPreview} alt="Cover preview" fill className="object-cover" />
+                  <div className="aspect-[2/3] overflow-hidden rounded-sm shadow-md bg-canvas-boneMuted">
+                    <Image
+                      src={coverPreview}
+                      alt="Cover preview"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
                   </div>
 
                   {/* Hover Overlay */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-sm bg-black/70 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-sm bg-black/70 opacity-0 transition-opacity duration-200 group-hover:opacity-100 px-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowCoverPicker(true)}
+                      disabled={isSubmitting}
+                      className={cn(
+                        "w-full rounded-md border border-line-ghost bg-canvas-bone/80 text-xs font-medium text-text-ink backdrop-blur-sm transition",
+                        "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn flex items-center justify-center gap-2",
+                      )}
+                      style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6 }}
+                    >
+                      <Globe style={{ width: 12, height: 12 }} />
+                      Web Search
+                    </button>{" "}
                     <label
                       className={cn(
-                        "cursor-pointer rounded-md border border-line-ghost bg-canvas-bone/80 px-4 py-2 text-sm font-medium text-text-ink backdrop-blur-sm transition",
+                        "w-full cursor-pointer rounded-md border border-line-ghost bg-canvas-bone/80 px-2 py-1.5 text-xs font-medium text-text-ink backdrop-blur-sm transition text-center",
                         "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn",
                       )}
                     >
@@ -330,13 +370,13 @@ export function AddBookSheet({
                         className="hidden"
                         disabled={isSubmitting}
                       />
-                      Change
+                      Upload File
                     </label>
                     <button
                       type="button"
                       onClick={handleRemoveCover}
                       disabled={isSubmitting}
-                      className="text-sm text-white/90 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50"
+                      className="text-xs text-white/90 hover:text-white hover:underline disabled:pointer-events-none disabled:opacity-50 mt-1"
                     >
                       Remove
                     </button>
@@ -344,26 +384,48 @@ export function AddBookSheet({
                 </div>
               </div>
             ) : (
-              <label
-                className={cn(
-                  "flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-line-ghost bg-canvas-boneMuted transition hover:border-text-inkMuted hover:bg-canvas-bone",
-                  isSubmitting && "pointer-events-none opacity-60",
+              <div className="flex flex-col gap-2">
+                <label
+                  className={cn(
+                    "flex h-32 cursor-pointer flex-col items-center justify-center rounded-md border-2 border-dashed border-line-ghost bg-canvas-boneMuted transition hover:border-text-inkMuted hover:bg-canvas-bone",
+                    isSubmitting && "pointer-events-none opacity-60",
+                  )}
+                >
+                  <input
+                    type="file"
+                    accept={ALLOWED_TYPES.join(",")}
+                    onChange={handleFileChange}
+                    className="hidden"
+                    disabled={isSubmitting}
+                  />
+                  <span className="text-sm font-medium text-text-inkMuted">Click to upload</span>
+                  <span className="mt-1 text-xs text-text-inkSubtle">
+                    JPG, PNG, or WebP (max 5MB)
+                  </span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="h-px flex-1 bg-line-ghost"></div>
+                  <span className="text-[10px] text-text-inkSubtle uppercase tracking-wider">
+                    OR
+                  </span>
+                  <div className="h-px flex-1 bg-line-ghost"></div>
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowCoverPicker(true)}
+                  disabled={isSubmitting || !title}
+                  className="w-full border border-line-ghost"
+                >
+                  <Search style={{ width: 16, height: 16, marginRight: 8 }} />
+                  Search Web for Cover
+                </Button>
+                {!title && (
+                  <p className="text-[10px] text-center text-text-inkSubtle">
+                    Enter a title first to search for covers
+                  </p>
                 )}
-              >
-                <input
-                  type="file"
-                  accept={ALLOWED_TYPES.join(",")}
-                  onChange={handleFileChange}
-                  className="hidden"
-                  disabled={isSubmitting}
-                />
-                <span className="text-sm font-medium text-text-inkMuted">
-                  Click to upload or drag and drop
-                </span>
-                <span className="mt-1 text-xs text-text-inkSubtle">
-                  JPG, PNG, or WebP (max 5MB)
-                </span>
-              </label>
+              </div>
             )}
           </div>
 
@@ -512,6 +574,22 @@ export function AddBookSheet({
             </Button>
           </div>
         </form>
+
+        {/* Cover Picker Dialog */}
+        <Dialog open={showCoverPicker} onOpenChange={setShowCoverPicker}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Select Cover</DialogTitle>
+            </DialogHeader>
+            <CoverPicker
+              title={title}
+              author={author}
+              isbn={isbn}
+              currentCoverUrl={coverPreview || undefined}
+              onSelect={handleCoverSelectedFromPicker}
+            />
+          </DialogContent>
+        </Dialog>
       </SideSheet>
     </>
   );
