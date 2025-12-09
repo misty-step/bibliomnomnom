@@ -480,7 +480,7 @@ export async function fetchCoverHandler(
     return { success: false, error: "Book already has a cover" };
   }
 
-  const result = await ctx.runAction(internal.actions.coverFetch.search, {
+  const result = await ctx.runAction(internal.actions.coverFetch.searchBookCover, {
     bookId: args.bookId,
   });
 
@@ -556,7 +556,7 @@ export async function fetchMissingCoversHandler(
 
       processed += 1;
 
-      const result = await ctx.runAction(internal.actions.coverFetch.search, {
+      const result = await ctx.runAction(internal.actions.coverFetch.searchBookCover, {
         bookId: book._id,
       });
 
