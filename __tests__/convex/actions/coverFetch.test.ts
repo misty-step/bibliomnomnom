@@ -121,6 +121,13 @@ describe("searchBookCoverHelper", () => {
     vi.clearAllMocks();
   });
 
+  it("returns error when book is null", async () => {
+    const result = await searchBookCoverHelper(null);
+
+    expect(result).toHaveProperty("error");
+    expect((result as { error: string }).error).toBe("Book not found");
+  });
+
   it("returns cover from Open Library when ISBN found (Google disabled)", async () => {
     global.fetch = createMockFetch({
       olIsbn: MOCK_OL_ISBN_RESPONSE,

@@ -727,6 +727,23 @@ updates:
 
 ---
 
+### [DESIGN SYSTEM] Design Token Compliance Cleanup
+
+**Files**: AddBookSheet.tsx:355, BookCoverManager.tsx:282, CoverPicker.tsx:75,79,120,122
+**Perspectives**: design-systems-architect
+**Problem**: Multiple hardcoded pixel values and color values bypass the design token system.
+**Identified in**: PR #11 review (Gemini, CodeRabbit)
+
+**Approach**:
+1. Create `destructive-ghost` button variant for delete actions (red with opacity)
+2. Extract common inline styles to utility classes or component variants
+3. Audit components for raw pixel values and replace with spacing/size tokens
+
+**Effort**: 2-3h | **Impact**: Visual consistency, maintainability
+**Priority**: MEDIUM - functional but inconsistent
+
+---
+
 ### [BUNDLE OPTIMIZATION] Replace Framer Motion with CSS Animations
 
 **Scope**: BookTile, BookDetail, StatusBadge, FadeInContent

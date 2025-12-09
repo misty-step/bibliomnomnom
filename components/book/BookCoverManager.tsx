@@ -16,7 +16,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { CoverPicker } from "./CoverPicker";
-import { designTokens } from "@/lib/design/tokens.generated";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024; // 5MB
@@ -64,7 +63,7 @@ export function BookCoverManager({
 
   const updateBook = useMutation(api.books.update);
   const updateCoverFromBlob = useMutation(api.books.updateCoverFromBlob);
-  const downloadImage = useAction(api.actions.coverFetch.downloadImage); // We need to implement this
+  const downloadImage = useAction(api.actions.coverFetch.downloadImage);
   const fetchBestCover = useAction(api.books.fetchCover); // Legacy "I'm feeling lucky"
 
   const activeCover = coverUrl ?? apiCoverUrl;
@@ -177,7 +176,11 @@ export function BookCoverManager({
   };
 
   // 4. Handle Selection from Picker
-  const handlePickerSelect = async (url: string, source: string, apiId?: string) => {
+  const handlePickerSelect = async (
+    url: string,
+    source: "open-library" | "google-books",
+    apiId?: string,
+  ) => {
     setShowPicker(false);
     setIsUploading(true);
     try {
@@ -197,7 +200,7 @@ export function BookCoverManager({
       await updateCoverFromBlob({
         bookId,
         blobUrl: uploadResponse.url,
-        apiSource: source as any,
+        apiSource: source,
         apiCoverUrl: url,
       });
 
@@ -227,9 +230,14 @@ export function BookCoverManager({
       />
 
       <div
-        className="group relative aspect-[2/3] w-full overflow-hidden rounded-sm shadow-lg bg-canvas-bone"
+        className="group relative aspect-[2/3] w-full overflow-hidden rounded-sm shadow-lg bg-canvas-bone focus-within:ring-2 focus-within:ring-accent-ember"
+        tabIndex={0}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsHovered(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setIsHovered(false);
+        }}
       >
         {activeCover ? (
           <>

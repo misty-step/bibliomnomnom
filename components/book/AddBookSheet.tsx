@@ -207,9 +207,13 @@ export function AddBookSheet({
     setApiCoverUrl(undefined);
   };
 
-  const handleCoverSelectedFromPicker = (url: string, source: string, id?: string) => {
+  const handleCoverSelectedFromPicker = (
+    url: string,
+    source: "open-library" | "google-books",
+    id?: string,
+  ) => {
     setApiCoverUrl(url);
-    setApiSource(source as any);
+    setApiSource(source);
     if (id) setApiId(id);
     setCoverPreview(url);
     setCoverFile(null);
@@ -257,7 +261,7 @@ export function AddBookSheet({
         isAudiobook,
         isFavorite,
         dateFinished: status === "read" ? dateFinishedTimestamp : undefined,
-        apiSource: apiSource as any,
+        apiSource,
         apiId,
         apiCoverUrl, // API selected
         isbn: isbn.trim() || undefined,

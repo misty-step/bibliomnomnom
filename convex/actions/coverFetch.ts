@@ -11,6 +11,24 @@ const OPEN_LIBRARY_COVERS_URL = "https://covers.openlibrary.org/b/id";
 const GOOGLE_BOOKS_API = "https://www.googleapis.com/books/v1/volumes";
 const FETCH_TIMEOUT_MS = 8000; // Increased for parallel requests
 
+// Allowed domains for image proxy to prevent SSRF attacks
+const ALLOWED_COVER_DOMAINS = [
+  "covers.openlibrary.org",
+  "books.google.com",
+  "books.googleusercontent.com",
+];
+
+function isAllowedCoverUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ALLOWED_COVER_DOMAINS.some(
+      (domain) => parsed.hostname === domain || parsed.hostname.endsWith("." + domain),
+    );
+  } catch {
+    return false;
+  }
+}
+
 export type CoverCandidate = {
   url: string;
   source: "open-library" | "google-books";
@@ -224,6 +242,12 @@ export const searchCovers = action({
 export const downloadImage = action({
   args: { url: v.string() },
   handler: async (ctx, { url }) => {
+    // Validate URL against allowlist to prevent SSRF
+    if (!isAllowedCoverUrl(url)) {
+      logger.warn({ url }, "Blocked download from non-allowed domain");
+      return { error: "URL not from allowed cover source" };
+    }
+
     try {
       logger.info({ url }, "Downloading image proxy");
       const response = await fetchWithTimeout(url);
@@ -238,9 +262,10 @@ export const downloadImage = action({
       );
 
       return { dataUrl };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error({ err, url }, "Download image failed");
-      return { error: err.message || "Failed to download image" };
+      const message = err instanceof Error ? err.message : "Failed to download image";
+      return { error: message };
     }
   },
 });
@@ -270,26 +295,37 @@ export async function searchBookCoverHelper(
     return { error: "Cover not found for this book. Try uploading manually." };
   }
 
-  // Heuristic: Prefer Google Books (usually higher res) -> Open Library
-  // Prefer the first result as they are usually sorted by relevance from the APIs
-  const best = candidates.find((c) => c.source === "google-books") || candidates[0];
+  // Sort candidates: prefer Google Books (usually higher res) first
+  const sorted = [
+    ...candidates.filter((c) => c.source === "google-books"),
+    ...candidates.filter((c) => c.source === "open-library"),
+  ];
 
-  if (!best) return { error: "Cover not found" };
+  // Try each candidate until one succeeds
+  for (const candidate of sorted) {
+    try {
+      const response = await fetchWithTimeout(candidate.url);
+      if (!response.ok) {
+        logger.warn(
+          { url: candidate.url, status: response.status },
+          "Candidate fetch failed, trying next",
+        );
+        continue;
+      }
 
-  try {
-    const response = await fetchWithTimeout(best.url);
-    if (!response.ok) throw new Error("Failed to download image");
-
-    const buffer = await response.arrayBuffer();
-    return {
-      coverDataUrl: arrayBufferToDataUrl(buffer),
-      apiSource: best.source,
-      apiCoverUrl: best.url,
-    };
-  } catch (err) {
-    logger.error({ err, url: best.url }, "Failed to process best cover");
-    return { error: "Failed to download selected cover" };
+      const buffer = await response.arrayBuffer();
+      return {
+        coverDataUrl: arrayBufferToDataUrl(buffer),
+        apiSource: candidate.source,
+        apiCoverUrl: candidate.url,
+      };
+    } catch (err) {
+      logger.warn({ err, url: candidate.url }, "Candidate download failed, trying next");
+      continue;
+    }
   }
+
+  return { error: "Failed to download any cover candidate" };
 }
 
 /**
@@ -308,4 +344,5 @@ export const searchBookCover = internalAction({
   },
 });
 
-export const search = searchBookCover;
+// Test alias - kept for backwards compatibility with existing tests
+export const _test_search = searchBookCover;

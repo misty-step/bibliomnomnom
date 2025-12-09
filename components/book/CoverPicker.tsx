@@ -2,7 +2,7 @@
 
 /* eslint-disable design-tokens/no-raw-design-values */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAction } from "convex/react";
 import Image from "next/image";
 import { api } from "@/convex/_generated/api";
@@ -21,7 +21,7 @@ type CoverPickerProps = {
   author: string;
   isbn?: string;
   currentCoverUrl?: string;
-  onSelect: (url: string, source: string, apiId?: string) => void;
+  onSelect: (url: string, source: "open-library" | "google-books", apiId?: string) => void;
 };
 
 export function CoverPicker({ title, author, isbn, currentCoverUrl, onSelect }: CoverPickerProps) {
@@ -32,7 +32,7 @@ export function CoverPicker({ title, author, isbn, currentCoverUrl, onSelect }: 
 
   const searchCovers = useAction(api.actions.coverFetch.searchCovers);
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!title) return;
 
     setIsLoading(true);
@@ -40,26 +40,20 @@ export function CoverPicker({ title, author, isbn, currentCoverUrl, onSelect }: 
     setHasSearched(true);
 
     try {
-      // @ts-ignore - The types might not be fully generated yet
       const results = await searchCovers({ title, author, isbn });
       setCandidates(results);
     } catch (err) {
-      console.error(err);
+      console.error("Cover search failed:", err);
       setError("Failed to load covers. Please try again.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [title, author, isbn, searchCovers]);
 
-  // Auto-search on mount if no current cover, or explicitly requested?
-  // Let's not auto-search to save API calls unless the user opens this picker.
-  // But usually this component will be inside a Dialog/Popover that is opened when the user wants to pick.
-  // So we can auto-search on mount.
+  // Auto-search when props change
   useEffect(() => {
     handleSearch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, author, isbn]); // Re-search if props change significantly
-  // Actually, if title changes, we probably want new covers.
+  }, [handleSearch]);
 
   return (
     <div className="space-y-4">
