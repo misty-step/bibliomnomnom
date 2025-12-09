@@ -1,20 +1,16 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
-import { upload } from "@vercel/blob/client";
 import { Globe, Headphones, Lock, Pencil, Star, Trash2 } from "lucide-react";
-import { FetchCoverButton } from "./FetchCoverButton";
 import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { CreateNote } from "@/components/notes/CreateNote";
 import { NoteList } from "@/components/notes/NoteList";
-import { Button } from "@/components/ui/button";
 import { BOOK_STATUS_OPTIONS } from "./constants";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -31,9 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { BookForm, type SanitizedBookFormValues } from "./BookForm";
 import { SideSheet } from "@/components/ui/SideSheet";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 5 * 1024 * 1024;
+import { BookCoverManager } from "./BookCoverManager";
 
 type BookDetailProps = {
   bookId: Id<"books">;
@@ -55,11 +49,8 @@ export function BookDetail({ bookId }: BookDetailProps) {
   const [isTogglingAudiobook, setIsTogglingAudiobook] = useState(false);
   const [isTogglingPrivacy, setIsTogglingPrivacy] = useState(false);
   const [localPrivacy, setLocalPrivacy] = useState<"private" | "public">("private");
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [coverHovered, setCoverHovered] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isFetchSuccess, setIsFetchSuccess] = useState(false);
 
   const currentStatus = book?.status;
   const currentPrivacy = book?.privacy;
@@ -138,66 +129,6 @@ export function BookDetail({ bookId }: BookDetailProps) {
     }
   };
 
-  const handleCoverUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      toast({
-        title: "Invalid file type",
-        description: "Please upload a JPG, PNG, or WebP image.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (file.size > MAX_BYTES) {
-      toast({
-        title: "File too large",
-        description: "Images must be smaller than 5MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsUploadingCover(true);
-    try {
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/blob/upload",
-      });
-      await updateBook({ id: book._id, coverUrl: blob.url });
-      toast({ title: "Cover updated" });
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Upload failed",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploadingCover(false);
-      event.target.value = "";
-    }
-  };
-
-  const handleCoverRemove = async () => {
-    setIsUploadingCover(true);
-    try {
-      await updateBook({ id: book._id, coverUrl: undefined });
-      toast({ title: "Cover removed" });
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Remove failed",
-        description: "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploadingCover(false);
-    }
-  };
-
   const handleDelete = async () => {
     setIsDeleting(true);
     try {
@@ -240,8 +171,6 @@ export function BookDetail({ bookId }: BookDetailProps) {
     notes === undefined
       ? "all associated notes"
       : `${noteCount} ${noteCount === 1 ? "note" : "notes"}`;
-  const coverSrc = book.coverUrl ?? book.apiCoverUrl;
-  const showFetchCoverButton = !book.coverUrl && !isFetchSuccess;
 
   return (
     <motion.article
@@ -253,108 +182,14 @@ export function BookDetail({ bookId }: BookDetailProps) {
       {/* Cover Column - Sticky */}
       <div className="flex justify-center lg:justify-start">
         <div className="lg:sticky lg:top-8 lg:self-start w-full">
-          <div
-            className="group relative w-full"
-            onMouseEnter={() => setCoverHovered(true)}
-            onMouseLeave={() => setCoverHovered(false)}
-          >
-            {/* Cover Image */}
-            <div className="relative aspect-[2/3] overflow-hidden rounded-sm shadow-lg">
-              {coverSrc ? (
-                <Image
-                  src={coverSrc}
-                  alt={`${book.title} cover`}
-                  fill
-                  className="object-cover"
-                  priority
-                />
-              ) : (
-                <div className="flex h-full w-full flex-col justify-between rounded-sm border border-line-ghost/50 bg-canvas-bone p-8">
-                  <div className="space-y-3">
-                    <h2 className="font-display text-2xl leading-tight text-text-ink line-clamp-5">
-                      {book.title}
-                    </h2>
-                    {book.author ? (
-                      <p className="font-mono text-sm uppercase tracking-wider text-text-inkMuted line-clamp-2">
-                        {book.author}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="space-y-4">
-                    {book.publishedYear ? (
-                      <span className="font-mono text-xs text-text-inkSubtle">
-                        {book.publishedYear}
-                      </span>
-                    ) : null}
-                    <div className="flex flex-col gap-2">
-                      {showFetchCoverButton && (
-                        <FetchCoverButton
-                          bookId={book._id}
-                          onSuccess={() => setIsFetchSuccess(true)}
-                          className="w-full justify-center"
-                        />
-                      )}
-                      <div>
-                        <input
-                          id="cover-upload-empty"
-                          type="file"
-                          accept={ALLOWED_TYPES.join(",")}
-                          onChange={handleCoverUpload}
-                          className="hidden"
-                          disabled={isUploadingCover}
-                        />
-                        <label htmlFor="cover-upload-empty" className="w-full">
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="w-full justify-center"
-                            disabled={isUploadingCover}
-                          >
-                            {isUploadingCover ? "Uploading…" : "Upload cover"}
-                          </Button>
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Hover Overlay for Cover Edit (only when a cover exists) */}
-              {coverSrc ? (
-                <motion.div
-                  initial={false}
-                  animate={{ opacity: coverHovered ? 1 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ pointerEvents: coverHovered ? "auto" : "none" }}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70"
-                >
-                  <label
-                    className={cn(
-                      "cursor-pointer rounded-md border border-line-ghost bg-canvas-bone/80 px-4 py-2 text-sm font-medium text-text-ink backdrop-blur-sm transition",
-                      "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn",
-                      isUploadingCover && "pointer-events-none opacity-50",
-                    )}
-                  >
-                    <input
-                      type="file"
-                      accept={ALLOWED_TYPES.join(",")}
-                      onChange={handleCoverUpload}
-                      className="hidden"
-                      disabled={isUploadingCover}
-                    />
-                    {isUploadingCover ? "Uploading…" : "Change"}
-                  </label>
-                  <button
-                    onClick={handleCoverRemove}
-                    disabled={isUploadingCover}
-                    className="text-sm text-text-ink hover:text-text-ink hover:underline disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                </motion.div>
-              ) : null}
-            </div>
-          </div>
+          <BookCoverManager
+            bookId={book._id}
+            title={book.title}
+            author={book.author}
+            isbn={book.isbn}
+            coverUrl={book.coverUrl}
+            apiCoverUrl={book.apiCoverUrl}
+          />
         </div>
       </div>
 

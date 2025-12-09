@@ -218,6 +218,34 @@ export const searchCovers = action({
 });
 
 /**
+ * Action to download an image from a URL and return it as base64
+ * Used to bypass CORS when client wants to upload a 3rd party image to Vercel Blob
+ */
+export const downloadImage = action({
+  args: { url: v.string() },
+  handler: async (ctx, { url }) => {
+    try {
+      logger.info({ url }, "Downloading image proxy");
+      const response = await fetchWithTimeout(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status}`);
+      }
+
+      const buffer = await response.arrayBuffer();
+      const dataUrl = arrayBufferToDataUrl(
+        buffer,
+        response.headers.get("content-type") || "image/jpeg",
+      );
+
+      return { dataUrl };
+    } catch (err: any) {
+      logger.error({ err, url }, "Download image failed");
+      return { error: err.message || "Failed to download image" };
+    }
+  },
+});
+
+/**
  * Helper function that contains the core search logic
  * Separated from action wrapper to enable testing
  *
