@@ -20,6 +20,12 @@
       "ember": "#DC2626",
       "favorite": "#F59E0B"
     },
+    "deco": {
+      "gold": "#C5A059",
+      "goldLight": "#E6C786",
+      "goldDark": "#AA771C",
+      "goldShine": "#D4AF37"
+    },
     "status": {
       "positive": "#46D549",
       "warning": "#FFB347",
@@ -46,6 +52,12 @@
     "accent": {
       "ember": "#EF4444",
       "favorite": "#FBBF24"
+    },
+    "deco": {
+      "gold": "#D4AF37",
+      "goldLight": "#F0D78C",
+      "goldDark": "#B8860B",
+      "goldShine": "#E6C786"
     },
     "status": {
       "positive": "#46D549",

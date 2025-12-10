@@ -4,6 +4,10 @@
   --color-accent-favorite: #f59e0b;
   --color-canvas-bone: #faf8f5;
   --color-canvas-bone-muted: #f2ede5;
+  --color-deco-gold: #c5a059;
+  --color-deco-gold-dark: #aa771c;
+  --color-deco-gold-light: #e6c786;
+  --color-deco-gold-shine: #d4af37;
   --color-line-ember: rgba(28, 25, 23, 0.15);
   --color-line-ghost: rgba(28, 25, 23, 0.08);
   --color-status-danger: #ff4d4f;
@@ -45,6 +49,10 @@
   --color-accent-favorite: #fbbf24;
   --color-canvas-bone: #1c1917;
   --color-canvas-bone-muted: #27241f;
+  --color-deco-gold: #d4af37;
+  --color-deco-gold-dark: #b8860b;
+  --color-deco-gold-light: #f0d78c;
+  --color-deco-gold-shine: #e6c786;
   --color-line-ember: rgba(250, 248, 245, 0.15);
   --color-line-ghost: rgba(250, 248, 245, 0.08);
   --color-status-danger: #ff4d4f;

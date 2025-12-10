@@ -19,6 +19,7 @@ const config: Config = {
         text: colorVars.text,
         line: colorVars.line,
         status: colorVars.status,
+        deco: colorVars.deco,
         // Shadcn-compatible aliases using our monochrome palette
         background: colorVars.canvas.bone,
         foreground: colorVars.text.ink,
