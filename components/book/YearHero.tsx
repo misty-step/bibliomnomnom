@@ -1,12 +1,11 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { pluralize } from "@/lib/format";
 
 export interface YearStats {
   totalBooks: number;
   totalPages: number;
-  favorites: number;
-  audiobooks: number;
 }
 
 export interface YearHeroProps {
@@ -29,7 +28,7 @@ export function YearHero({ year, stats, className }: YearHeroProps) {
 
         {/* Stats - single line */}
         <p className="mt-4 font-mono text-sm text-text-inkMuted">
-          {stats.totalBooks} {stats.totalBooks === 1 ? "book" : "books"} ·{" "}
+          {stats.totalBooks} {pluralize(stats.totalBooks, "book")} ·{" "}
           {stats.totalPages.toLocaleString()} pages
         </p>
       </div>

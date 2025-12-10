@@ -7,6 +7,7 @@ import { BookTile, BookTileSkeleton } from "./BookTile";
 import { AddBookSheet } from "./AddBookSheet";
 import { YearHero } from "./YearHero";
 import { cn } from "@/lib/utils";
+import { pluralize } from "@/lib/format";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -205,46 +206,6 @@ function getBookStats(books: Book[]) {
   };
 }
 
-// Year Section with vintage almanac header
-function YearSection({
-  year,
-  totalBooks,
-  children,
-}: {
-  year: number;
-  totalBooks: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="mt-20 first:mt-0">
-      {/* Decorative top rule with corner brackets */}
-      <div className="flex items-center gap-3">
-        <span className="font-mono text-lg text-text-inkSubtle">┌</span>
-        <div className="h-px flex-1 bg-line-ghost" />
-        <span className="font-mono text-lg text-text-inkSubtle">┐</span>
-      </div>
-
-      {/* Year display with count */}
-      <div className="py-6 text-center">
-        <h2 className="font-display text-5xl font-medium tracking-wide text-text-ink">{year}</h2>
-        <span className="mt-2 block font-mono text-xs uppercase tracking-widest text-text-inkMuted">
-          {totalBooks} {totalBooks === 1 ? "book" : "books"} finished
-        </span>
-      </div>
-
-      {/* Decorative bottom rule */}
-      <div className="flex items-center gap-3">
-        <span className="font-mono text-lg text-text-inkSubtle">└</span>
-        <div className="h-px flex-1 bg-line-ghost" />
-        <span className="font-mono text-lg text-text-inkSubtle">┘</span>
-      </div>
-
-      {/* Month sections */}
-      <div className="mt-8">{children}</div>
-    </div>
-  );
-}
-
 // Month Section with stats
 function MonthSection({ month, books }: { month: number; books: Book[] }) {
   const stats = getBookStats(books);
@@ -256,10 +217,10 @@ function MonthSection({ month, books }: { month: number; books: Book[] }) {
       <div className="mb-6 flex items-baseline gap-3">
         <h3 className="font-display text-xl font-medium text-text-ink">{monthName}</h3>
         <span className="font-mono text-xs tracking-wide text-text-inkMuted">
-          • {stats.count} {stats.count === 1 ? "book" : "books"}
-          {stats.favorites > 0 && ` • ${stats.favorites} favorite${stats.favorites > 1 ? "s" : ""}`}
+          • {stats.count} {pluralize(stats.count, "book")}
+          {stats.favorites > 0 && ` • ${stats.favorites} ${pluralize(stats.favorites, "favorite")}`}
           {stats.audiobooks > 0 &&
-            ` • ${stats.audiobooks} audiobook${stats.audiobooks > 1 ? "s" : ""}`}
+            ` • ${stats.audiobooks} ${pluralize(stats.audiobooks, "audiobook")}`}
         </span>
         <div className="h-px flex-1 bg-line-ghost/50" />
       </div>
@@ -300,8 +261,6 @@ function FinishedBooksTimeline({ books }: { books: Book[] }) {
               stats={{
                 totalBooks: yearStats.count,
                 totalPages: yearStats.pages,
-                favorites: yearStats.favorites,
-                audiobooks: yearStats.audiobooks,
               }}
             />
 
