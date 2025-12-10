@@ -24,6 +24,12 @@ export const designTokens = {
       ember: "#DC2626",
       favorite: "#F59E0B",
     },
+    deco: {
+      gold: "#C5A059",
+      goldLight: "#E6C786",
+      goldDark: "#AA771C",
+      goldShine: "#D4AF37",
+    },
     status: {
       positive: "#46D549",
       warning: "#FFB347",
@@ -90,6 +96,12 @@ export const tokenVars = {
     canvas: {
       bone: "var(--color-canvas-bone)",
       boneMuted: "var(--color-canvas-bone-muted)",
+    },
+    deco: {
+      gold: "var(--color-deco-gold)",
+      goldDark: "var(--color-deco-gold-dark)",
+      goldLight: "var(--color-deco-gold-light)",
+      goldShine: "var(--color-deco-gold-shine)",
     },
     line: {
       ember: "var(--color-line-ember)",

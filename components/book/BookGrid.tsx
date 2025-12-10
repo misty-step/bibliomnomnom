@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { api } from "@/convex/_generated/api";
 import { BookTile, BookTileSkeleton } from "./BookTile";
 import { AddBookSheet } from "./AddBookSheet";
+import { YearHero } from "./YearHero";
 import { cn } from "@/lib/utils";
+import { pluralize } from "@/lib/format";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button } from "@/components/ui/button";
@@ -148,6 +150,146 @@ export function BookGrid() {
   );
 }
 
+// Month names for display
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+type Book = NonNullable<ReturnType<typeof useAuthedQuery<typeof api.books.list>>>[number];
+
+// Group finished books by year and month
+function groupBooksByYearMonth(books: Book[]) {
+  // Sort by dateFinished DESC (newest first)
+  const sorted = [...books].sort((a, b) => (b.dateFinished ?? 0) - (a.dateFinished ?? 0));
+
+  // Group by year, then month
+  const grouped: Record<number, Record<number, Book[]>> = {};
+  const booksWithoutDate: Book[] = [];
+
+  for (const book of sorted) {
+    if (!book.dateFinished) {
+      booksWithoutDate.push(book);
+      continue;
+    }
+
+    const date = new Date(book.dateFinished);
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    if (!grouped[year]) grouped[year] = {};
+    if (!grouped[year][month]) grouped[year][month] = [];
+
+    grouped[year][month].push(book);
+  }
+
+  return { grouped, booksWithoutDate };
+}
+
+// Calculate stats for a set of books
+function getBookStats(books: Book[]) {
+  return {
+    count: books.length,
+    pages: books.reduce((sum, b) => sum + (b.pageCount ?? 0), 0),
+    favorites: books.filter((b) => b.isFavorite).length,
+    audiobooks: books.filter((b) => b.isAudiobook).length,
+  };
+}
+
+// Month Section with stats
+function MonthSection({ month, books }: { month: number; books: Book[] }) {
+  const stats = getBookStats(books);
+  const monthName = MONTH_NAMES[month];
+
+  return (
+    <div className="mt-10 first:mt-0">
+      {/* Month header with stats */}
+      <div className="mb-6 flex items-baseline gap-3">
+        <h3 className="font-display text-xl font-medium text-text-ink">{monthName}</h3>
+        <span className="font-mono text-xs tracking-wide text-text-inkMuted">
+          • {stats.count} {pluralize(stats.count, "book")}
+          {stats.favorites > 0 && ` • ${stats.favorites} ${pluralize(stats.favorites, "favorite")}`}
+          {stats.audiobooks > 0 &&
+            ` • ${stats.audiobooks} ${pluralize(stats.audiobooks, "audiobook")}`}
+        </span>
+        <div className="h-px flex-1 bg-line-ghost/50" />
+      </div>
+
+      {/* Books grid */}
+      <BooksGrid books={books} />
+    </div>
+  );
+}
+
+// Finished Books Timeline - organized by year and month (Art Deco Editorial)
+function FinishedBooksTimeline({ books }: { books: Book[] }) {
+  const { grouped, booksWithoutDate } = useMemo(() => groupBooksByYearMonth(books), [books]);
+
+  // Get years sorted descending
+  const years = Object.keys(grouped)
+    .map(Number)
+    .sort((a, b) => b - a);
+
+  return (
+    <div className="space-y-24">
+      {/* Main timeline */}
+      {years.map((year) => {
+        const monthsObj = grouped[year] ?? {};
+        const months = Object.keys(monthsObj)
+          .map(Number)
+          .sort((a, b) => b - a);
+
+        // Calculate year stats
+        const yearBooks = months.flatMap((month) => monthsObj[month] ?? []);
+        const yearStats = getBookStats(yearBooks);
+
+        return (
+          <div key={year} className="space-y-12">
+            {/* Art Deco Year Header */}
+            <YearHero
+              year={year}
+              stats={{
+                totalBooks: yearStats.count,
+                totalPages: yearStats.pages,
+              }}
+            />
+
+            {/* Month sections with bento layouts */}
+            <div className="space-y-16">
+              {months.map((month) => {
+                const monthBooks = monthsObj[month];
+                if (!monthBooks) return null;
+                return <MonthSection key={month} month={month} books={monthBooks} />;
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Books without dates (edge case) */}
+      {booksWithoutDate.length > 0 && (
+        <div className="mt-20">
+          <div className="mb-8 flex items-center gap-4">
+            <h2 className="font-display text-2xl font-medium text-text-ink">Undated</h2>
+            <div className="h-px flex-1 bg-line-ghost" />
+          </div>
+          <BooksGrid books={booksWithoutDate} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Library View - sectioned into Currently Reading and Finished
 function LibraryView({
   readingBooks,
@@ -194,11 +336,10 @@ function LibraryView({
         </section>
       )}
 
-      {/* Finished Section */}
+      {/* Finished Section - Timeline View */}
       {hasFinished && (
         <section>
-          <SectionHeader>Finished</SectionHeader>
-          <BooksGrid books={finishedBooks} />
+          <FinishedBooksTimeline books={finishedBooks} />
         </section>
       )}
     </div>

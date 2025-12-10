@@ -9,6 +9,85 @@
     text-wrap: balance;
   }
 
+  /* Art Deco Gold Gradient Text */
+  .text-deco-gold {
+    background: linear-gradient(
+      145deg,
+      var(--color-deco-gold-dark) 0%,
+      var(--color-deco-gold-shine) 25%,
+      var(--color-deco-gold) 50%,
+      var(--color-deco-gold-shine) 75%,
+      var(--color-deco-gold-dark) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Art Deco Double Border Frame - Bold */
+  .deco-frame {
+    border: 2px solid var(--color-deco-gold);
+    outline: 6px solid var(--color-canvas-bone);
+    outline-offset: -10px;
+    box-shadow:
+      0 0 0 8px var(--color-deco-gold),
+      inset 0 0 0 1px var(--color-deco-gold-light);
+  }
+
+  .deco-frame-subtle {
+    border: 1px solid var(--color-deco-gold);
+    outline: 3px solid var(--color-canvas-bone);
+    outline-offset: -5px;
+    box-shadow: 0 0 0 4px var(--color-deco-gold);
+  }
+
+  /* Art Deco Line Accents */
+  .deco-line {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--color-deco-gold) 20%,
+      var(--color-deco-gold) 80%,
+      transparent 100%
+    );
+  }
+
+  .deco-line-double {
+    height: 3px;
+    background:
+      linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--color-deco-gold) 20%,
+        var(--color-deco-gold) 80%,
+        transparent 100%
+      ),
+      linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--color-canvas-bone) 20%,
+        var(--color-canvas-bone) 80%,
+        transparent 100%
+      ),
+      linear-gradient(
+        90deg,
+        transparent 0%,
+        var(--color-deco-gold) 20%,
+        var(--color-deco-gold) 80%,
+        transparent 100%
+      );
+    background-size:
+      100% 1px,
+      100% 1px,
+      100% 1px;
+    background-position:
+      0 0,
+      0 1px,
+      0 2px;
+    background-repeat: no-repeat;
+  }
+
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -33,6 +112,20 @@
     transform: translateY(-2px);
     box-shadow: var(--elevation-raised);
   }
+
+  .animate-shimmer {
+    animation: shimmer 2.5s infinite linear;
+  }
+
+  .animate-draw-h {
+    animation: draw-line-h 1.2s ease-out forwards;
+    transform-origin: center;
+  }
+
+  .animate-draw-v {
+    animation: draw-line-v 1.2s ease-out forwards;
+    transform-origin: center;
+  }
 }
 
 @keyframes fade-in {
@@ -43,6 +136,33 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes draw-line-h {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes draw-line-v {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
   }
 }
 
