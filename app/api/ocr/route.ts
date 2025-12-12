@@ -6,6 +6,10 @@ const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "google/gemini-2.5-flash-preview";
 const TIMEOUT_MS = 30000;
 
+// 5MB limit - base64 expands by ~4/3, plus data URL prefix overhead
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_BASE64_CHARS = Math.ceil(MAX_IMAGE_BYTES * (4 / 3)) + 1024;
+
 const EXTRACTION_PROMPT = `Extract all visible text from this book page photograph.
 Return only the extracted text, preserving paragraph breaks.
 Do not add any commentary, formatting, or interpretation—just the raw text as it appears.
@@ -28,17 +32,12 @@ type OpenRouterResponse = {
 };
 
 function extractBase64(dataUrl: string): { base64: string; mediaType: string } | null {
-  // Handle data URL format: data:image/jpeg;base64,/9j/4AAQ...
-  const match = dataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+  // Require data URL format with explicit media type (e.g., data:image/jpeg;base64,/9j/4AAQ...)
+  // Supports standard types (image/jpeg, image/png) and extended types (image/svg+xml, image/vnd.*)
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (match) {
     return { mediaType: match[1]!, base64: match[2]! };
   }
-
-  // Handle raw base64 (assume JPEG)
-  if (/^[A-Za-z0-9+/]+=*$/.test(dataUrl.slice(0, 100))) {
-    return { mediaType: "image/jpeg", base64: dataUrl };
-  }
-
   return null;
 }
 
@@ -63,18 +62,33 @@ export const POST = withObservability(async (request: Request) => {
 
   let body: OCRRequest;
   try {
-    body = (await request.json()) as OCRRequest;
+    const raw: unknown = await request.json();
+    // Runtime validation - don't trust the cast
+    if (
+      typeof raw !== "object" ||
+      raw === null ||
+      !("image" in raw) ||
+      typeof (raw as { image: unknown }).image !== "string" ||
+      (raw as { image: string }).image.length === 0
+    ) {
+      return NextResponse.json(
+        { error: "Request body must include a non-empty image string", code: "INVALID_IMAGE" },
+        { status: 400 },
+      );
+    }
+    body = { image: (raw as { image: string }).image };
   } catch {
     return NextResponse.json(
-      { error: "Invalid request body", code: "INVALID_IMAGE" },
+      { error: "Invalid JSON in request body", code: "INVALID_IMAGE" },
       { status: 400 },
     );
   }
 
-  if (!body.image) {
+  // Enforce 5MB size limit before processing
+  if (body.image.length > MAX_BASE64_CHARS) {
     return NextResponse.json(
-      { error: "No image provided", code: "INVALID_IMAGE" },
-      { status: 400 },
+      { error: "Image is too large (max 5MB).", code: "INVALID_IMAGE" },
+      { status: 413 },
     );
   }
 
@@ -88,10 +102,10 @@ export const POST = withObservability(async (request: Request) => {
 
   const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
 
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
+  try {
     const response = await fetch(OPENROUTER_API_URL, {
       method: "POST",
       headers: {
@@ -123,8 +137,6 @@ export const POST = withObservability(async (request: Request) => {
       }),
       signal: controller.signal,
     });
-
-    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorData = (await response.json().catch(() => ({}))) as OpenRouterResponse;
@@ -168,5 +180,7 @@ export const POST = withObservability(async (request: Request) => {
       { error: "Could not read text. Please try again.", code: "OCR_FAILED" },
       { status: 500 },
     );
+  } finally {
+    clearTimeout(timeoutId);
   }
 }, "ocr");

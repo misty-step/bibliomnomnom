@@ -7,6 +7,14 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
 
 ## Now (Sprint-Ready, <2 weeks)
 
+### [PRODUCT] Support rambling voice notes
+
+- use case: after a reading session, i want to just talk to my phone about what i read in a disorganized way
+- i want this to create / save a few things:
+  * the raw transcription of the ramble
+  * an organized synthesis of it
+  * pushback / feedback / followup questions / challenges / things to mull over etc
+
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
 
 **File**: New feature - export module

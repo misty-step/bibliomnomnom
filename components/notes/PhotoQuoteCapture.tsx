@@ -95,7 +95,8 @@ export function PhotoQuoteCapture({ bookId }: PhotoQuoteCaptureProps) {
       } else {
         setState({ step: "error", message: "No text found in image.", image });
       }
-    } catch {
+    } catch (error) {
+      console.error("[PhotoQuoteCapture] Failed to fetch OCR result:", error);
       setState({ step: "error", message: "Network error. Check your connection.", image });
     }
   }, [state]);
@@ -114,7 +115,8 @@ export function PhotoQuoteCapture({ bookId }: PhotoQuoteCaptureProps) {
       toast({ title: "Quote saved" });
       setDialogOpen(false);
       setState({ step: "idle" });
-    } catch {
+    } catch (error) {
+      console.error("[PhotoQuoteCapture] Failed to save quote:", error);
       toast({
         title: "Failed to save",
         description: "Please try again.",
@@ -173,7 +175,16 @@ export function PhotoQuoteCapture({ bookId }: PhotoQuoteCaptureProps) {
       />
 
       {/* Dialog for capture flow */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          // Prevent closing during processing or saving to avoid confusing state
+          if (!open && (state.step === "processing" || isSaving)) return;
+          setDialogOpen(open);
+          // Reset state when dialog closes
+          if (!open) setState({ step: "idle" });
+        }}
+      >
         <DialogContent
           className={cn(
             // Mobile: full screen
