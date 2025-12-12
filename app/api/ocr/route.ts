@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { withObservability } from "@/lib/api/withObservability";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "anthropic/claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "google/gemini-2.5-flash-preview";
 const TIMEOUT_MS = 30000;
 
 const EXTRACTION_PROMPT = `Extract all visible text from this book page photograph.
