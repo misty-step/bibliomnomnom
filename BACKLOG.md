@@ -7,6 +7,14 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
 
 ## Now (Sprint-Ready, <2 weeks)
 
+### [PRODUCT] Support rambling voice notes
+
+- use case: after a reading session, i want to just talk to my phone about what i read in a disorganized way
+- i want this to create / save a few things:
+  * the raw transcription of the ramble
+  * an organized synthesis of it
+  * pushback / feedback / followup questions / challenges / things to mull over etc
+
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
 
 **File**: New feature - export module
@@ -709,6 +717,74 @@ updates:
 ---
 
 ## Next (This Quarter, <3 months)
+
+### [SECURITY] OCR API Rate Limiting
+
+**Source**: PR #20 review (CodeRabbit)
+**File**: `app/api/ocr/route.ts`
+**Problem**: No per-user throttling on OCR endpoint. Authenticated users could abuse the endpoint, causing unbounded OpenRouter costs and potential DoS.
+
+**Current mitigation**: Clerk authentication required (blocks anonymous abuse)
+**Status**: deferred (not merge-blocking); implement before public launch
+
+**Recommended fix**:
+```typescript
+// Option 1: Upstash Redis rate limiter
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, "1 m"), // 10 requests per minute per user
+});
+
+// In handler:
+const { success, limit, remaining, reset } = await ratelimit.limit(userId);
+if (!success) {
+  return NextResponse.json(
+    { error: "Too many requests. Please wait a moment.", code: "RATE_LIMITED" },
+    { status: 429, headers: { "Retry-After": String(Math.ceil((reset - Date.now()) / 1000)) } }
+  );
+}
+```
+
+**Effort**: 2-4h (including Upstash setup)
+**Impact**: Prevents cost abuse, improves service reliability
+**Priority**: MEDIUM - MVP has low traffic, but should be added before public launch
+
+---
+
+### [ARCHITECTURE] Lift PhotoQuoteCapture mutation to parent
+
+**Source**: PR #20 review (CodeRabbit nitpick)
+**File**: `components/notes/PhotoQuoteCapture.tsx`, `components/notes/CreateNote.tsx`
+**Problem**: PhotoQuoteCapture component calls `useMutation(api.notes.create)` directly instead of receiving a callback from parent. This violates the "UI components should be presentational" pattern.
+
+**Current state**: Works correctly, just an architectural preference
+
+**Recommended fix**:
+```typescript
+// PhotoQuoteCapture.tsx
+type PhotoQuoteCaptureProps = {
+  bookId: Id<"books">;
+  onSaveQuote: (text: string) => Promise<void>; // Receive callback instead of calling mutation
+};
+
+// CreateNote.tsx
+<PhotoQuoteCapture
+  bookId={bookId}
+  onSaveQuote={async (text) => {
+    await createNote({ bookId, type: "quote", content: text });
+    toast({ title: "Quote saved" });
+  }}
+/>
+```
+
+**Effort**: 1h
+**Impact**: Better separation of concerns, easier testing
+**Priority**: LOW - purely architectural improvement
+
+---
 
 ### [FEATURE] "Magic Add" Book Input
 
