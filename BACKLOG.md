@@ -725,6 +725,7 @@ updates:
 **Problem**: No per-user throttling on OCR endpoint. Authenticated users could abuse the endpoint, causing unbounded OpenRouter costs and potential DoS.
 
 **Current mitigation**: Clerk authentication required (blocks anonymous abuse)
+**Status**: deferred (not merge-blocking); implement before public launch
 
 **Recommended fix**:
 ```typescript
