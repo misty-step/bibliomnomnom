@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { withObservability } from "@/lib/api/withObservability";
-import { MAX_BASE64_CHARS } from "@/lib/ocr/limits";
+import { MAX_BASE64_PAYLOAD_CHARS, MAX_DATA_URL_CHARS } from "@/lib/ocr/limits";
 import { formatOcrText } from "@/lib/ocr/format";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -35,6 +35,12 @@ type OpenRouterResponse = {
   };
 };
 
+function redactUserId(userId: string): string {
+  if (!userId) return "";
+  const suffixLen = 6;
+  return userId.length <= suffixLen ? "…" : `…${userId.slice(-suffixLen)}`;
+}
+
 function extractBase64(dataUrl: string): { base64: string; mediaType: string } | null {
   // Require data URL format with explicit media type (e.g., data:image/jpeg;base64,/9j/4AAQ...)
   // Supports standard types (image/jpeg, image/png) and extended types (image/svg+xml, image/vnd.*)
@@ -57,7 +63,7 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
-  console.log("[ocr] REQUEST", { requestId, userId });
+  console.log("[ocr] REQUEST", { requestId, user: redactUserId(userId) });
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -92,8 +98,8 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
-  // Enforce 5MB size limit before processing
-  if (body.image.length > MAX_BASE64_CHARS) {
+  // Quick guard before regex extraction; true size check happens on base64 payload below.
+  if (body.image.length > MAX_DATA_URL_CHARS) {
     return NextResponse.json(
       { error: "Image is too large (max 5MB).", code: "INVALID_IMAGE" },
       { status: 413, headers: responseHeaders },
@@ -105,6 +111,13 @@ export const POST = withObservability(async (request: Request) => {
     return NextResponse.json(
       { error: "Could not process image. Try a different photo.", code: "INVALID_IMAGE" },
       { status: 400, headers: responseHeaders },
+    );
+  }
+
+  if (extracted.base64.length > MAX_BASE64_PAYLOAD_CHARS) {
+    return NextResponse.json(
+      { error: "Image is too large (max 5MB).", code: "INVALID_IMAGE" },
+      { status: 413, headers: responseHeaders },
     );
   }
 

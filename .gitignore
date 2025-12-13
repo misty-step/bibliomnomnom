@@ -15,6 +15,9 @@
 # quality infrastructure
 lefthook-local.yml
 
+# local agent configs
+.claude/
+
 # next.js
 /.next/
 /out/

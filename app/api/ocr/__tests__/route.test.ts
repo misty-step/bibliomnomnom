@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { POST } from "../route";
 
-const originalEnv = { ...process.env };
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
+const originalOpenRouterModel = process.env.OPENROUTER_MODEL;
+const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 vi.mock("@/lib/api/withObservability", async () => {
   const mod = await vi.importActual<typeof import("@/lib/api/withObservability")>(
@@ -9,7 +11,11 @@ vi.mock("@/lib/api/withObservability", async () => {
   );
   return {
     ...mod,
-    withObservability: (handler: any) => handler,
+    withObservability: (
+      handler: Parameters<typeof mod.withObservability>[0],
+      _operationName: Parameters<typeof mod.withObservability>[1],
+      _options?: Parameters<typeof mod.withObservability>[2],
+    ) => handler,
   };
 });
 
@@ -97,7 +103,18 @@ describe("ocr route", () => {
   });
 });
 
+function restoreEnvVar(key: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[key];
+    return;
+  }
+  process.env[key] = value;
+}
+
 afterEach(() => {
-  process.env = { ...originalEnv };
+  restoreEnvVar("OPENROUTER_API_KEY", originalOpenRouterApiKey);
+  restoreEnvVar("OPENROUTER_MODEL", originalOpenRouterModel);
+  restoreEnvVar("NEXT_PUBLIC_APP_URL", originalAppUrl);
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });

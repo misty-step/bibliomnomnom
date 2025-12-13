@@ -362,12 +362,13 @@ export function PhotoQuoteCapture({ bookId, onDialogOpenChange }: PhotoQuoteCapt
       const previewUrl = state.previewUrl;
       if (!previewUrl) {
         setState({ step: "idle" });
-        setDialogOpen(false);
+        setDialogOpenSafe(false);
+        clearSelection();
         return;
       }
       setState({ step: "preview", previewUrl });
     }
-  }, [state]);
+  }, [state, clearSelection, setDialogOpenSafe]);
 
   const triggerCapture = useCallback(() => {
     fileInputRef.current?.click();
