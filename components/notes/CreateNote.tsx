@@ -23,12 +23,14 @@ export function CreateNote({ bookId }: CreateNoteProps) {
   const [page, setPage] = useState("");
   const [isExpanded, setIsExpanded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Collapse on click outside if empty
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (isModalOpen) return;
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         if (!content.trim()) {
           setIsExpanded(false);
@@ -38,7 +40,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
 
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [content]);
+  }, [content, isModalOpen]);
 
   const handleSave = async () => {
     if (!content.trim()) return;
@@ -96,7 +98,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
               <div className="flex flex-wrap items-center gap-3">
                 <NoteTypeSelector value={type} onChange={setType} />
                 <div className="h-4 w-px bg-line-ghost" />
-                <PhotoQuoteCapture bookId={bookId} />
+                <PhotoQuoteCapture bookId={bookId} onDialogOpenChange={setIsModalOpen} />
                 <div className="h-4 w-px bg-line-ghost" />
                 <input
                   value={page}

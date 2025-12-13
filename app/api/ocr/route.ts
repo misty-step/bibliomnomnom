@@ -1,18 +1,22 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { withObservability } from "@/lib/api/withObservability";
+import { MAX_BASE64_CHARS } from "@/lib/ocr/limits";
+import { formatOcrText } from "@/lib/ocr/format";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "google/gemini-2.5-flash-preview";
+const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const TIMEOUT_MS = 30000;
 
-// 5MB limit - base64 expands by ~4/3, plus data URL prefix overhead
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_BASE64_CHARS = Math.ceil(MAX_IMAGE_BYTES * (4 / 3)) + 1024;
-
 const EXTRACTION_PROMPT = `Extract all visible text from this book page photograph.
-Return only the extracted text, preserving paragraph breaks.
-Do not add any commentary, formatting, or interpretation—just the raw text as it appears.
+
+Return plain text only.
+
+Formatting rules:
+- Preserve paragraph breaks as blank lines between paragraphs.
+- Do not insert line breaks for line wrapping; each paragraph should be reflowed into a single line.
+- If a word is split across a line break with a hyphen, join it back into one word.
+
 If no text is visible or readable, return an empty string.`;
 
 type OCRRequest = {
@@ -42,21 +46,25 @@ function extractBase64(dataUrl: string): { base64: string; mediaType: string } |
 }
 
 export const POST = withObservability(async (request: Request) => {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
+  const responseHeaders = { "x-request-id": requestId };
   const { userId } = await auth();
 
   if (!userId) {
     return NextResponse.json(
       { error: "Please sign in to use this feature", code: "UNAUTHORIZED" },
-      { status: 401 },
+      { status: 401, headers: responseHeaders },
     );
   }
+
+  console.log("[ocr] REQUEST", { requestId, userId });
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.error("[ocr] OPENROUTER_API_KEY not configured");
     return NextResponse.json(
       { error: "OCR service not configured", code: "OCR_FAILED" },
-      { status: 500 },
+      { status: 500, headers: responseHeaders },
     );
   }
 
@@ -73,14 +81,14 @@ export const POST = withObservability(async (request: Request) => {
     ) {
       return NextResponse.json(
         { error: "Request body must include a non-empty image string", code: "INVALID_IMAGE" },
-        { status: 400 },
+        { status: 400, headers: responseHeaders },
       );
     }
     body = { image: (raw as { image: string }).image };
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON in request body", code: "INVALID_IMAGE" },
-      { status: 400 },
+      { status: 400, headers: responseHeaders },
     );
   }
 
@@ -88,7 +96,7 @@ export const POST = withObservability(async (request: Request) => {
   if (body.image.length > MAX_BASE64_CHARS) {
     return NextResponse.json(
       { error: "Image is too large (max 5MB).", code: "INVALID_IMAGE" },
-      { status: 413 },
+      { status: 413, headers: responseHeaders },
     );
   }
 
@@ -96,11 +104,12 @@ export const POST = withObservability(async (request: Request) => {
   if (!extracted) {
     return NextResponse.json(
       { error: "Could not process image. Try a different photo.", code: "INVALID_IMAGE" },
-      { status: 400 },
+      { status: 400, headers: responseHeaders },
     );
   }
 
   const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  console.log("[ocr] MODEL", { requestId, model });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -145,40 +154,56 @@ export const POST = withObservability(async (request: Request) => {
       if (response.status === 429) {
         return NextResponse.json(
           { error: "Too many requests. Please wait a moment.", code: "RATE_LIMITED" },
-          { status: 429 },
+          { status: 429, headers: responseHeaders },
+        );
+      }
+
+      const providerMessage = errorData.error?.message ?? "";
+      if (response.status === 400 && providerMessage.toLowerCase().includes("not a valid model")) {
+        return NextResponse.json(
+          {
+            error: "OCR model misconfigured. Please set OPENROUTER_MODEL to a valid model ID.",
+            code: "OCR_MODEL_INVALID",
+          },
+          { status: 500, headers: responseHeaders },
         );
       }
 
       return NextResponse.json(
         { error: "Could not read text. Please try again.", code: "OCR_FAILED" },
-        { status: 500 },
+        { status: 500, headers: responseHeaders },
       );
     }
 
     const data = (await response.json()) as OpenRouterResponse;
-    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+    const text = formatOcrText(rawText);
 
     if (!text) {
       return NextResponse.json(
         { error: "No text found in image. Try a clearer photo.", code: "NO_TEXT" },
-        { status: 200 },
+        { status: 200, headers: responseHeaders },
       );
     }
 
-    console.log(`[ocr] Extracted ${text.length} characters`);
-    return NextResponse.json({ text });
+    console.log("[ocr] SUCCESS", {
+      requestId,
+      rawChars: rawText.length,
+      formattedChars: text.length,
+    });
+    return NextResponse.json({ text }, { headers: responseHeaders });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json(
         { error: "Taking too long. Please try again.", code: "OCR_FAILED" },
-        { status: 504 },
+        { status: 504, headers: responseHeaders },
       );
     }
 
     console.error("[ocr] Unexpected error:", error);
     return NextResponse.json(
       { error: "Could not read text. Please try again.", code: "OCR_FAILED" },
-      { status: 500 },
+      { status: 500, headers: responseHeaders },
     );
   } finally {
     clearTimeout(timeoutId);
