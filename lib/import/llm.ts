@@ -62,6 +62,14 @@ Rules:
 - Default status to want-to-read when uncertain
 - Include tempId from the source if provided
 
+DATE EXTRACTION RULES (critical):
+- NEVER guess or infer dateStarted - only extract if explicitly stated as "started reading on X"
+- For dateFinished: use year context from section headers (e.g., "### 2025" or "## 2024")
+  - If a book has a partial date like "(Nov 2)" under a "### 2025" header, interpret as 2025-11-02
+  - If a book is in a "Currently Reading" section, do NOT set dateFinished
+- Return dates as Unix timestamps in milliseconds (e.g., 1730505600000 for Nov 2, 2025)
+- When in doubt, omit the date field entirely - empty data is better than wrong data
+
 Input:
 """
 ${chunk}

@@ -114,4 +114,32 @@ describe("llmExtract", () => {
     expect(result.rows).toHaveLength(0);
     expect(result.errors[0]!.message).toContain("Row missing required title or author");
   });
+
+  it("prompt includes year-context date extraction rules", async () => {
+    let capturedPrompt = "";
+    const capturingProvider = {
+      name: "openai" as const,
+      call: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return JSON.stringify({ books: [] });
+      },
+    };
+
+    const windowBackup = global.window;
+    // @ts-expect-error - simulate server environment
+    delete global.window;
+
+    await llmExtract("test input", { provider: capturingProvider });
+
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
+
+    // Verify prompt contains date extraction rules
+    expect(capturedPrompt).toContain("DATE EXTRACTION RULES");
+    expect(capturedPrompt).toContain("NEVER guess or infer dateStarted");
+    expect(capturedPrompt).toContain("year context from section headers");
+    expect(capturedPrompt).toContain("Currently Reading");
+    expect(capturedPrompt).toContain("empty data is better than wrong data");
+  });
 });
