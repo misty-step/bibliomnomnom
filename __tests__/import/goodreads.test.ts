@@ -31,6 +31,18 @@ describe("parseGoodreadsCsv", () => {
     expect(dune.isbn).toBe("9780441013593");
   });
 
+  it("never maps Date Added to dateStarted", () => {
+    // Date Added (2022-12-01) should NOT become dateStarted
+    // It represents when the book was shelved, not when reading began
+    const csv =
+      CSV_HEADER +
+      "Currently Reading,Author,,,,,,,2023-06-15,currently-reading,currently-reading\n";
+
+    const result = parseGoodreadsCsv(csv);
+
+    expect(result.rows[0]!.dateStarted).toBeUndefined();
+  });
+
   it("emits warning and defaults status for unknown shelf", () => {
     const csv = CSV_HEADER + "Book,Author,,,,,,,someday-maybe,someday-maybe\n";
 

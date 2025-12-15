@@ -181,7 +181,9 @@ export const parseGoodreadsCsv = (fileText: string): ClientParseResult => {
 
     const dateFinished = toDateTimestamp(getValue(row, headerLookup, OPTIONAL_HEADERS.dateRead));
 
-    const dateStarted = toDateTimestamp(getValue(row, headerLookup, OPTIONAL_HEADERS.dateAdded));
+    // Never map Date Added to dateStarted - it represents when the book was shelved,
+    // not when reading started. Empty data is better than false data.
+    const dateStarted = undefined;
 
     const coverUrl = normalizeOptionalText(getValue(row, headerLookup, OPTIONAL_HEADERS.coverUrl));
 
