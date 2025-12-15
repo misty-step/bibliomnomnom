@@ -10,6 +10,7 @@ import type {
 import { IMPORT_PAGE_SIZE as PAGE_SIZE } from "../lib/import/types";
 import { inferGenericCsv } from "../lib/import/client/csvInfer";
 import { parseGoodreadsCsv } from "../lib/import/client/goodreads";
+import { parseReadingSummaryMarkdown } from "../lib/import/client/readingSummary";
 import { makeTempId } from "../lib/import/types";
 
 type Status = "idle" | "parsing" | "previewing" | "ready" | "committing" | "success" | "error";
@@ -203,6 +204,41 @@ export const useImportJob = ({
       if (sourceType === "txt" || sourceType === "md" || sourceType === "unknown") {
         const importRunId = file.name + "-" + (crypto.randomUUID?.() ?? makeTempId("run"));
         try {
+          // For .md files, try deterministic parser first (no LLM needed)
+          if (sourceType === "md") {
+            const deterministicResult = parseReadingSummaryMarkdown(text);
+            if (deterministicResult.matched) {
+              console.log("[Import] Deterministic parser matched, skipping LLM", {
+                books: deterministicResult.rows.length,
+                warnings: deterministicResult.warnings.length,
+              });
+
+              const preview = await preparePreview({
+                importRunId,
+                sourceType: "md",
+                rows: deterministicResult.rows,
+                page: 0,
+                totalPages: 1,
+              });
+
+              dispatch({
+                type: "PREVIEW_SUCCESS",
+                payload: {
+                  sourceType: preview.sourceType,
+                  importRunId,
+                  pages: slicePages(preview.books, PAGE_SIZE),
+                  dedupMatches: preview.dedupMatches,
+                  warnings: [...deterministicResult.warnings, ...preview.warnings],
+                  errors: [...deterministicResult.errors, ...(preview.errors ?? [])].map((e) =>
+                    typeof e === "string" ? e : e.message || "Unknown error",
+                  ),
+                },
+              });
+              return;
+            }
+            console.log("[Import] Deterministic parser did not match, falling back to LLM");
+          }
+
           console.log("[Import] Extracting books from text/md file via action");
 
           // Step 1: Extract books using LLM (Convex action - can use fetch)
