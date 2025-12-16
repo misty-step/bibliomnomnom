@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Star } from "lucide-react";
 import { DedupControls } from "./DedupControls";
 import { Button } from "@/components/ui/button";
 
@@ -86,7 +87,7 @@ export function PreviewTable({
       )}
 
       <div className="overflow-hidden rounded-lg border border-line-ghost">
-        <div className="grid grid-cols-[auto,1fr,1fr,auto,auto] bg-canvas-boneMuted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-text-inkMuted">
+        <div className="grid grid-cols-[auto,1fr,1fr,auto,auto,auto,auto,auto] bg-canvas-boneMuted px-3 py-2 text-xs font-semibold uppercase tracking-wide text-text-inkMuted">
           <input
             type="checkbox"
             checked={allSelected}
@@ -97,6 +98,9 @@ export function PreviewTable({
           <span>Title</span>
           <span>Author</span>
           <span className="min-w-32">Status</span>
+          <span className="min-w-28">Started</span>
+          <span className="min-w-28">Finished</span>
+          <span className="min-w-16 text-center">Favorite</span>
           <span className="min-w-32">Decision</span>
         </div>
         <div className="divide-y divide-line-ghost bg-canvas-bone">
@@ -107,7 +111,7 @@ export function PreviewTable({
             return (
               <div
                 key={row.tempId}
-                className="grid grid-cols-[auto,1fr,1fr,auto,auto] items-center gap-2 px-3 py-3 text-sm"
+                className="grid grid-cols-[auto,1fr,1fr,auto,auto,auto,auto,auto] items-center gap-2 px-3 py-3 text-sm"
               >
                 <input
                   type="checkbox"
@@ -118,24 +122,40 @@ export function PreviewTable({
                 />
                 <div className="space-y-0.5">
                   <p className="font-medium text-text-ink">{row.title}</p>
-                  <p className="text-xs text-text-inkMuted">ISBN {row.isbn ?? "—"}</p>
-                  {(row.dateStarted || row.dateFinished) && (
-                    <p className="text-xs text-status-positive">
-                      {row.dateStarted &&
-                        `Started ${new Date(row.dateStarted).toLocaleDateString()}`}
-                      {row.dateStarted && row.dateFinished && " • "}
-                      {row.dateFinished &&
-                        `Finished ${new Date(row.dateFinished).toLocaleDateString()}`}
-                    </p>
-                  )}
+                  {row.isbn && <p className="text-xs text-text-inkMuted">ISBN {row.isbn}</p>}
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-text-ink">{row.author}</p>
-                  <p className="text-xs text-text-inkMuted">{row.publishedYear ?? ""}</p>
+                  {row.publishedYear && (
+                    <p className="text-xs text-text-inkMuted">{row.publishedYear}</p>
+                  )}
                 </div>
                 <span className="text-xs font-medium text-text-inkMuted">
                   {row.status ?? DEFAULT_STATUS}
                 </span>
+                <span className="text-xs text-text-ink">
+                  {row.dateStarted
+                    ? new Date(row.dateStarted).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "—"}
+                </span>
+                <span className="text-xs text-text-ink">
+                  {row.dateFinished
+                    ? new Date(row.dateFinished).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })
+                    : "—"}
+                </span>
+                <div className="flex justify-center">
+                  {row.isFavorite && (
+                    <Star className="h-4 w-4 fill-status-warning text-status-warning" />
+                  )}
+                </div>
                 <DedupControls
                   tempId={row.tempId}
                   decision={decision}

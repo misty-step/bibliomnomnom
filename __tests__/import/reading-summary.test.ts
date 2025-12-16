@@ -12,7 +12,10 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 const FIXTURE_PATH = join(__dirname, "../fixtures/reading-sample.md");
 
 describe("READING_SUMMARY.md import", () => {
-  describe("Deterministic parser", () => {
+  // NOTE: The deterministic parser is currently DISABLED for markdown imports in useImportJob.ts
+  // Markdown files always use LLM to support arbitrary date formats
+  // These tests remain as unit tests for the parser function itself
+  describe("Deterministic parser (UNIT TESTS ONLY - not used in import flow)", () => {
     it("parses the fixture file with year-context dates", () => {
       const markdown = readFileSync(FIXTURE_PATH, "utf-8");
       const result = parseReadingSummaryMarkdown(markdown);

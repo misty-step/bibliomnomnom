@@ -3,22 +3,22 @@
 Source: `TASK.md`, `SPEC.md`.
 
 ## Architecture Overview
-**Selected Approach**: Deterministic parsing for known markdown reading-log format + stricter import normalization.
+**Selected Approach**: Deterministic parsing for CSV imports + LLM parsing for markdown/text.
 
-**Rationale**: Markdown reading logs are structured; parsing them without LLM removes randomness + cost. LLM stays as fallback for unstructured text, with a prompt upgraded to handle “year header → month/day” context when used. Goodreads CSV fix is pure correctness (stop fabricating `dateStarted`). `timesRead` fix is a data integrity invariant for imported “read” books.
+**Rationale**: CSV imports (Goodreads) have deterministic structure and use deterministic parsing (fast, free, reliable). Markdown/text files use LLM exclusively to support arbitrary date formats and articulations (user requirement: "the parser should be a fucking llm that accepts fairly arbitrary fucking formats"). Goodreads CSV fix is pure correctness (stop fabricating `dateStarted`). `timesRead` fix is a data integrity invariant for imported "read" books.
 
 **Core Modules**
-- `GoodreadsCsvParser` (`lib/import/client/goodreads.ts`) — parse Goodreads export; never infer start dates.
-- `ReadingSummaryParser` (`lib/import/client/readingSummary.ts`) — parse `READING_SUMMARY.md`-style markdown with year-context dates.
-- `LlmExtract` (`lib/import/llm.ts`) — fallback extractor; prompt explicitly describes year-context date rules.
+- `GoodreadsCsvParser` (`lib/import/client/goodreads.ts`) — parse Goodreads export deterministically; never infer start dates.
+- `ReadingSummaryParser` (`lib/import/client/readingSummary.ts`) — DISABLED for import flow (cannot handle arbitrary date formats); kept as utility function for future use.
+- `LlmExtract` (`lib/import/llm.ts`) — PRIMARY parser for markdown/text imports; handles arbitrary date formats and articulations.
 - `DedupHelpers` (`lib/import/dedup.ts`) — enforces `timesRead` invariant on create/merge.
 
 **Data Flow**
-User → `ImportFlow` → `useImportJob` → (CSV parser | ReadingSummaryParser | LLM action) → `imports.preparePreview` → Preview UI → `imports.commitImport` → `books` table.
+User → `ImportFlow` → `useImportJob` → (CSV parser [deterministic] | LLM action [markdown/text]) → `imports.preparePreview` → Preview UI → `imports.commitImport` → `books` table.
 
 **Key Decisions**
 1. **Empty > wrong**: never map Goodreads `Date Added` to `dateStarted`.
-2. **Deterministic for known format**: parse year headers + `(Mon D)` dates ourselves; don’t ask an LLM to do algebra.
+2. **LLM for arbitrary formats**: Markdown/text imports use LLM exclusively to handle arbitrary date formats and articulations; CSV imports use deterministic parsing.
 3. **Invariant**: `status:"read"` implies `timesRead >= 1` for imported books (create + merge repair).
 
 ## Module: GoodreadsCsvParser
@@ -44,8 +44,12 @@ Error Handling
 - Missing `title`/`author` → row error, skip row.
 - Unknown shelf → warning + default status.
 
-## Module: ReadingSummaryParser
-Responsibility: parse the repo’s markdown reading-log format (see `__tests__/fixtures/reading-sample.md`) and extract finish dates using year headers.
+## Module: ReadingSummaryParser (DISABLED)
+**Status**: DISABLED for import flow; kept as utility function for future use.
+
+**Why Disabled**: Cannot handle arbitrary date formats (e.g., `*(Finished: November 2, 2025)*` vs `_(Nov 2)_`). User requirement: markdown imports must support arbitrary articulations, which requires LLM.
+
+Responsibility (if re-enabled): parse specific markdown reading-log format (see `__tests__/fixtures/reading-sample.md`) and extract finish dates using year headers.
 
 Public Interface:
 ```ts
@@ -59,17 +63,17 @@ export type ReadingSummaryParseResult = {
 export function parseReadingSummaryMarkdown(markdown: string): ReadingSummaryParseResult;
 ```
 
-Format Assumptions (explicit)
+Format Assumptions (if re-enabled)
 - Contains sections like `## Currently Reading` and `## Books by Year`.
 - Year blocks like `### 2025` (optionally `### 2025 (N books)`).
 - Book line like `- **Title** by Author _(Nov 2)_` (date optional; month/day only).
 
 Non-goals
-- Don’t infer `dateStarted`.
-- Don’t invent year when no year header applies (leave `dateFinished` empty).
+- Don't infer `dateStarted`.
+- Don't invent year when no year header applies (leave `dateFinished` empty).
 
-## Module: LlmExtract (Fallback)
-Responsibility: extract books from unstructured `.txt/.md` when deterministic parsing doesn’t match.
+## Module: LlmExtract (PRIMARY for markdown/text)
+Responsibility: extract books from markdown/text imports with support for arbitrary date formats and articulations.
 
 Prompt Requirements (new)
 - Teach “year context”: if a book line has `(Nov 21)` under a `### 2025` header, interpret as `2025-11-21`.
@@ -144,19 +148,20 @@ New
 
 Modify
 - `lib/import/client/goodreads.ts` — remove `Date Added` → `dateStarted`.
-- `lib/import/llm.ts` — prompt updates (year-context rules + “never guess dateStarted”).
+- `lib/import/llm.ts` — prompt updates (year-context rules + "never guess dateStarted").
 - `lib/import/dedup.ts` — `timesRead` logic for create + merge.
-- `hooks/useImportJob.ts` — for `.md`: attempt `ReadingSummaryParser` before calling `extractBooks` action.
+- `hooks/useImportJob.ts` — DISABLED deterministic parser for `.md` files; markdown/text always uses LLM.
+- `components/import/PreviewTable.tsx` — expanded grid to show all ParsedBook fields (dateStarted, dateFinished, isFavorite as dedicated columns).
 - Tests:
   - `__tests__/import/goodreads.test.ts` — assert `dateStarted` is `undefined`.
   - `__tests__/import/imports.commit.test.ts` and/or `__tests__/import/dedup.test.ts` — assert `timesRead` fixes.
-  - `__tests__/import/llm*.test.ts` — assert prompt contains year-context instructions (spy on provider call arg).
+  - `__tests__/import/reading-summary.test.ts` — clarified deterministic parser tests are unit tests only (not used in import flow).
 
 ## Integration Points
 
 External Services / Env Vars
 - No new services.
-- Existing LLM env vars remain (`OPENAI_API_KEY`, `GEMINI_API_KEY`), but markdown reading-summary imports should succeed without them (deterministic path).
+- LLM env vars REQUIRED for markdown/text imports (`OPENAI_API_KEY` or `GEMINI_API_KEY`). CSV imports don't need LLM (deterministic parsing).
 
 Build / Deploy
 - No schema changes.
@@ -172,7 +177,7 @@ Security / PII
 
 ## State Management
 - No changes to UI state machine (`useImportJob` statuses stay).
-- Only change is parser selection for `.md` inputs (deterministic first, LLM fallback).
+- Parser selection: CSV uses deterministic parsing; markdown/text always uses LLM.
 
 ## Error Handling Strategy
 - Parsing errors stay non-throwing: return `{ warnings, errors }` and show first error via toast (current behavior).
@@ -185,19 +190,21 @@ Targets (new/changed code)
 
 Unit tests
 - Goodreads: `dateStarted` always `undefined`; `dateFinished` still parsed.
-- ReadingSummaryParser:
-  - “Currently Reading” rows: status set, no `dateFinished`.
+- ReadingSummaryParser (unit tests only, not used in import flow):
+  - Tests verify parser function itself (kept for future use).
+  - "Currently Reading" rows: status set, no `dateFinished`.
   - Year section rows: correct `dateFinished` for `(Mon D)` using the section year.
 - DedupHelpers:
   - Create: `timesRead` correct for read vs non-read.
   - Merge repair: `timesRead: 0 → 1` when incoming status is read.
-
-Optional local-only test
-- If `../vanity/READING_SUMMARY.md` exists, run the same parser assertions against it; skip in CI when missing.
+- PreviewTable:
+  - Verify all ParsedBook fields rendered as columns.
+  - Verify dateStarted, dateFinished formatted correctly.
+  - Verify isFavorite shows star icon.
 
 ## Performance & Security Notes
-- Deterministic markdown parse is O(n) on text size; no network; no token budget issues.
-- LLM fallback remains bounded by `LLM_TOKEN_CAP`.
+- CSV parsing is O(n) on text size; no network; no token budget issues.
+- Markdown/text imports use LLM (requires API key); bounded by `LLM_TOKEN_CAP`.
 
 ## Alternative Architectures Considered
 

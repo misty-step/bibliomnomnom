@@ -10,7 +10,7 @@ import type {
 import { IMPORT_PAGE_SIZE as PAGE_SIZE } from "../lib/import/types";
 import { inferGenericCsv } from "../lib/import/client/csvInfer";
 import { parseGoodreadsCsv } from "../lib/import/client/goodreads";
-import { parseReadingSummaryMarkdown } from "../lib/import/client/readingSummary";
+// import { parseReadingSummaryMarkdown } from "../lib/import/client/readingSummary"; // DISABLED: Markdown uses LLM exclusively
 import { makeTempId } from "../lib/import/types";
 
 type Status = "idle" | "parsing" | "previewing" | "ready" | "committing" | "success" | "error";
@@ -204,43 +204,47 @@ export const useImportJob = ({
       if (sourceType === "txt" || sourceType === "md" || sourceType === "unknown") {
         const importRunId = file.name + "-" + (crypto.randomUUID?.() ?? makeTempId("run"));
         try {
-          let deterministicWarnings: string[] = [];
-
-          // For .md files, try deterministic parser first (no LLM needed)
-          if (sourceType === "md") {
-            const deterministicResult = parseReadingSummaryMarkdown(text);
-            if (deterministicResult.matched) {
-              console.log("[Import] Deterministic parser matched, skipping LLM", {
-                books: deterministicResult.rows.length,
-                warnings: deterministicResult.warnings.length,
-              });
-
-              const preview = await preparePreview({
-                importRunId,
-                sourceType: "md",
-                rows: deterministicResult.rows,
-                page: 0,
-                totalPages: 1,
-              });
-
-              dispatch({
-                type: "PREVIEW_SUCCESS",
-                payload: {
-                  sourceType: preview.sourceType,
-                  importRunId,
-                  pages: slicePages(preview.books, PAGE_SIZE),
-                  dedupMatches: preview.dedupMatches,
-                  warnings: [...deterministicResult.warnings, ...preview.warnings],
-                  errors: [...deterministicResult.errors, ...(preview.errors ?? [])].map((e) =>
-                    typeof e === "string" ? e : e.message || "Unknown error",
-                  ),
-                },
-              });
-              return;
-            }
-            deterministicWarnings = deterministicResult.warnings;
-            console.log("[Import] Deterministic parser did not match, falling back to LLM");
-          }
+          // DISABLED: Deterministic markdown parser cannot handle arbitrary date formats
+          // Markdown files must always use LLM to support arbitrary articulations
+          // CSV imports continue to use deterministic parsing (works perfectly for that format)
+          //
+          // let deterministicWarnings: string[] = [];
+          //
+          // // For .md files, try deterministic parser first (no LLM needed)
+          // if (sourceType === "md") {
+          //   const deterministicResult = parseReadingSummaryMarkdown(text);
+          //   if (deterministicResult.matched) {
+          //     console.log("[Import] Deterministic parser matched, skipping LLM", {
+          //       books: deterministicResult.rows.length,
+          //       warnings: deterministicResult.warnings.length,
+          //     });
+          //
+          //     const preview = await preparePreview({
+          //       importRunId,
+          //       sourceType: "md",
+          //       rows: deterministicResult.rows,
+          //       page: 0,
+          //       totalPages: 1,
+          //     });
+          //
+          //     dispatch({
+          //       type: "PREVIEW_SUCCESS",
+          //       payload: {
+          //         sourceType: preview.sourceType,
+          //         importRunId,
+          //         pages: slicePages(preview.books, PAGE_SIZE),
+          //         dedupMatches: preview.dedupMatches,
+          //         warnings: [...deterministicResult.warnings, ...preview.warnings],
+          //         errors: [...deterministicResult.errors, ...(preview.errors ?? [])].map((e) =>
+          //           typeof e === "string" ? e : e.message || "Unknown error",
+          //         ),
+          //       },
+          //     });
+          //     return;
+          //   }
+          //   deterministicWarnings = deterministicResult.warnings;
+          //   console.log("[Import] Deterministic parser did not match, falling back to LLM");
+          // }
 
           console.log("[Import] Extracting books from text/md file via action");
 
@@ -286,7 +290,7 @@ export const useImportJob = ({
               importRunId,
               pages: slicePages(preview.books, PAGE_SIZE),
               dedupMatches: preview.dedupMatches,
-              warnings: [...deterministicWarnings, ...extracted.warnings, ...preview.warnings],
+              warnings: [...extracted.warnings, ...preview.warnings],
               errors: [...extracted.errors, ...(preview.errors ?? [])].map((e) =>
                 typeof e === "string" ? e : e.message || "Unknown error",
               ),
