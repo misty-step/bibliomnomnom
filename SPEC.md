@@ -58,7 +58,7 @@ As a reader importing finished books, I want `timesRead` set to 1 for "read" boo
 
 No UI changes required. This is a data processing fix that affects:
 
-```
+```text
 [File Upload] → [Parse/Extract] → [Preview] → [Commit]
                       ↑
                Dates handled here

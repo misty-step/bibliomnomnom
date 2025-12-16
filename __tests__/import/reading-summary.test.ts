@@ -95,6 +95,42 @@ describe("READING_SUMMARY.md import", () => {
       expect(result.rows[2]!.dateFinished).toBe(Date.UTC(2025, 11, 31, 12, 0, 0, 0));
     });
 
+    it("treats year headers as books-by-year even if they appear under currently-reading", () => {
+      const markdown = `## Currently Reading
+- **Active Book** by Author
+
+### 2025
+- **Finished Book** by Author _(Nov 2)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.matched).toBe(true);
+      expect(result.rows).toHaveLength(2);
+
+      const active = result.rows.find((r) => r.title === "Active Book");
+      expect(active).toBeDefined();
+      expect(active!.status).toBe("currently-reading");
+
+      const finished = result.rows.find((r) => r.title === "Finished Book");
+      expect(finished).toBeDefined();
+      expect(finished!.status).toBe("read");
+      expect(finished!.dateFinished).toBe(Date.UTC(2025, 10, 2, 12, 0, 0, 0));
+    });
+
+    it("returns matched=false when it would skip book-like lines", () => {
+      const markdown = `## Books by Year
+### 2025
+- **Good Book** by Author _(Nov 2)_
+- **Weird Book** — Author _(Nov 3)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]!.title).toBe("Good Book");
+      expect(result.matched).toBe(false);
+      expect(result.warnings.some((w) => w.includes("Skipped"))).toBe(true);
+    });
+
     it("dateStarted is never set", () => {
       const markdown = `## Currently Reading
 - **Active Book** by Author

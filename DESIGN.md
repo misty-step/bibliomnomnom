@@ -50,7 +50,7 @@ Responsibility: parse the repo’s markdown reading-log format (see `__tests__/f
 Public Interface:
 ```ts
 export type ReadingSummaryParseResult = {
-  matched: boolean;          // false => caller should fall back (LLM, etc)
+  matched: boolean;          // true => safe/complete parse; false => caller should fall back (LLM, etc)
   rows: ParsedBook[];
   warnings: string[];
   errors: ParseError[];
@@ -113,7 +113,7 @@ Behavior Changes
 3. For each line:
    - If line matches `^##\\s+Currently Reading` → `section="currently-reading"`, `currentYear=undefined`.
    - If line matches `^##\\s+Books by Year` → `section="books-by-year"`.
-   - If `section==="books-by-year"` and line matches `^###\\s+(\\d{4})` → `currentYear = that year`.
+   - If line matches `^###\\s+(\\d{4})` → `section="books-by-year"`, `currentYear = that year`.
    - If line matches a book bullet:
      - Extract `title`, `author`.
      - If `section==="currently-reading"`:
@@ -124,7 +124,7 @@ Behavior Changes
          - `dateFinished = timestampFor(currentYear, "Nov", 2)`.
        - Else `dateFinished=undefined`.
      - Push `ParsedBook` with `tempId` derived from line index.
-4. `matched = rows.length>0 && sawExpectedHeadings`.
+4. `matched = rows.length>0 && sawExpectedHeadings && noSkippedBookLikeLines`.
 
 ### buildNewBook(incoming)
 1. Map basic fields as today.

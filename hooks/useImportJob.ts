@@ -204,6 +204,8 @@ export const useImportJob = ({
       if (sourceType === "txt" || sourceType === "md" || sourceType === "unknown") {
         const importRunId = file.name + "-" + (crypto.randomUUID?.() ?? makeTempId("run"));
         try {
+          let deterministicWarnings: string[] = [];
+
           // For .md files, try deterministic parser first (no LLM needed)
           if (sourceType === "md") {
             const deterministicResult = parseReadingSummaryMarkdown(text);
@@ -236,6 +238,7 @@ export const useImportJob = ({
               });
               return;
             }
+            deterministicWarnings = deterministicResult.warnings;
             console.log("[Import] Deterministic parser did not match, falling back to LLM");
           }
 
@@ -283,7 +286,7 @@ export const useImportJob = ({
               importRunId,
               pages: slicePages(preview.books, PAGE_SIZE),
               dedupMatches: preview.dedupMatches,
-              warnings: [...extracted.warnings, ...preview.warnings],
+              warnings: [...deterministicWarnings, ...extracted.warnings, ...preview.warnings],
               errors: [...extracted.errors, ...(preview.errors ?? [])].map((e) =>
                 typeof e === "string" ? e : e.message || "Unknown error",
               ),

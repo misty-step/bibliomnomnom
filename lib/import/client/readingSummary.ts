@@ -20,7 +20,7 @@ import {
 } from "../types";
 
 export type ReadingSummaryParseResult = {
-  matched: boolean; // false => caller should fall back (LLM, etc)
+  matched: boolean; // true => safe/complete parse; false => caller should fall back (LLM, etc)
   rows: ParsedBook[];
   warnings: string[];
   errors: ParseError[];
@@ -88,7 +88,8 @@ const YEAR_HEADER_PATTERN = /^###\s+(\d{4})/;
 
 // Book line pattern: - **Title** by Author _(date)_ or - **Title** by Author
 // Captures: title, author, optional date wrapped in _()_
-const BOOK_LINE_PATTERN = /^-\s+\*\*(.+?)\*\*\s+by\s+(.+?)(?:\s+_\(([A-Za-z]+\s*\d{1,2})\)_)?$/;
+const BOOK_LINE_PATTERN = /^-\s+\*\*(.+?)\*\*\s+by\s+(.+?)(?:\s+_\(([A-Za-z]+\s*\d{1,2})\)_)?$/i;
+const BOOK_LIKE_LINE_PATTERN = /^-\s+/;
 
 export const parseReadingSummaryMarkdown = (markdown: string): ReadingSummaryParseResult => {
   const warnings: string[] = [];
@@ -99,12 +100,20 @@ export const parseReadingSummaryMarkdown = (markdown: string): ReadingSummaryPar
   let currentYear: number | undefined;
   let sawCurrentlyReading = false;
   let sawBooksByYear = false;
+  let skippedBookLikeLines = 0;
+  const skippedBookLikeExamples: Array<{ line: number; text: string }> = [];
 
   const lines = markdown.split(/\r?\n/);
 
   lines.forEach((rawLine, index) => {
     const line = rawLine.trim();
     const lineNumber = index + 1;
+    const recordSkippedBookLikeLine = () => {
+      skippedBookLikeLines += 1;
+      if (skippedBookLikeExamples.length < 3) {
+        skippedBookLikeExamples.push({ line: lineNumber, text: line });
+      }
+    };
 
     // Check for section headers
     if (CURRENTLY_READING_PATTERN.test(line)) {
@@ -120,13 +129,11 @@ export const parseReadingSummaryMarkdown = (markdown: string): ReadingSummaryPar
       return;
     }
 
-    // Check for year headers (only relevant in books-by-year section)
+    // Check for year headers (strong signal that we are in a "books-by-year" list)
     const yearMatch = line.match(YEAR_HEADER_PATTERN);
     if (yearMatch) {
-      if (section === "books-by-year" || section === "other") {
-        section = "books-by-year";
-        sawBooksByYear = true;
-      }
+      section = "books-by-year";
+      sawBooksByYear = true;
       currentYear = parseInt(yearMatch[1]!, 10);
       return;
     }
@@ -192,11 +199,30 @@ export const parseReadingSummaryMarkdown = (markdown: string): ReadingSummaryPar
         dateFinished,
         privacy: "private",
       });
+      return;
+    }
+
+    // If we're in an expected list section, a non-matching list item is a strong hint we're
+    // about to silently drop books. Treat this as "partial" so callers can fall back safely.
+    if (
+      (section === "currently-reading" || section === "books-by-year") &&
+      BOOK_LIKE_LINE_PATTERN.test(line) &&
+      line.includes("**")
+    ) {
+      recordSkippedBookLikeLine();
     }
   });
 
-  // Determine if we matched the expected format
-  const matched = rows.length > 0 && (sawCurrentlyReading || sawBooksByYear);
+  if (skippedBookLikeLines > 0) {
+    const examples = skippedBookLikeExamples.map((e) => `Row ${e.line}: ${e.text}`).join(" | ");
+    warnings.push(
+      `Skipped ${skippedBookLikeLines} book-like line(s) that didn't match the expected format. ${examples}`,
+    );
+  }
+
+  // Only claim "matched" when we're confident we didn't silently skip book entries.
+  const matched =
+    rows.length > 0 && (sawCurrentlyReading || sawBooksByYear) && skippedBookLikeLines === 0;
 
   return {
     matched,
