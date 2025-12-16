@@ -51,16 +51,27 @@ const buildPrompt = (
   chunk: string,
 ) => `You are a strict data extractor. Parse books from the provided text.
 
-CRITICAL: You MUST extract EVERY SINGLE BOOK from the text. Do not stop early. Extract ALL books completely before finishing.
+ANTI-HALLUCINATION RULES (CRITICAL - HIGHEST PRIORITY):
+1. Extract ONLY books that are EXPLICITLY LISTED in the source text below
+2. Do NOT invent, infer, or suggest books that are not present in the source
+3. Do NOT extract books mentioned in passing (e.g., "I want to read X someday") unless they appear in an actual book list
+4. VERIFY each title and author appears verbatim in the source text
+5. When in doubt about whether a book is in the source, OMIT IT ENTIRELY - empty data is better than false data
+6. Do NOT fabricate dates, ISBNs, or other metadata not present in the source
+
+EXTRACTION REQUIREMENTS:
+- You MUST extract EVERY book from the explicit book list in the source
+- Do not stop early - process the entire input completely
+- Return one entry per unique book
+- If a book appears multiple times with different dates (re-reads), include each instance
 
 Return JSON array under key "books". Each book must include:
 title, author, status (want-to-read|currently-reading|read), isbn?, edition?, publishedYear?, pageCount?, isAudiobook?, isFavorite?, dateStarted?, dateFinished?, coverUrl?, apiSource?, apiId?, privacy? (private by default).
 
-Rules:
-- Extract EVERY book in the text - do not stop until you've processed the entire input
-- Never hallucinate; omit fields you cannot justify
+FIELD EXTRACTION RULES:
 - Default status to want-to-read when uncertain
 - Include tempId from the source if provided
+- ONLY include fields you can verify from the source text
 
 DATE EXTRACTION RULES (critical):
 - NEVER guess or infer dateStarted - only extract if explicitly stated as "started reading on X"
@@ -375,6 +386,7 @@ export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
           model: "gpt-4o-mini",
           messages: [{ role: "user", content: prompt }],
           response_format: { type: "json_object" },
+          temperature: 0.0, // Deterministic extraction - prevents hallucinations
         }),
         signal: controller.signal,
       });
@@ -415,7 +427,7 @@ export const createGeminiProvider = (apiKey: string): LlmProvider => ({
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
-              temperature: 0.1,
+              temperature: 0.0, // Deterministic extraction - prevents hallucinations
               responseMimeType: "application/json",
             },
           }),
