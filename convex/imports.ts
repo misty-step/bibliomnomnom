@@ -11,7 +11,7 @@ import {
   createOpenRouterExtractionProvider,
   createOpenRouterVerificationProvider,
 } from "../lib/import/llm";
-import { DEFAULT_IMPORT_FALLBACK_MODEL, DEFAULT_IMPORT_MODEL } from "../lib/ai/models";
+import { DEFAULT_IMPORT_MODEL } from "../lib/ai/models";
 import { ConvexImportRunRepository } from "../lib/import/repository/convex";
 import { checkImportRateLimits, shouldSkipRateLimits } from "../lib/import/rateLimit";
 import { createConvexRepositories } from "../lib/import/repository/convex";
@@ -130,14 +130,9 @@ export const extractBooks = action({
     }
 
     const model = process.env.OPENROUTER_IMPORT_MODEL || DEFAULT_IMPORT_MODEL;
-    const fallbackModel =
-      process.env.OPENROUTER_IMPORT_FALLBACK_MODEL || DEFAULT_IMPORT_FALLBACK_MODEL;
     const verifierModel = process.env.OPENROUTER_IMPORT_VERIFIER_MODEL;
 
     const provider = createOpenRouterExtractionProvider({ apiKey: openrouterKey, model });
-    const fallbackProvider = fallbackModel
-      ? createOpenRouterExtractionProvider({ apiKey: openrouterKey, model: fallbackModel })
-      : undefined;
     const verifierProvider = verifierModel
       ? createOpenRouterVerificationProvider({ apiKey: openrouterKey, model: verifierModel })
       : undefined;
@@ -146,7 +141,6 @@ export const extractBooks = action({
       const llmResult = await llmExtract(args.rawText ?? "", {
         tokenCap: LLM_TOKEN_CAP,
         provider,
-        fallbackProvider,
         verifierProvider,
       });
 

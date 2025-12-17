@@ -20,7 +20,6 @@ export type LlmExtractOptions = {
   tokenCap?: number;
   chunkTokenSize?: number;
   provider?: LlmProvider;
-  fallbackProvider?: LlmProvider;
   verifierProvider?: LlmProvider;
 };
 
@@ -246,10 +245,13 @@ export const llmExtract = async (
     throw new Error("llmExtract is server-only");
   }
 
+  const provider = opts.provider;
+  const verifier = opts.verifierProvider;
+
   const tokenCap = opts.tokenCap ?? LLM_TOKEN_CAP;
   const chunkSize = opts.chunkTokenSize ?? DEFAULT_CHUNK_TOKEN_SIZE;
 
-  if (!opts.provider && !opts.fallbackProvider) {
+  if (!provider) {
     return {
       rows: [],
       warnings: [],
@@ -278,10 +280,6 @@ export const llmExtract = async (
   const collected: ParsedBook[] = [];
   let tokenUsage = 0;
 
-  const provider = opts.provider;
-  const fallback = opts.fallbackProvider;
-  const verifier = opts.verifierProvider;
-
   // Process a single chunk
   const processChunk = async (
     chunk: string,
@@ -291,20 +289,10 @@ export const llmExtract = async (
     let parsed: ParsedBook[] = [];
     let providerError: Error | null = null;
 
-    if (provider) {
-      try {
-        parsed = await runProvider(provider, prompt);
-      } catch (err: any) {
-        providerError = err;
-      }
-    }
-
-    if (!parsed.length && fallback) {
-      try {
-        parsed = await runProvider(fallback, prompt);
-      } catch (err: any) {
-        providerError = providerError ?? err;
-      }
+    try {
+      parsed = await runProvider(provider, prompt);
+    } catch (err: any) {
+      providerError = err;
     }
 
     return { parsed, error: providerError };

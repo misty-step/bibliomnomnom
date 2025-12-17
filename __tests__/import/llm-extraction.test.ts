@@ -77,28 +77,19 @@ describe("llmExtract", () => {
     expect(result.errors[0]!.message).toContain("timed out");
   });
 
-  it("falls back to fallback provider when primary fails", async () => {
+  it("returns error when provider fails", async () => {
     const failingProvider: LlmProvider = {
       name: "openrouter",
       call: vi.fn().mockRejectedValue(new Error("Primary failed")),
     };
 
-    const fallbackProvider: LlmProvider = {
-      name: "openrouter",
-      call: vi
-        .fn()
-        .mockResolvedValue(
-          JSON.stringify({ books: [{ title: "Fallback Book", author: "Fallback Author" }] }),
-        ),
-    };
-
     const result = await llmExtract("Some text", {
       provider: failingProvider,
-      fallbackProvider,
     });
 
-    expect(result.rows).toHaveLength(1);
-    expect(result.rows[0]!.title).toBe("Fallback Book");
+    expect(result.rows).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]!.message).toContain("Primary failed");
   });
 
   it("rejects token budget exceeding files", async () => {

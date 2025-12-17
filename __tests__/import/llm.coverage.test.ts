@@ -6,32 +6,6 @@ import {
 } from "../../lib/import/llm";
 
 describe("llmExtract coverage", () => {
-  it("handles fallback provider logic", async () => {
-    const provider = {
-      name: "openrouter" as const,
-      call: vi.fn().mockResolvedValue(JSON.stringify({ books: [] })), // Returns empty
-    };
-    const fallback = {
-      name: "openrouter" as const,
-      call: vi.fn().mockResolvedValue(JSON.stringify({ books: [{ title: "T", author: "A" }] })),
-    };
-
-    // Server only check
-    const windowBackup = global.window;
-    // Server only check
-    delete (global as any).window;
-
-    const result = await llmExtract("text", { provider, fallbackProvider: fallback });
-
-    // Restore window
-    if (windowBackup !== undefined) {
-      global.window = windowBackup;
-    }
-
-    expect(result.rows).toHaveLength(1);
-    expect(fallback.call).toHaveBeenCalled();
-  });
-
   it("handles validation and collection limits", async () => {
     const provider = {
       name: "openrouter" as const,
