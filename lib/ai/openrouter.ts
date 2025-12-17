@@ -30,6 +30,14 @@ export type OpenRouterChatCompletionRequest = {
   temperature?: number;
   max_tokens?: number;
   response_format?: OpenRouterResponseFormat;
+  include_reasoning?: boolean;
+  reasoning?: unknown;
+  seed?: number;
+  stop?: string | string[];
+  top_p?: number;
+  top_k?: number;
+  tools?: unknown;
+  tool_choice?: unknown;
 };
 
 type OpenRouterChatCompletionResponse = {
@@ -41,8 +49,37 @@ type OpenRouterChatCompletionResponse = {
   error?: {
     message: string;
     code?: string | number;
+    metadata?: {
+      raw?: string;
+      provider_name?: string;
+    };
   };
 };
+
+type OpenRouterError = NonNullable<OpenRouterChatCompletionResponse["error"]>;
+
+function parseOpenRouterProviderRaw(raw: string): { message?: string; requestId?: string } {
+  try {
+    const parsed = JSON.parse(raw) as any;
+    return { message: parsed?.error?.message, requestId: parsed?.request_id };
+  } catch {
+    return {};
+  }
+}
+
+function formatOpenRouterError(err: OpenRouterError): string {
+  const provider = err.metadata?.provider_name;
+  const raw = err.metadata?.raw;
+  const rawParsed = raw ? parseOpenRouterProviderRaw(raw) : {};
+
+  const parts: string[] = [];
+  if (provider) parts.push(`provider=${provider}`);
+  parts.push(rawParsed.message ?? err.message);
+  if (rawParsed.requestId) parts.push(`request_id=${rawParsed.requestId}`);
+  if (!rawParsed.message && raw) parts.push(raw);
+
+  return parts.join(" - ");
+}
 
 export class OpenRouterApiError extends Error {
   readonly status: number;
@@ -81,9 +118,14 @@ export async function openRouterChatCompletion(params: {
 
     const data = (await response.json().catch(() => ({}))) as OpenRouterChatCompletionResponse;
 
+    if (data.error) {
+      const status = typeof data.error.code === "number" ? data.error.code : response.status;
+      const providerMessage = formatOpenRouterError(data.error);
+      throw new OpenRouterApiError({ status, providerMessage });
+    }
+
     if (!response.ok) {
-      const providerMessage = data.error?.message ?? "Unknown error";
-      throw new OpenRouterApiError({ status: response.status, providerMessage });
+      throw new OpenRouterApiError({ status: response.status, providerMessage: "Unknown error" });
     }
 
     const content = data.choices?.[0]?.message?.content ?? "";

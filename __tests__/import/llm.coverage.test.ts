@@ -91,6 +91,18 @@ describe("llmExtract coverage", () => {
     await expect(provider.call("prompt")).rejects.toThrow("OpenRouter error");
   });
 
+  it("treats OpenRouter error payload as error even when HTTP ok", async () => {
+    const provider = createOpenRouterExtractionProvider({ apiKey: "key", model: "test/model" });
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ error: { message: "Provider returned error", code: 524 } }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await expect(provider.call("prompt")).rejects.toThrow("OpenRouter error: 524");
+  });
+
   it("handles verification issues", async () => {
     const provider = {
       name: "openrouter" as const,

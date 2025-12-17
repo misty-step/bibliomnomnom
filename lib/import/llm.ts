@@ -366,6 +366,7 @@ export const makeStaticProvider = (payload: any): LlmProvider => ({
 });
 
 const PROVIDER_TIMEOUT_MS = 300_000; // 5 minutes
+const PROVIDER_REASONING = { effort: "low" } as const;
 
 const BOOK_EXTRACTION_SCHEMA: Record<string, unknown> = {
   type: "object",
@@ -379,22 +380,22 @@ const BOOK_EXTRACTION_SCHEMA: Record<string, unknown> = {
         additionalProperties: false,
         required: ["title", "author", "status"],
         properties: {
-          tempId: { type: ["string", "null"] },
+          tempId: { type: "string" },
           title: { type: "string" },
           author: { type: "string" },
           status: { type: "string", enum: ["want-to-read", "currently-reading", "read"] },
-          isbn: { type: ["string", "null"] },
-          edition: { type: ["string", "null"] },
-          publishedYear: { type: ["integer", "null"] },
-          pageCount: { type: ["integer", "null"] },
-          isAudiobook: { type: ["boolean", "null"] },
-          isFavorite: { type: ["boolean", "null"] },
-          dateStarted: { type: ["integer", "null"] },
-          dateFinished: { type: ["integer", "null"] },
-          coverUrl: { type: ["string", "null"] },
-          apiSource: { type: ["string", "null"] },
-          apiId: { type: ["string", "null"] },
-          privacy: { type: ["string", "null"], enum: ["private", "public", null] },
+          isbn: { type: "string" },
+          edition: { type: "string" },
+          publishedYear: { type: "integer" },
+          pageCount: { type: "integer" },
+          isAudiobook: { type: "boolean" },
+          isFavorite: { type: "boolean" },
+          dateStarted: { type: "integer" },
+          dateFinished: { type: "integer" },
+          coverUrl: { type: "string" },
+          apiSource: { type: "string", enum: ["google-books", "open-library", "manual"] },
+          apiId: { type: "string" },
+          privacy: { type: "string", enum: ["private", "public"] },
         },
       },
     },
@@ -455,8 +456,10 @@ export const createOpenRouterExtractionProvider = (params: {
         model: params.model,
         messages: [{ role: "user", content: prompt }],
         response_format: EXTRACTION_RESPONSE_FORMAT,
+        include_reasoning: false,
+        reasoning: PROVIDER_REASONING,
         temperature: 0.0,
-        max_tokens: 8192,
+        max_tokens: 32768,
       },
     });
 
@@ -477,6 +480,8 @@ export const createOpenRouterVerificationProvider = (params: {
         model: params.model,
         messages: [{ role: "user", content: prompt }],
         response_format: VERIFICATION_RESPONSE_FORMAT,
+        include_reasoning: false,
+        reasoning: PROVIDER_REASONING,
         temperature: 0.0,
         max_tokens: 2048,
       },
