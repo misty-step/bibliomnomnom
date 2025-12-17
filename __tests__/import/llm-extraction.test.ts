@@ -38,7 +38,7 @@ describe("llmExtract", () => {
   it("handles timeout errors gracefully with retry", async () => {
     let callCount = 0;
     const mockProvider: LlmProvider = {
-      name: "openai",
+      name: "openrouter",
       call: vi.fn().mockImplementation(async () => {
         callCount++;
         if (callCount < 3) {
@@ -61,7 +61,7 @@ describe("llmExtract", () => {
 
   it("returns error after max retries on persistent timeout", async () => {
     const mockProvider: LlmProvider = {
-      name: "openai",
+      name: "openrouter",
       call: vi.fn().mockImplementation(async () => {
         const error = new Error("Request timed out");
         error.name = "AbortError";
@@ -79,12 +79,12 @@ describe("llmExtract", () => {
 
   it("falls back to fallback provider when primary fails", async () => {
     const failingProvider: LlmProvider = {
-      name: "openai",
+      name: "openrouter",
       call: vi.fn().mockRejectedValue(new Error("Primary failed")),
     };
 
     const fallbackProvider: LlmProvider = {
-      name: "gemini",
+      name: "openrouter",
       call: vi
         .fn()
         .mockResolvedValue(

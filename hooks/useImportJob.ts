@@ -170,7 +170,7 @@ const slicePages = (rows: ParsedBook[], size: number) => {
   for (let i = 0; i < rows.length; i += size) {
     pages.push(rows.slice(i, i + size));
   }
-  return pages.length ? pages : [[]];
+  return pages;
 };
 
 const detectSourceType = (fileName: string, mime?: string): PreviewResult["sourceType"] => {
@@ -266,6 +266,11 @@ export const useImportJob = ({
               "[Import] Extraction errors:",
               extracted.errors.map((e) => e.message).join(", "),
             );
+            dispatch({
+              type: "PREVIEW_ERROR",
+              message: extracted.errors[0]?.message ?? "Extraction failed",
+            });
+            return;
           }
 
           // Step 2: Prepare preview with extracted books (Convex mutation - saves to DB)

@@ -70,7 +70,7 @@ describe("llmExtract", () => {
 
   it("falls back to second provider when first fails", async () => {
     const failingProvider = {
-      name: "openai" as const,
+      name: "openrouter" as const,
       call: async () => {
         throw new Error("boom");
       },
@@ -118,7 +118,7 @@ describe("llmExtract", () => {
   it("prompt includes year-context date extraction rules", async () => {
     let capturedPrompt = "";
     const capturingProvider = {
-      name: "openai" as const,
+      name: "openrouter" as const,
       call: async (prompt: string) => {
         capturedPrompt = prompt;
         return JSON.stringify({ books: [] });

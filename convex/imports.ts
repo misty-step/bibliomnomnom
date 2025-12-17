@@ -2,11 +2,16 @@ import { mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
-import { requireAuth } from "./auth";
+import { requireAuth, requireAuthAction } from "./auth";
 import { parsedBookSchema, ParseError, ParsedBook, LLM_TOKEN_CAP } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
 import { matchBooks } from "../lib/import/dedup/core";
-import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../lib/import/llm";
+import {
+  llmExtract,
+  createOpenRouterExtractionProvider,
+  createOpenRouterVerificationProvider,
+} from "../lib/import/llm";
+import { DEFAULT_IMPORT_FALLBACK_MODEL, DEFAULT_IMPORT_MODEL } from "../lib/ai/models";
 import { ConvexImportRunRepository } from "../lib/import/repository/convex";
 import { checkImportRateLimits, shouldSkipRateLimits } from "../lib/import/rateLimit";
 import { createConvexRepositories } from "../lib/import/repository/convex";
@@ -108,30 +113,41 @@ export const extractBooks = action({
     importRunId: v.string(),
   },
   handler: async (ctx, args) => {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const geminiKey = process.env.GEMINI_API_KEY;
+    await requireAuthAction(ctx);
 
-    if (!openaiKey && !geminiKey) {
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openrouterKey) {
       return {
         books: [],
         warnings: [],
         errors: [
           {
             message:
-              "No LLM provider configured. Please set OPENAI_API_KEY or GEMINI_API_KEY in your Convex environment variables to extract books from text files.",
+              "No LLM provider configured. Set OPENROUTER_API_KEY in Convex env vars (or run `pnpm convex:env:sync`) to enable TXT/MD imports.",
           },
         ] as ParseError[],
       };
     }
 
-    const provider = openaiKey ? createOpenAIProvider(openaiKey) : undefined;
-    const fallbackProvider = geminiKey ? createGeminiProvider(geminiKey) : undefined;
+    const model = process.env.OPENROUTER_IMPORT_MODEL || DEFAULT_IMPORT_MODEL;
+    const fallbackModel =
+      process.env.OPENROUTER_IMPORT_FALLBACK_MODEL || DEFAULT_IMPORT_FALLBACK_MODEL;
+    const verifierModel = process.env.OPENROUTER_IMPORT_VERIFIER_MODEL;
+
+    const provider = createOpenRouterExtractionProvider({ apiKey: openrouterKey, model });
+    const fallbackProvider = fallbackModel
+      ? createOpenRouterExtractionProvider({ apiKey: openrouterKey, model: fallbackModel })
+      : undefined;
+    const verifierProvider = verifierModel
+      ? createOpenRouterVerificationProvider({ apiKey: openrouterKey, model: verifierModel })
+      : undefined;
 
     try {
       const llmResult = await llmExtract(args.rawText ?? "", {
         tokenCap: LLM_TOKEN_CAP,
         provider,
         fallbackProvider,
+        verifierProvider,
       });
 
       return {

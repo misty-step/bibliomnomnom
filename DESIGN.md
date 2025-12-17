@@ -161,7 +161,7 @@ Modify
 
 External Services / Env Vars
 - No new services.
-- LLM env vars REQUIRED for markdown/text imports (`OPENAI_API_KEY` or `GEMINI_API_KEY`). CSV imports don't need LLM (deterministic parsing).
+- LLM env vars REQUIRED for markdown/text imports (`OPENROUTER_API_KEY`). CSV imports don't need LLM (deterministic parsing).
 
 Build / Deploy
 - No schema changes.

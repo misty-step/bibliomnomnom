@@ -1,11 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { withObservability } from "@/lib/api/withObservability";
+import { DEFAULT_OCR_MODEL } from "@/lib/ai/models";
+import { OpenRouterApiError, openRouterChatCompletion } from "@/lib/ai/openrouter";
 import { MAX_BASE64_PAYLOAD_CHARS, MAX_DATA_URL_CHARS } from "@/lib/ocr/limits";
 import { formatOcrText } from "@/lib/ocr/format";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const TIMEOUT_MS = 30000;
 
 const EXTRACTION_PROMPT = `Extract all visible text from this book page photograph.
@@ -21,18 +21,6 @@ If no text is visible or readable, return an empty string.`;
 
 type OCRRequest = {
   image: string;
-};
-
-type OpenRouterResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string;
-    };
-  }>;
-  error?: {
-    message: string;
-    code?: string;
-  };
 };
 
 function redactUserId(userId: string): string {
@@ -121,24 +109,20 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
-  const model = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  const model =
+    process.env.OPENROUTER_OCR_MODEL || process.env.OPENROUTER_MODEL || DEFAULT_OCR_MODEL;
   console.log("[ocr] MODEL", { requestId, model });
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
   try {
-    const response = await fetch(OPENROUTER_API_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://bibliomnomnom.app",
-        "X-Title": "bibliomnomnom",
-      },
-      body: JSON.stringify({
+    const { content } = await openRouterChatCompletion({
+      apiKey,
+      timeoutMs: TIMEOUT_MS,
+      referer: process.env.NEXT_PUBLIC_APP_URL || "https://bibliomnomnom.app",
+      title: "bibliomnomnom",
+      request: {
         model,
         max_tokens: 4096,
+        temperature: 0.0,
         messages: [
           {
             role: "user",
@@ -156,40 +140,10 @@ export const POST = withObservability(async (request: Request) => {
             ],
           },
         ],
-      }),
-      signal: controller.signal,
+      },
     });
 
-    if (!response.ok) {
-      const errorData = (await response.json().catch(() => ({}))) as OpenRouterResponse;
-      console.error("[ocr] OpenRouter error:", response.status, errorData);
-
-      if (response.status === 429) {
-        return NextResponse.json(
-          { error: "Too many requests. Please wait a moment.", code: "RATE_LIMITED" },
-          { status: 429, headers: responseHeaders },
-        );
-      }
-
-      const providerMessage = errorData.error?.message ?? "";
-      if (response.status === 400 && providerMessage.toLowerCase().includes("not a valid model")) {
-        return NextResponse.json(
-          {
-            error: "OCR model misconfigured. Please set OPENROUTER_MODEL to a valid model ID.",
-            code: "OCR_MODEL_INVALID",
-          },
-          { status: 500, headers: responseHeaders },
-        );
-      }
-
-      return NextResponse.json(
-        { error: "Could not read text. Please try again.", code: "OCR_FAILED" },
-        { status: 500, headers: responseHeaders },
-      );
-    }
-
-    const data = (await response.json()) as OpenRouterResponse;
-    const rawText = data.choices?.[0]?.message?.content?.trim() || "";
+    const rawText = content.trim();
     const text = formatOcrText(rawText);
 
     if (!text) {
@@ -206,6 +160,28 @@ export const POST = withObservability(async (request: Request) => {
     });
     return NextResponse.json({ text }, { headers: responseHeaders });
   } catch (error) {
+    if (error instanceof OpenRouterApiError && error.status === 429) {
+      return NextResponse.json(
+        { error: "Too many requests. Please wait a moment.", code: "RATE_LIMITED" },
+        { status: 429, headers: responseHeaders },
+      );
+    }
+
+    if (
+      error instanceof OpenRouterApiError &&
+      error.status === 400 &&
+      error.providerMessage.toLowerCase().includes("not a valid model")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "OCR model misconfigured. Please set OPENROUTER_OCR_MODEL (or OPENROUTER_MODEL) to a valid model ID.",
+          code: "OCR_MODEL_INVALID",
+        },
+        { status: 500, headers: responseHeaders },
+      );
+    }
+
     if (error instanceof Error && error.name === "AbortError") {
       return NextResponse.json(
         { error: "Taking too long. Please try again.", code: "OCR_FAILED" },
@@ -218,7 +194,5 @@ export const POST = withObservability(async (request: Request) => {
       { error: "Could not read text. Please try again.", code: "OCR_FAILED" },
       { status: 500, headers: responseHeaders },
     );
-  } finally {
-    clearTimeout(timeoutId);
   }
 }, "ocr");

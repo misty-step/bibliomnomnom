@@ -830,7 +830,7 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 - `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`
 - `CONVEX_DEPLOY_KEY`
 - `BLOB_READ_WRITE_TOKEN`
-- `OPENAI_API_KEY`, `GEMINI_API_KEY`
+- `OPENROUTER_API_KEY`
 
 ### Escape Hatches
 

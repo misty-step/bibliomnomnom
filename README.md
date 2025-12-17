@@ -26,8 +26,9 @@ You'll need free accounts on these services:
 1. **[Clerk](https://clerk.com)** - User authentication (free tier: 10,000 monthly active users)
 2. **[Convex](https://convex.dev)** - Real-time backend database (free tier: unlimited dev deployments)
 3. **[Vercel Blob](https://vercel.com/docs/storage/vercel-blob)** - File storage for book covers (free tier: 100 GB bandwidth/month)
+4. **[OpenRouter](https://openrouter.ai)** - AI gateway for imports (TXT/MD) + photo OCR (pay-as-you-go)
 
-Sign up for all three before proceeding with installation.
+Sign up before proceeding with installation.
 
 ## Environment Setup
 
@@ -92,7 +93,7 @@ pnpm install
 ### 4. Enable Imports (Goodreads/CSV/TXT/MD)
 
 - Feature flag: `NEXT_PUBLIC_IMPORT_ENABLED=true` (defaults to true). Toggle to hide the import UI if needed.
-- LLM providers (for TXT/MD/unknown CSV): set `OPENAI_API_KEY` and/or `GEMINI_API_KEY` in `.env.local`.
+- LLM (for TXT/MD/unknown CSV): set `OPENROUTER_API_KEY` (and optionally `OPENROUTER_IMPORT_MODEL`) in `.env.local` (or `~/.secrets`) **and** in Convex env vars (`pnpm convex:env:sync` or `pnpm convex env set OPENROUTER_API_KEY or_...`).
 - Schema updates: run `pnpm convex:push` after pulling to apply `importRuns` and `importPreviews` tables and regenerate Convex types.
 - Rate limits: enforced per user (5 imports/day, 2 concurrent previews); adjust constants in `convex/imports.ts` if policy changes.
 - File limits: accepts CSV/TXT/MD up to 10MB; previews paginate at 300 rows/page.
@@ -172,9 +173,10 @@ CONVEX_DEPLOY_KEY=prod:deployment|token
 # Vercel Blob (auto-configured via integration)
 BLOB_READ_WRITE_TOKEN=vercel_blob_...
 
-# LLM (optional - for import feature)
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=AI...
+# AI (OpenRouter - optional for import + OCR)
+OPENROUTER_API_KEY=or_...
+OPENROUTER_IMPORT_MODEL=google/gemini-3-pro-preview
+OPENROUTER_OCR_MODEL=google/gemini-2.5-flash
 NEXT_PUBLIC_IMPORT_ENABLED=true
 ```
 

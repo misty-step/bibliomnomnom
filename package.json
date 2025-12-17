@@ -30,6 +30,7 @@
     "convex:dev": "convex dev",
     "convex:push": "convex dev --once",
     "convex:deploy": "npx convex deploy",
+    "convex:env:sync": "./scripts/convex-env-sync.sh",
     "hooks:install": "lefthook install",
     "hooks:uninstall": "lefthook uninstall",
     "storybook": "storybook dev -p 6006",
