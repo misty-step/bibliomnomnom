@@ -109,9 +109,12 @@ CONVEX_DEPLOY_KEY=prod:deployment|token
 # Vercel Blob (already configured via Vercel Integration)
 # BLOB_READ_WRITE_TOKEN - auto-configured ✅
 
-# LLM Providers (optional - for import feature)
-OPENAI_API_KEY=sk-...
-GEMINI_API_KEY=AI...
+# AI (OpenRouter - optional for import + OCR)
+# Note: OCR runs in Next.js (Vercel env vars). TXT/MD import extraction runs in Convex (Convex env vars).
+# In production, set `OPENROUTER_API_KEY` in BOTH Vercel and Convex.
+OPENROUTER_API_KEY=or_...
+OPENROUTER_IMPORT_MODEL=google/gemini-3-pro-preview
+OPENROUTER_OCR_MODEL=google/gemini-2.5-flash
 
 # Feature Flags
 NEXT_PUBLIC_IMPORT_ENABLED=true
@@ -424,7 +427,7 @@ Example: `Blocked loading font from 'https://fonts.gstatic.com'`
 
 **Fix**:
 
-1. Add `OPENAI_API_KEY` or `GEMINI_API_KEY` to Vercel env vars (Production)
+1. Add `OPENROUTER_API_KEY` to Convex env vars (Production deployment) and Vercel env vars (Production)
 2. Verify keys are valid and have quota remaining
 3. Check Vercel logs for specific API error messages
 

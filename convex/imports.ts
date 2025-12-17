@@ -2,24 +2,21 @@ import { mutation, action } from "./_generated/server";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
-import { requireAuth } from "./auth";
+import { requireAuth, requireAuthAction } from "./auth";
 import { parsedBookSchema, ParseError, ParsedBook, LLM_TOKEN_CAP } from "../lib/import/types";
 import { dedupHelpers } from "../lib/import/dedup";
 import { matchBooks } from "../lib/import/dedup/core";
-import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../lib/import/llm";
+import {
+  llmExtract,
+  createOpenRouterExtractionProvider,
+  createOpenRouterVerificationProvider,
+} from "../lib/import/llm";
+import { DEFAULT_IMPORT_MODEL } from "../lib/ai/models";
 import { ConvexImportRunRepository } from "../lib/import/repository/convex";
 import { checkImportRateLimits, shouldSkipRateLimits } from "../lib/import/rateLimit";
 import { createConvexRepositories } from "../lib/import/repository/convex";
 import type { Doc } from "./_generated/dataModel";
 import { logImportEvent } from "../lib/import/metrics";
-
-type Decision = {
-  tempId: string;
-  action: "skip" | "merge" | "create";
-  fieldsToMerge?: string[];
-};
-
-const isCsvSource = (source: string) => source === "goodreads-csv" || source === "csv";
 
 const preparePreviewArgs = {
   importRunId: v.string(),
@@ -108,30 +105,35 @@ export const extractBooks = action({
     importRunId: v.string(),
   },
   handler: async (ctx, args) => {
-    const openaiKey = process.env.OPENAI_API_KEY;
-    const geminiKey = process.env.GEMINI_API_KEY;
+    await requireAuthAction(ctx);
 
-    if (!openaiKey && !geminiKey) {
+    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    if (!openrouterKey) {
       return {
         books: [],
         warnings: [],
         errors: [
           {
             message:
-              "No LLM provider configured. Please set OPENAI_API_KEY or GEMINI_API_KEY in your Convex environment variables to extract books from text files.",
+              "No LLM provider configured. Set OPENROUTER_API_KEY in Convex env vars (or run `pnpm convex:env:sync`) to enable TXT/MD imports.",
           },
         ] as ParseError[],
       };
     }
 
-    const provider = openaiKey ? createOpenAIProvider(openaiKey) : undefined;
-    const fallbackProvider = geminiKey ? createGeminiProvider(geminiKey) : undefined;
+    const model = process.env.OPENROUTER_IMPORT_MODEL || DEFAULT_IMPORT_MODEL;
+    const verifierModel = process.env.OPENROUTER_IMPORT_VERIFIER_MODEL;
+
+    const provider = createOpenRouterExtractionProvider({ apiKey: openrouterKey, model });
+    const verifierProvider = verifierModel
+      ? createOpenRouterVerificationProvider({ apiKey: openrouterKey, model: verifierModel })
+      : undefined;
 
     try {
       const llmResult = await llmExtract(args.rawText ?? "", {
         tokenCap: LLM_TOKEN_CAP,
         provider,
-        fallbackProvider,
+        verifierProvider,
       });
 
       return {
@@ -165,7 +167,13 @@ export const preparePreviewHandler = async (
   const repos = createConvexRepositories(ctx.db as any);
   const importRunRepo = repos.importRuns;
 
-  if (!shouldSkipRateLimits()) {
+  const existingRun = await importRunRepo.findByUserAndRun(userId, args.importRunId);
+
+  if (args.page !== 0 && !existingRun) {
+    throw new Error("Preview required before preparing this page");
+  }
+
+  if (args.page === 0 && !existingRun && !shouldSkipRateLimits()) {
     await checkImportRateLimits(importRunRepo, userId);
   }
 
@@ -190,16 +198,18 @@ export const preparePreviewHandler = async (
   // Determine status: failed if errors OR no books extracted
   const importStatus = errors.length > 0 || books.length === 0 ? "failed" : "previewed";
 
-  await upsertImportRun(importRunRepo, {
-    userId,
-    importRunId: args.importRunId,
-    sourceType: args.sourceType,
-    page: args.page,
-    totalPages: args.totalPages ?? 1,
-    rowCount: books.length,
-    errors: errors.length,
-    status: importStatus,
-  });
+  if (args.page === 0) {
+    await upsertImportRun(importRunRepo, {
+      userId,
+      importRunId: args.importRunId,
+      sourceType: args.sourceType,
+      page: args.page,
+      totalPages: args.totalPages ?? 1,
+      rowCount: books.length,
+      errors: errors.length,
+      status: importStatus,
+    });
+  }
 
   logImportEvent({
     phase: "preview",
@@ -300,39 +310,74 @@ export const commitImportHandler = async (
     throw new Error("Preview required before commit");
   }
 
-  if (run.status === "committed" && run.page === args.page) {
+  if (run.status === "committed" && run.page >= args.page) {
     return {
-      created: run.counts.created,
-      merged: run.counts.merged,
-      skipped: run.counts.skipped,
+      created: 0,
+      merged: 0,
+      skipped: 0,
       errors: [],
     } satisfies Summary;
   }
 
   const now = Date.now();
-  const decisionsByTempId = new Map<string, Decision>();
-  args.decisions.forEach((d) => decisionsByTempId.set(d.tempId, d));
 
-  const incomingMap = await loadPreviewRows(
-    repos.importPreviews,
-    userId,
-    args.importRunId,
-    args.page,
-  );
+  const preview = await repos.importPreviews.findByUserRunPage(userId, args.importRunId, args.page);
+  if (!preview || !Array.isArray(preview.books)) {
+    return {
+      created: 0,
+      merged: 0,
+      skipped: 0,
+      errors: [{ message: `Preview required for page ${args.page + 1}` }],
+    } satisfies Summary;
+  }
+
+  const incomingMap = new Map<string, ParsedBook>();
+  preview.books.forEach((row: ParsedBook) => {
+    incomingMap.set(row.tempId, row);
+  });
 
   let created = 0;
   let merged = 0;
   let skipped = 0;
   const errors: ParseError[] = [];
 
+  const mergeIds = new Set<Id<"books">>();
+
   for (const decision of args.decisions) {
     const incoming = incomingMap.get(decision.tempId);
     if (!incoming) {
-      errors.push({
-        message: `Unknown tempId ${decision.tempId}`,
-      });
+      errors.push({ message: `Unknown tempId ${decision.tempId}` });
+    }
+
+    if (decision.action === "merge") {
+      if (!decision.existingBookId) {
+        errors.push({ message: `Missing existingBookId for merge ${decision.tempId}` });
+      } else {
+        mergeIds.add(decision.existingBookId);
+      }
+    }
+  }
+
+  if (errors.length) {
+    return { created: 0, merged: 0, skipped: 0, errors } satisfies Summary;
+  }
+
+  const existingById = new Map<Id<"books">, Doc<"books">>();
+  for (const id of mergeIds) {
+    const existing = await repos.books.findById(id);
+    if (!existing || existing.userId !== userId) {
+      errors.push({ message: `Book not found for merge ${id}` });
       continue;
     }
+    existingById.set(id, existing as Doc<"books">);
+  }
+
+  if (errors.length) {
+    return { created: 0, merged: 0, skipped: 0, errors } satisfies Summary;
+  }
+
+  for (const decision of args.decisions) {
+    const incoming = incomingMap.get(decision.tempId) as ParsedBook;
 
     if (decision.action === "skip") {
       skipped += 1;
@@ -345,16 +390,7 @@ export const commitImportHandler = async (
       continue;
     }
 
-    if (!decision.existingBookId) {
-      errors.push({ message: `Missing existingBookId for merge ${decision.tempId}` });
-      continue;
-    }
-
-    const existing = await repos.books.findById(decision.existingBookId as Id<"books">);
-    if (!existing || existing.userId !== userId) {
-      errors.push({ message: `Book not found for merge ${decision.existingBookId}` });
-      continue;
-    }
+    const existing = existingById.get(decision.existingBookId as Id<"books">) as Doc<"books">;
 
     const patch = dedupHelpers.applyDecision(existing as Doc<"books">, incoming, "merge");
     if (patch && Object.keys(patch).length) {
@@ -390,23 +426,3 @@ export const commitImportHandler = async (
 };
 
 type Summary = { created: number; merged: number; skipped: number; errors: ParseError[] };
-
-const loadPreviewRows = async (
-  previewRepo: any,
-  userId: Id<"users">,
-  importRunId: string,
-  page: number,
-): Promise<Map<string, ParsedBook>> => {
-  const map = new Map<string, ParsedBook>();
-  const preview = await previewRepo.findByUserRunPage(userId, importRunId, page);
-
-  if (!preview || !Array.isArray(preview.books)) {
-    return map;
-  }
-
-  preview.books.forEach((row: ParsedBook) => {
-    map.set(row.tempId, row);
-  });
-
-  return map;
-};

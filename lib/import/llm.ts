@@ -9,11 +9,10 @@ import {
   ParseError,
 } from "./types";
 import { mapShelfToStatus } from "./status";
-
-type ProviderName = "openai" | "gemini";
+import { openRouterChatCompletion } from "../ai/openrouter";
 
 export type LlmProvider = {
-  name: ProviderName;
+  name: string;
   call: (prompt: string) => Promise<string>;
 };
 
@@ -21,7 +20,7 @@ export type LlmExtractOptions = {
   tokenCap?: number;
   chunkTokenSize?: number;
   provider?: LlmProvider;
-  fallbackProvider?: LlmProvider;
+  verifierProvider?: LlmProvider;
 };
 
 export type LlmExtractResult = {
@@ -31,7 +30,7 @@ export type LlmExtractResult = {
   tokenUsage: number;
 };
 
-const DEFAULT_CHUNK_TOKEN_SIZE = 100_000; // Large chunks for Gemini's 1M context
+const DEFAULT_CHUNK_TOKEN_SIZE = 100_000; // Large chunks for big-context models
 const TOKEN_ESTIMATE_DIVISOR = 4; // rough chars→tokens heuristic
 const PARALLEL_CONCURRENCY = 3; // Process up to 3 chunks at once
 
@@ -51,16 +50,35 @@ const buildPrompt = (
   chunk: string,
 ) => `You are a strict data extractor. Parse books from the provided text.
 
-CRITICAL: You MUST extract EVERY SINGLE BOOK from the text. Do not stop early. Extract ALL books completely before finishing.
+ANTI-HALLUCINATION RULES (CRITICAL - HIGHEST PRIORITY):
+1. Extract ONLY books that are EXPLICITLY LISTED in the source text below
+2. Do NOT invent, infer, or suggest books that are not present in the source
+3. Do NOT extract books mentioned in passing (e.g., "I want to read X someday") unless they appear in an actual book list
+4. VERIFY each title and author appears verbatim in the source text
+5. When in doubt about whether a book is in the source, OMIT IT ENTIRELY - empty data is better than false data
+6. Do NOT fabricate dates, ISBNs, or other metadata not present in the source
+
+EXTRACTION REQUIREMENTS:
+- You MUST extract EVERY book from the explicit book list in the source
+- Do not stop early - process the entire input completely
+- Return one entry per unique book
+- If a book appears multiple times with different dates (re-reads), include each instance
 
 Return JSON array under key "books". Each book must include:
 title, author, status (want-to-read|currently-reading|read), isbn?, edition?, publishedYear?, pageCount?, isAudiobook?, isFavorite?, dateStarted?, dateFinished?, coverUrl?, apiSource?, apiId?, privacy? (private by default).
 
-Rules:
-- Extract EVERY book in the text - do not stop until you've processed the entire input
-- Never hallucinate; omit fields you cannot justify
+FIELD EXTRACTION RULES:
 - Default status to want-to-read when uncertain
 - Include tempId from the source if provided
+- ONLY include fields you can verify from the source text
+
+DATE EXTRACTION RULES (critical):
+- NEVER guess or infer dateStarted - only extract if explicitly stated as "started reading on X"
+- For dateFinished: use year context from section headers (e.g., "### 2025" or "## 2024")
+  - If a book has a partial date like "(Nov 2)" under a "### 2025" header, interpret as 2025-11-02
+  - If a book is in a "Currently Reading" section, do NOT set dateFinished
+- Return dates as Unix timestamps in milliseconds (e.g., 1730505600000 for Nov 2, 2025)
+- When in doubt, omit the date field entirely - empty data is better than wrong data
 
 Input:
 """
@@ -227,10 +245,13 @@ export const llmExtract = async (
     throw new Error("llmExtract is server-only");
   }
 
+  const provider = opts.provider;
+  const verifier = opts.verifierProvider;
+
   const tokenCap = opts.tokenCap ?? LLM_TOKEN_CAP;
   const chunkSize = opts.chunkTokenSize ?? DEFAULT_CHUNK_TOKEN_SIZE;
 
-  if (!opts.provider && !opts.fallbackProvider) {
+  if (!provider) {
     return {
       rows: [],
       warnings: [],
@@ -259,9 +280,6 @@ export const llmExtract = async (
   const collected: ParsedBook[] = [];
   let tokenUsage = 0;
 
-  const provider = opts.provider;
-  const fallback = opts.fallbackProvider;
-
   // Process a single chunk
   const processChunk = async (
     chunk: string,
@@ -271,20 +289,10 @@ export const llmExtract = async (
     let parsed: ParsedBook[] = [];
     let providerError: Error | null = null;
 
-    if (provider) {
-      try {
-        parsed = await runProvider(provider, prompt);
-      } catch (err: any) {
-        providerError = err;
-      }
-    }
-
-    if (!parsed.length && fallback) {
-      try {
-        parsed = await runProvider(fallback, prompt);
-      } catch (err: any) {
-        providerError = providerError ?? err;
-      }
+    try {
+      parsed = await runProvider(provider, prompt);
+    } catch (err: any) {
+      providerError = err;
     }
 
     return { parsed, error: providerError };
@@ -315,8 +323,8 @@ export const llmExtract = async (
       }
 
       // Verify extraction completeness (sequential to avoid overloading)
-      if (fallback && parsed.length > 0) {
-        const verification = await verifyExtraction(fallback, chunk, parsed);
+      if (verifier && parsed.length > 0) {
+        const verification = await verifyExtraction(verifier, chunk, parsed);
 
         if (!verification.complete) {
           warnings.push(
@@ -341,94 +349,134 @@ export const llmExtract = async (
 
 // Minimal noop provider for tests or offline use
 export const makeStaticProvider = (payload: any): LlmProvider => ({
-  name: "openai",
+  name: "static",
   call: async () => JSON.stringify(payload),
 });
 
-// OpenAI provider using REST API
 const PROVIDER_TIMEOUT_MS = 300_000; // 5 minutes
+const PROVIDER_REASONING = { effort: "low" } as const;
 
-export const createOpenAIProvider = (apiKey: string): LlmProvider => ({
-  name: "openai",
-  call: async (prompt: string) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, PROVIDER_TIMEOUT_MS);
-
-    try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+const BOOK_EXTRACTION_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  required: ["books"],
+  properties: {
+    books: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "author", "status"],
+        properties: {
+          tempId: { type: "string" },
+          title: { type: "string" },
+          author: { type: "string" },
+          status: { type: "string", enum: ["want-to-read", "currently-reading", "read"] },
+          isbn: { type: "string" },
+          edition: { type: "string" },
+          publishedYear: { type: "integer" },
+          pageCount: { type: "integer" },
+          isAudiobook: { type: "boolean" },
+          isFavorite: { type: "boolean" },
+          dateStarted: { type: "integer" },
+          dateFinished: { type: "integer" },
+          coverUrl: { type: "string" },
+          apiSource: { type: "string", enum: ["google-books", "open-library", "manual"] },
+          apiId: { type: "string" },
+          privacy: { type: "string", enum: ["private", "public"] },
         },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" },
-        }),
-        signal: controller.signal,
-      });
+      },
+    },
+  },
+};
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} ${error}`);
-      }
+const EXTRACTION_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "book_extraction",
+    strict: true,
+    schema: BOOK_EXTRACTION_SCHEMA,
+  },
+} as const;
 
-      const data = await response.json();
-      return data.choices[0]?.message?.content ?? "{}";
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        throw new Error(`OpenAI request timed out after ${PROVIDER_TIMEOUT_MS / 1000}s`);
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+const VERIFICATION_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  additionalProperties: false,
+  required: ["complete", "estimatedTotal", "missingBooks", "issues"],
+  properties: {
+    complete: { type: "boolean" },
+    estimatedTotal: { type: "integer" },
+    missingBooks: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "author"],
+        properties: {
+          title: { type: "string" },
+          author: { type: "string" },
+        },
+      },
+    },
+    issues: { type: "array", items: { type: "string" } },
+  },
+};
+
+const VERIFICATION_RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "book_extraction_verification",
+    strict: true,
+    schema: VERIFICATION_SCHEMA,
+  },
+} as const;
+
+export const createOpenRouterExtractionProvider = (params: {
+  apiKey: string;
+  model: string;
+}): LlmProvider => ({
+  name: "openrouter",
+  call: async (prompt: string) => {
+    const { content } = await openRouterChatCompletion({
+      apiKey: params.apiKey,
+      timeoutMs: PROVIDER_TIMEOUT_MS,
+      request: {
+        model: params.model,
+        provider: { require_parameters: true },
+        messages: [{ role: "user", content: prompt }],
+        response_format: EXTRACTION_RESPONSE_FORMAT,
+        include_reasoning: false,
+        reasoning: PROVIDER_REASONING,
+        temperature: 0.0,
+        max_tokens: 32768,
+      },
+    });
+
+    return content || "{}";
   },
 });
 
-// Gemini provider using REST API
-export const createGeminiProvider = (apiKey: string): LlmProvider => ({
-  name: "gemini",
+export const createOpenRouterVerificationProvider = (params: {
+  apiKey: string;
+  model: string;
+}): LlmProvider => ({
+  name: "openrouter",
   call: async (prompt: string) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, PROVIDER_TIMEOUT_MS);
+    const { content } = await openRouterChatCompletion({
+      apiKey: params.apiKey,
+      timeoutMs: PROVIDER_TIMEOUT_MS,
+      request: {
+        model: params.model,
+        provider: { require_parameters: true },
+        messages: [{ role: "user", content: prompt }],
+        response_format: VERIFICATION_RESPONSE_FORMAT,
+        include_reasoning: false,
+        reasoning: PROVIDER_REASONING,
+        temperature: 0.0,
+        max_tokens: 2048,
+      },
+    });
 
-    try {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.1,
-              responseMimeType: "application/json",
-            },
-          }),
-          signal: controller.signal,
-        },
-      );
-
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Gemini API error: ${response.status} ${error}`);
-      }
-
-      const data = await response.json();
-      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "{}";
-    } catch (err: any) {
-      if (err.name === "AbortError") {
-        throw new Error(`Gemini request timed out after ${PROVIDER_TIMEOUT_MS / 1000}s`);
-      }
-      throw err;
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    return content || "{}";
   },
 });

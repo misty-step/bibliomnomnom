@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyDecision } from "../../lib/import/dedup";
+import { applyDecision, buildNewBook } from "../../lib/import/dedup";
 import { matchBooks } from "../../lib/import/dedup/core";
 import { normalizeTitleAuthorKey } from "../../lib/import/normalize";
 import type { ParsedBook } from "../../lib/import/types";
@@ -143,5 +143,61 @@ describe("applyDecision", () => {
 
     expect(patch).not.toHaveProperty("isFavorite");
     expect(patch).not.toHaveProperty("coverUrl");
+  });
+
+  it("repairs timesRead when existing is 0 and incoming status is read", () => {
+    const existingBook = book({
+      timesRead: 0,
+      userId: fakeId<"users">("user_1"),
+    });
+    const patch = applyDecision(existingBook, incoming({ status: "read" }), "merge");
+
+    expect(patch).toMatchObject({ timesRead: 1 });
+  });
+
+  it("does not repair timesRead when existing already has reads", () => {
+    const existingBook = book({
+      timesRead: 3,
+      userId: fakeId<"users">("user_1"),
+    });
+    const patch = applyDecision(existingBook, incoming({ status: "read" }), "merge");
+
+    expect(patch).not.toHaveProperty("timesRead");
+  });
+
+  it("does not repair timesRead when incoming is not read status", () => {
+    const existingBook = book({
+      timesRead: 0,
+      userId: fakeId<"users">("user_1"),
+    });
+    const patch = applyDecision(existingBook, incoming({ status: "currently-reading" }), "merge");
+
+    expect(patch).not.toHaveProperty("timesRead");
+  });
+});
+
+describe("buildNewBook", () => {
+  it("sets timesRead to 1 for read books", () => {
+    const result = buildNewBook(incoming({ status: "read" }), fakeId<"users">("user_1"));
+    expect(result.timesRead).toBe(1);
+  });
+
+  it("sets timesRead to 0 for want-to-read books", () => {
+    const result = buildNewBook(incoming({ status: "want-to-read" }), fakeId<"users">("user_1"));
+    expect(result.timesRead).toBe(0);
+  });
+
+  it("sets timesRead to 0 for currently-reading books", () => {
+    const result = buildNewBook(
+      incoming({ status: "currently-reading" }),
+      fakeId<"users">("user_1"),
+    );
+    expect(result.timesRead).toBe(0);
+  });
+
+  it("defaults status to want-to-read when not provided", () => {
+    const result = buildNewBook({ ...incoming(), status: undefined }, fakeId<"users">("user_1"));
+    expect(result.status).toBe("want-to-read");
+    expect(result.timesRead).toBe(0);
   });
 });

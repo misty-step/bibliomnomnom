@@ -1,36 +1,28 @@
 import { describe, expect, it, vi } from "vitest";
-import { llmExtract, createOpenAIProvider, createGeminiProvider } from "../../lib/import/llm";
+import {
+  llmExtract,
+  createOpenRouterExtractionProvider,
+  createOpenRouterVerificationProvider,
+} from "../../lib/import/llm";
 
 describe("llmExtract coverage", () => {
-  it("handles fallback provider logic", async () => {
-    const provider = {
-      name: "openai" as const,
-      call: vi.fn().mockResolvedValue(JSON.stringify({ books: [] })), // Returns empty
-    };
-    const fallback = {
-      name: "gemini" as const,
-      call: vi.fn().mockResolvedValue(JSON.stringify({ books: [{ title: "T", author: "A" }] })),
-    };
+  it("throws when called in browser environment", async () => {
+    const originalWindow = global.window;
+    // @ts-expect-error - simulate browser environment
+    global.window = {};
 
-    // Server only check
-    const windowBackup = global.window;
-    // Server only check
-    delete (global as any).window;
+    await expect(llmExtract("text", {})).rejects.toThrow("llmExtract is server-only");
 
-    const result = await llmExtract("text", { provider, fallbackProvider: fallback });
-
-    // Restore window
-    if (windowBackup !== undefined) {
-      global.window = windowBackup;
+    if (originalWindow !== undefined) {
+      global.window = originalWindow;
+    } else {
+      delete (global as any).window;
     }
-
-    expect(result.rows).toHaveLength(1);
-    expect(fallback.call).toHaveBeenCalled();
   });
 
   it("handles validation and collection limits", async () => {
     const provider = {
-      name: "openai" as const,
+      name: "openrouter" as const,
       call: vi.fn().mockImplementation(async () => {
         // Generate > 300 (IMPORT_PAGE_SIZE) books
         const books = Array.from({ length: 305 }, (_, i) => ({
@@ -59,8 +51,8 @@ describe("llmExtract coverage", () => {
     expect(result.warnings.some((w) => w.includes("preview will paginate"))).toBe(true);
   });
 
-  it("handles OpenAI provider calls", async () => {
-    const provider = createOpenAIProvider("key");
+  it("handles OpenRouter provider calls", async () => {
+    const provider = createOpenRouterExtractionProvider({ apiKey: "key", model: "test/model" });
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ choices: [{ message: { content: JSON.stringify({ books: [] }) } }] }),
@@ -70,60 +62,42 @@ describe("llmExtract coverage", () => {
     await provider.call("prompt");
 
     expect(mockFetch).toHaveBeenCalledWith(
-      "https://api.openai.com/v1/chat/completions",
+      "https://openrouter.ai/api/v1/chat/completions",
       expect.anything(),
     );
   });
 
-  it("handles OpenAI provider errors", async () => {
-    const provider = createOpenAIProvider("key");
+  it("handles OpenRouter provider errors", async () => {
+    const provider = createOpenRouterExtractionProvider({ apiKey: "key", model: "test/model" });
     const mockFetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
-      text: async () => "Error",
+      json: async () => ({ error: { message: "Error" } }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await expect(provider.call("prompt")).rejects.toThrow("OpenAI API error");
+    await expect(provider.call("prompt")).rejects.toThrow("OpenRouter error");
   });
 
-  it("handles Gemini provider calls", async () => {
-    const provider = createGeminiProvider("key");
+  it("treats OpenRouter error payload as error even when HTTP ok", async () => {
+    const provider = createOpenRouterExtractionProvider({ apiKey: "key", model: "test/model" });
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({
-        candidates: [{ content: { parts: [{ text: JSON.stringify({ books: [] }) }] } }],
-      }),
+      status: 200,
+      json: async () => ({ error: { message: "Provider returned error", code: 524 } }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await provider.call("prompt");
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("generativelanguage.googleapis.com"),
-      expect.anything(),
-    );
-  });
-
-  it("handles Gemini provider errors", async () => {
-    const provider = createGeminiProvider("key");
-    const mockFetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => "Error",
-    });
-    vi.stubGlobal("fetch", mockFetch);
-
-    await expect(provider.call("prompt")).rejects.toThrow("Gemini API error");
+    await expect(provider.call("prompt")).rejects.toThrow("OpenRouter error: 524");
   });
 
   it("handles verification issues", async () => {
     const provider = {
-      name: "openai" as const,
+      name: "openrouter" as const,
       call: vi.fn().mockResolvedValue(JSON.stringify({ books: [{ title: "T", author: "A" }] })),
     };
-    const fallback = {
-      name: "gemini" as const,
+    const verifier = {
+      name: "openrouter" as const,
       call: vi
         .fn()
         .mockResolvedValue(
@@ -136,7 +110,7 @@ describe("llmExtract coverage", () => {
     // Server only check
     delete (global as any).window;
 
-    const result = await llmExtract("text", { provider, fallbackProvider: fallback });
+    const result = await llmExtract("text", { provider, verifierProvider: verifier });
 
     if (windowBackup !== undefined) {
       global.window = windowBackup;
@@ -147,15 +121,33 @@ describe("llmExtract coverage", () => {
 });
 
 describe("Providers", () => {
-  it("createOpenAIProvider returns provider", () => {
-    const p = createOpenAIProvider("key");
-    expect(p.name).toBe("openai");
+  it("createOpenRouterExtractionProvider returns provider", () => {
+    const p = createOpenRouterExtractionProvider({ apiKey: "key", model: "test/model" });
+    expect(p.name).toBe("openrouter");
     expect(p.call).toBeDefined();
   });
 
-  it("createGeminiProvider returns provider", () => {
-    const p = createGeminiProvider("key");
-    expect(p.name).toBe("gemini");
+  it("createOpenRouterVerificationProvider returns provider", () => {
+    const p = createOpenRouterVerificationProvider({ apiKey: "key", model: "test/model" });
+    expect(p.name).toBe("openrouter");
     expect(p.call).toBeDefined();
+  });
+
+  it("handles OpenRouter verification provider calls", async () => {
+    const provider = createOpenRouterVerificationProvider({ apiKey: "key", model: "test/model" });
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ complete: true }) } }],
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await provider.call("prompt");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/chat/completions",
+      expect.anything(),
+    );
   });
 });

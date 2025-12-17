@@ -54,6 +54,12 @@ export const applyDecision = (
     }
   });
 
+  // Repair timesRead: if existing has 0 and incoming is "read", set to 1
+  // This handles books that were imported before the fix and need correction
+  if (existing.timesRead === 0 && incoming.status === "read") {
+    patch.timesRead = 1;
+  }
+
   return Object.keys(patch).length ? patch : null;
 };
 
@@ -61,6 +67,8 @@ export const buildNewBook = (
   incoming: ParsedBook,
   userId: Id<"users">,
 ): Omit<Doc<"books">, "_id" | "_creationTime"> => {
+  const status = incoming.status ?? "want-to-read";
+
   return {
     userId,
     title: incoming.title,
@@ -70,11 +78,12 @@ export const buildNewBook = (
     edition: incoming.edition,
     publishedYear: incoming.publishedYear,
     pageCount: incoming.pageCount,
-    status: incoming.status ?? "want-to-read",
+    status,
     isFavorite: incoming.isFavorite ?? false,
     isAudiobook: incoming.isAudiobook ?? false,
     privacy: incoming.privacy ?? "private",
-    timesRead: 0,
+    // Invariant: status "read" implies timesRead >= 1 for imported books
+    timesRead: status === "read" ? 1 : 0,
     dateStarted: incoming.dateStarted,
     dateFinished: incoming.dateFinished,
     coverUrl: incoming.coverUrl,

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "fs";
 import { join } from "path";
 
+import { parseReadingSummaryMarkdown } from "../../lib/import/client/readingSummary";
 import { llmExtract, makeStaticProvider } from "../../lib/import/llm";
 import { dedupHelpers } from "../../lib/import/dedup";
 import { normalizeTitleAuthorKey } from "../../lib/import/normalize";
@@ -11,7 +12,145 @@ import type { Doc, Id } from "../../convex/_generated/dataModel";
 const FIXTURE_PATH = join(__dirname, "../fixtures/reading-sample.md");
 
 describe("READING_SUMMARY.md import", () => {
-  describe("LLM extraction", () => {
+  // NOTE: The deterministic parser is currently DISABLED for markdown imports in useImportJob.ts
+  // Markdown files always use LLM to support arbitrary date formats
+  // These tests remain as unit tests for the parser function itself
+  describe("Deterministic parser (UNIT TESTS ONLY - not used in import flow)", () => {
+    it("parses the fixture file with year-context dates", () => {
+      const markdown = readFileSync(FIXTURE_PATH, "utf-8");
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.matched).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.rows).toHaveLength(12); // 2 currently reading + 8 in 2025 + 2 in 2021
+
+      // Verify currently reading books
+      const currentlyReading = result.rows.filter((r) => r.status === "currently-reading");
+      expect(currentlyReading).toHaveLength(2);
+      expect(currentlyReading[0]!.title).toBe("The Absorbent Mind");
+      expect(currentlyReading[0]!.dateFinished).toBeUndefined();
+      expect(currentlyReading[1]!.title).toBe("Xenosystems");
+
+      // Verify read books with year-context dates
+      const hyperion = result.rows.find((r) => r.title === "Hyperion");
+      expect(hyperion).toBeDefined();
+      expect(hyperion!.status).toBe("read");
+      // Nov 2, 2025 at noon UTC
+      expect(hyperion!.dateFinished).toBe(Date.UTC(2025, 10, 2, 12, 0, 0, 0));
+
+      // Verify 2021 books get correct year
+      const sovereignIndividual2021 = result.rows.find(
+        (r) =>
+          r.title === "The Sovereign Individual" &&
+          r.dateFinished &&
+          r.dateFinished < Date.UTC(2022, 0, 1),
+      );
+      expect(sovereignIndividual2021).toBeDefined();
+      // Mar 9, 2021 at noon UTC
+      expect(sovereignIndividual2021!.dateFinished).toBe(Date.UTC(2021, 2, 9, 12, 0, 0, 0));
+    });
+
+    it("returns matched=false for non-matching markdown", () => {
+      const result = parseReadingSummaryMarkdown("# Random Document\n\nSome text here.");
+      expect(result.matched).toBe(false);
+      expect(result.rows).toHaveLength(0);
+    });
+
+    it("handles books without dates in year section", () => {
+      const markdown = `## Books by Year
+### 2025
+- **No Date Book** by Test Author`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.matched).toBe(true);
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]!.title).toBe("No Date Book");
+      expect(result.rows[0]!.status).toBe("read");
+      expect(result.rows[0]!.dateFinished).toBeUndefined();
+    });
+
+    it("warns on unparseable date tokens", () => {
+      const markdown = `## Books by Year
+### 2025
+- **Bad Date** by Author _(Foo 99)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]!.dateFinished).toBeUndefined();
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0]).toContain("Could not parse date");
+    });
+
+    it("handles various month abbreviations", () => {
+      const markdown = `## Books by Year
+### 2025
+- **Short Month** by Author _(Nov 2)_
+- **Sept Variant** by Author _(Sept 15)_
+- **Dec Book** by Author _(Dec 31)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.rows).toHaveLength(3);
+      expect(result.rows[0]!.dateFinished).toBe(Date.UTC(2025, 10, 2, 12, 0, 0, 0));
+      expect(result.rows[1]!.dateFinished).toBe(Date.UTC(2025, 8, 15, 12, 0, 0, 0));
+      expect(result.rows[2]!.dateFinished).toBe(Date.UTC(2025, 11, 31, 12, 0, 0, 0));
+    });
+
+    it("treats year headers as books-by-year even if they appear under currently-reading", () => {
+      const markdown = `## Currently Reading
+- **Active Book** by Author
+
+### 2025
+- **Finished Book** by Author _(Nov 2)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.matched).toBe(true);
+      expect(result.rows).toHaveLength(2);
+
+      const active = result.rows.find((r) => r.title === "Active Book");
+      expect(active).toBeDefined();
+      expect(active!.status).toBe("currently-reading");
+
+      const finished = result.rows.find((r) => r.title === "Finished Book");
+      expect(finished).toBeDefined();
+      expect(finished!.status).toBe("read");
+      expect(finished!.dateFinished).toBe(Date.UTC(2025, 10, 2, 12, 0, 0, 0));
+    });
+
+    it("returns matched=false when it would skip book-like lines", () => {
+      const markdown = `## Books by Year
+### 2025
+- **Good Book** by Author _(Nov 2)_
+- **Weird Book** — Author _(Nov 3)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]!.title).toBe("Good Book");
+      expect(result.matched).toBe(false);
+      expect(result.warnings.some((w) => w.includes("Skipped"))).toBe(true);
+    });
+
+    it("dateStarted is never set", () => {
+      const markdown = `## Currently Reading
+- **Active Book** by Author
+
+## Books by Year
+### 2025
+- **Finished Book** by Author _(Dec 1)_`;
+
+      const result = parseReadingSummaryMarkdown(markdown);
+
+      result.rows.forEach((row) => {
+        expect(row.dateStarted).toBeUndefined();
+      });
+    });
+  });
+
+  describe("LLM extraction (fallback)", () => {
     it("extracts books from markdown reading list format", async () => {
       const markdown = readFileSync(FIXTURE_PATH, "utf-8");
 

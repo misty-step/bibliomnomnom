@@ -1,5 +1,14 @@
 # TODO.md
-Last updated: 2025-12-13
+Last updated: 2025-12-16
+
+## PR #25 — Import date handling + deterministic markdown
+
+### Blockers
+- [ ] Year header always flips to `books-by-year` (even from `currently-reading`); add regression test. — `lib/import/client/readingSummary.ts`, `__tests__/import/reading-summary.test.ts` (https://github.com/misty-step/bibliomnomnom/pull/25#discussion_r2621401942)
+- [ ] No partial-parse short-circuit: only skip LLM when deterministic parse is complete (or prove no book-ish lines skipped); add mixed-format test. — `lib/import/client/readingSummary.ts`, `hooks/useImportJob.ts`, `__tests__/import/reading-summary.test.ts` (https://github.com/misty-step/bibliomnomnom/pull/25#discussion_r2621465465)
+
+### In-scope
+- [ ] SPEC.md fenced diagram uses language id (markdownlint). — `SPEC.md` (CodeRabbit nitpick)
 
 ## PR #20 — Photo → OCR → Quote
 
@@ -15,4 +24,3 @@ Last updated: 2025-12-13
 ### Follow-ups
 - [ ] Server-side OCR rate limiting (durable store) — `BACKLOG.md#L721`
 - [ ] Consider `useReducer` for PhotoQuoteCapture state machine (if callbacks/complexity grow) — `components/notes/PhotoQuoteCapture.tsx`
-

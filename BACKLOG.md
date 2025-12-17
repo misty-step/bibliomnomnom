@@ -1740,8 +1740,8 @@ describe("Import workflow integration", () => {
     expect(books.find((b) => b.title === "Foundation")).toBeDefined();
   });
 
-  it("handles LLM extraction with fallback provider", async () => {
-    // Test full LLM flow with primary failure + fallback success
+  it("handles LLM extraction provider errors", async () => {
+    // Test full LLM flow with provider failure (no fallback)
   });
 
   it("enforces rate limits across multiple previews", async () => {

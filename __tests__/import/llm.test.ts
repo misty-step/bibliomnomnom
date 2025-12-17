@@ -68,14 +68,13 @@ describe("llmExtract", () => {
     expect(result.errors[0]!.message).toContain("Token budget exceeded");
   });
 
-  it("falls back to second provider when first fails", async () => {
+  it("returns error when provider fails", async () => {
     const failingProvider = {
-      name: "openai" as const,
+      name: "openrouter" as const,
       call: async () => {
         throw new Error("boom");
       },
     };
-    const fallback = makeStaticProvider({ books: sampleBooks });
 
     // Mock server environment
     const windowBackup = global.window;
@@ -84,7 +83,6 @@ describe("llmExtract", () => {
 
     const result = await llmExtract("text", {
       provider: failingProvider,
-      fallbackProvider: fallback,
     });
 
     // Restore window
@@ -92,8 +90,9 @@ describe("llmExtract", () => {
       global.window = windowBackup;
     }
 
-    expect(result.rows).toHaveLength(1);
-    expect(result.errors).toHaveLength(0);
+    expect(result.rows).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]!.message).toContain("boom");
   });
 
   it("flags rows missing required fields", async () => {
@@ -113,5 +112,33 @@ describe("llmExtract", () => {
 
     expect(result.rows).toHaveLength(0);
     expect(result.errors[0]!.message).toContain("Row missing required title or author");
+  });
+
+  it("prompt includes year-context date extraction rules", async () => {
+    let capturedPrompt = "";
+    const capturingProvider = {
+      name: "openrouter" as const,
+      call: async (prompt: string) => {
+        capturedPrompt = prompt;
+        return JSON.stringify({ books: [] });
+      },
+    };
+
+    const windowBackup = global.window;
+    // @ts-expect-error - simulate server environment
+    delete global.window;
+
+    await llmExtract("test input", { provider: capturingProvider });
+
+    if (windowBackup !== undefined) {
+      global.window = windowBackup;
+    }
+
+    // Verify prompt contains date extraction rules
+    expect(capturedPrompt).toContain("DATE EXTRACTION RULES");
+    expect(capturedPrompt).toContain("NEVER guess or infer dateStarted");
+    expect(capturedPrompt).toContain("year context from section headers");
+    expect(capturedPrompt).toContain("Currently Reading");
+    expect(capturedPrompt).toContain("empty data is better than wrong data");
   });
 });

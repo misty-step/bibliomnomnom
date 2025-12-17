@@ -3,6 +3,7 @@ import { POST } from "../route";
 
 const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 const originalOpenRouterModel = process.env.OPENROUTER_MODEL;
+const originalOpenRouterOcrModel = process.env.OPENROUTER_OCR_MODEL;
 const originalAppUrl = process.env.NEXT_PUBLIC_APP_URL;
 
 vi.mock("@/lib/api/withObservability", async () => {
@@ -113,6 +114,7 @@ function restoreEnvVar(key: string, value: string | undefined) {
 
 afterEach(() => {
   restoreEnvVar("OPENROUTER_API_KEY", originalOpenRouterApiKey);
+  restoreEnvVar("OPENROUTER_OCR_MODEL", originalOpenRouterOcrModel);
   restoreEnvVar("OPENROUTER_MODEL", originalOpenRouterModel);
   restoreEnvVar("NEXT_PUBLIC_APP_URL", originalAppUrl);
   vi.unstubAllGlobals();
