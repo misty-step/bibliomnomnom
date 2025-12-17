@@ -7,4 +7,4 @@ export const DEFAULT_OCR_MODEL = "google/gemini-2.5-flash";
 export const DEFAULT_IMPORT_MODEL = "google/gemini-3-pro-preview";
 
 // Import fallback: strong instruction-following + structured outputs (used only if primary fails/returns empty).
-export const DEFAULT_IMPORT_FALLBACK_MODEL = "anthropic/claude-4.5-sonnet";
+export const DEFAULT_IMPORT_FALLBACK_MODEL = "anthropic/claude-sonnet-4.5";
