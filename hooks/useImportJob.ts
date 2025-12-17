@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import type { Id } from "@/convex/_generated/dataModel";
 
 import type {
@@ -29,6 +29,7 @@ type State = {
   page: number;
   totalPages: number;
   pages: ParsedBook[][];
+  preparedPages: boolean[];
   dedupMatches: PreviewResult["dedupMatches"];
   warnings: string[];
   errors: string[];
@@ -39,6 +40,7 @@ type State = {
 type Action =
   | { type: "RESET" }
   | { type: "PARSE_START"; fileName: string }
+  | { type: "PAGE_PREPARED"; page: number; dedupMatches: PreviewResult["dedupMatches"] }
   | {
       type: "PREVIEW_SUCCESS";
       payload: {
@@ -57,6 +59,7 @@ type Action =
       tempId: string;
       decision: Decision;
     }
+  | { type: "COMMIT_START" }
   | {
       type: "COMMIT_SUCCESS";
       page: number;
@@ -69,6 +72,7 @@ const initialState: State = {
   page: 0,
   totalPages: 0,
   pages: [],
+  preparedPages: [],
   dedupMatches: [],
   warnings: [],
   errors: [],
@@ -86,6 +90,20 @@ const reducer = (state: State, action: Action): State => {
         status: "parsing",
         fileName: action.fileName,
       };
+    case "PAGE_PREPARED": {
+      const preparedPages = state.preparedPages.slice();
+      while (preparedPages.length < state.totalPages) {
+        preparedPages.push(false);
+      }
+      preparedPages[action.page] = true;
+
+      const seen = new Set(state.dedupMatches.map((m) => m.tempId));
+      const dedupMatches = state.dedupMatches.concat(
+        action.dedupMatches.filter((m) => !seen.has(m.tempId)),
+      );
+
+      return { ...state, preparedPages, dedupMatches };
+    }
     case "PREVIEW_SUCCESS":
       return {
         ...state,
@@ -95,6 +113,7 @@ const reducer = (state: State, action: Action): State => {
         pages: action.payload.pages,
         totalPages: action.payload.pages.length,
         page: 0,
+        preparedPages: action.payload.pages.map((_, idx) => idx === 0),
         dedupMatches: action.payload.dedupMatches,
         warnings: action.payload.warnings,
         errors: action.payload.errors,
@@ -108,6 +127,8 @@ const reducer = (state: State, action: Action): State => {
         ...state,
         decisions: { ...state.decisions, [action.tempId]: action.decision },
       };
+    case "COMMIT_START":
+      return { ...state, status: "committing" };
     case "COMMIT_SUCCESS": {
       const { created, merged, skipped } = action.counts;
       const isLastPage = action.page + 1 >= state.totalPages;
@@ -187,6 +208,59 @@ export const useImportJob = ({
   commitImport,
 }: UseImportJobOptions) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const preparePageInFlight = useRef(new Map<number, Promise<PreviewResult | null>>());
+
+  const ensurePagePrepared = useCallback(
+    async (page: number): Promise<PreviewResult | null> => {
+      if (!state.importRunId || !state.sourceType) return null;
+      if (page < 0 || page >= state.pages.length) return null;
+      if (state.preparedPages[page]) return null;
+
+      const importRunId = state.importRunId;
+      const sourceType = state.sourceType;
+      const rows = state.pages[page] ?? [];
+      const totalPages = state.totalPages || 1;
+
+      const existing = preparePageInFlight.current.get(page);
+      if (existing) return existing;
+
+      const promise = (async () => {
+        try {
+          const preview = await preparePreview({
+            importRunId,
+            sourceType,
+            rows,
+            page,
+            totalPages,
+          });
+
+          dispatch({ type: "PAGE_PREPARED", page, dedupMatches: preview.dedupMatches });
+          return preview;
+        } catch (err: any) {
+          dispatch({ type: "PREVIEW_ERROR", message: err?.message ?? "Preview failed" });
+          throw err;
+        } finally {
+          preparePageInFlight.current.delete(page);
+        }
+      })();
+
+      preparePageInFlight.current.set(page, promise);
+      return promise;
+    },
+    [
+      preparePreview,
+      state.importRunId,
+      state.pages,
+      state.preparedPages,
+      state.sourceType,
+      state.totalPages,
+    ],
+  );
+
+  useEffect(() => {
+    if (state.status !== "ready") return;
+    void ensurePagePrepared(state.page);
+  }, [ensurePagePrepared, state.page, state.status]);
 
   const setDecision = useCallback((tempId: string, decision: Decision) => {
     dispatch({ type: "SET_DECISION", tempId, decision });
@@ -195,6 +269,7 @@ export const useImportJob = ({
   const start = useCallback(
     async (file: File) => {
       console.log("[Import] Starting import for file:", file.name, "type:", file.type);
+      preparePageInFlight.current.clear();
       dispatch({ type: "PARSE_START", fileName: file.name });
 
       const text = await file.text();
@@ -273,14 +348,17 @@ export const useImportJob = ({
             return;
           }
 
+          const pages = slicePages(extracted.books, PAGE_SIZE);
+          const totalPages = pages.length || 1;
+
           // Step 2: Prepare preview with extracted books (Convex mutation - saves to DB)
           console.log("[Import] Calling preparePreview mutation with extracted books");
           const preview = await preparePreview({
             importRunId,
             sourceType,
-            rows: extracted.books,
+            rows: pages[0] ?? [],
             page: 0,
-            totalPages: 1,
+            totalPages,
           });
 
           console.log("[Import] Preview result:", {
@@ -293,7 +371,7 @@ export const useImportJob = ({
             payload: {
               sourceType: preview.sourceType,
               importRunId,
-              pages: slicePages(preview.books, PAGE_SIZE),
+              pages,
               dedupMatches: preview.dedupMatches,
               warnings: [...extracted.warnings, ...preview.warnings],
               errors: [...extracted.errors, ...(preview.errors ?? [])].map((e) =>
@@ -332,13 +410,14 @@ export const useImportJob = ({
 
       try {
         console.log("[Import] Calling preparePreview for CSV file");
+        const totalPages = pages.length || 1;
         const preview = await preparePreview({
           importRunId,
           sourceType: useGoodreads ? "goodreads-csv" : "csv",
           rows: pages[0],
           rawText: undefined,
           page: 0,
-          totalPages: pages.length,
+          totalPages,
         });
 
         console.log("[Import] CSV preview result:", {
@@ -378,12 +457,23 @@ export const useImportJob = ({
   }, []);
 
   const commitPage = useCallback(async () => {
-    if (!state.importRunId) return;
-    dispatch({ type: "SET_PAGE", page: state.page });
+    if (!state.importRunId || !state.sourceType) return;
     const pageRows = state.pages[state.page] ?? [];
 
+    let preparedMatches = state.dedupMatches;
+    try {
+      const prepared = await ensurePagePrepared(state.page);
+      if (prepared?.dedupMatches?.length) {
+        preparedMatches = preparedMatches.concat(prepared.dedupMatches);
+      }
+    } catch {
+      return;
+    }
+
+    const matchMap = new Map(preparedMatches.map((m) => [m.tempId, m]));
+
     // Build match map for intelligent defaults
-    const matchMap = new Map(state.dedupMatches.map((m) => [m.tempId, m]));
+    dispatch({ type: "COMMIT_START" });
 
     const decisions = pageRows.map((row) => {
       // If user set explicit decision, use it
@@ -435,6 +525,18 @@ export const useImportJob = ({
         decisions,
       });
 
+      if (Array.isArray(result.errors) && result.errors.length > 0) {
+        const first = result.errors[0];
+        const message =
+          typeof first === "string"
+            ? first
+            : first?.message
+              ? String(first.message)
+              : "Commit failed";
+        dispatch({ type: "COMMIT_ERROR", message });
+        return;
+      }
+
       dispatch({
         type: "COMMIT_SUCCESS",
         page: state.page,
@@ -449,14 +551,19 @@ export const useImportJob = ({
     }
   }, [
     commitImport,
+    ensurePagePrepared,
     state.decisions,
     state.dedupMatches,
     state.importRunId,
     state.page,
     state.pages,
+    state.sourceType,
   ]);
 
-  const reset = useCallback(() => dispatch({ type: "RESET" }), []);
+  const reset = useCallback(() => {
+    preparePageInFlight.current.clear();
+    dispatch({ type: "RESET" });
+  }, []);
 
   return useMemo(
     () => ({
