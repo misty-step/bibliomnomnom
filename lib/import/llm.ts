@@ -442,6 +442,7 @@ export const createOpenRouterExtractionProvider = (params: {
       timeoutMs: PROVIDER_TIMEOUT_MS,
       request: {
         model: params.model,
+        provider: { require_parameters: true },
         messages: [{ role: "user", content: prompt }],
         response_format: EXTRACTION_RESPONSE_FORMAT,
         include_reasoning: false,
@@ -466,6 +467,7 @@ export const createOpenRouterVerificationProvider = (params: {
       timeoutMs: PROVIDER_TIMEOUT_MS,
       request: {
         model: params.model,
+        provider: { require_parameters: true },
         messages: [{ role: "user", content: prompt }],
         response_format: VERIFICATION_RESPONSE_FORMAT,
         include_reasoning: false,

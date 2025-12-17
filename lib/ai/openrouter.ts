@@ -30,6 +30,7 @@ export type OpenRouterChatCompletionRequest = {
   temperature?: number;
   max_tokens?: number;
   response_format?: OpenRouterResponseFormat;
+  provider?: unknown;
   include_reasoning?: boolean;
   reasoning?: unknown;
   seed?: number;
