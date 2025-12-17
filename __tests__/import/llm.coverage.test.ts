@@ -6,6 +6,20 @@ import {
 } from "../../lib/import/llm";
 
 describe("llmExtract coverage", () => {
+  it("throws when called in browser environment", async () => {
+    const originalWindow = global.window;
+    // @ts-expect-error - simulate browser environment
+    global.window = {};
+
+    await expect(llmExtract("text", {})).rejects.toThrow("llmExtract is server-only");
+
+    if (originalWindow !== undefined) {
+      global.window = originalWindow;
+    } else {
+      delete (global as any).window;
+    }
+  });
+
   it("handles validation and collection limits", async () => {
     const provider = {
       name: "openrouter" as const,
@@ -117,5 +131,23 @@ describe("Providers", () => {
     const p = createOpenRouterVerificationProvider({ apiKey: "key", model: "test/model" });
     expect(p.name).toBe("openrouter");
     expect(p.call).toBeDefined();
+  });
+
+  it("handles OpenRouter verification provider calls", async () => {
+    const provider = createOpenRouterVerificationProvider({ apiKey: "key", model: "test/model" });
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ complete: true }) } }],
+      }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    await provider.call("prompt");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/chat/completions",
+      expect.anything(),
+    );
   });
 });
