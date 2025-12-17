@@ -21,6 +21,7 @@ fi
 REQUIRED_VARS=(
   "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
   "NEXT_PUBLIC_CONVEX_URL"
+  "OPENROUTER_API_KEY"
 )
 
 # Optional but recommended vars (warnings only)
@@ -28,7 +29,6 @@ RECOMMENDED_VARS=(
   "CLERK_SECRET_KEY"
   "CONVEX_DEPLOYMENT"
   "BLOB_READ_WRITE_TOKEN"
-  "OPENROUTER_API_KEY"
 )
 
 missing_required=()

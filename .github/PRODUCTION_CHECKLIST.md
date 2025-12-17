@@ -56,9 +56,13 @@ Environment: **Production only**
 - [ ] `NEXT_PUBLIC_CONVEX_URL` = `https://your-prod.convex.cloud`
 - [ ] `CONVEX_DEPLOY_KEY` = `prod:deployment|token`
 - [ ] `BLOB_READ_WRITE_TOKEN` = (auto-configured) ✅
-- [ ] `OPENAI_API_KEY` = `sk-...` (optional - for imports)
-- [ ] `GEMINI_API_KEY` = `AI...` (optional - for imports)
 - [ ] `NEXT_PUBLIC_IMPORT_ENABLED` = `true` (if using imports)
+
+### Convex Environment Variables (Convex Dashboard)
+
+These must be set in **Convex Dashboard → Settings → Environment Variables** (not Vercel):
+
+- [ ] `OPENROUTER_API_KEY` = `sk-or-v1-...` (**required** for TXT/MD imports)
 
 ### Preview Environment (Vercel Dashboard)
 
