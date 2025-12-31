@@ -1,15 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
+import { Sparkles } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { cn } from "@/lib/utils";
 
 export function Masthead() {
+  const pathname = usePathname();
+  const isProfilePage = pathname === "/profile";
+
   return (
     <header className="relative z-10 flex h-20 items-center justify-between border-b border-line-ghost bg-canvas-bone/80 backdrop-blur-sm px-6 sm:px-8 md:px-12 lg:px-16 transition-all duration-base ease-base">
-      {/* Left: Empty for balance or Menu in future */}
+      {/* Left: Profile link */}
       <div className="flex w-12 justify-start">
-        {/* <Menu className="h-5 w-5 text-text-inkMuted" /> */}
+        <Link
+          href="/profile"
+          className={cn(
+            "p-2 rounded-md hover:bg-canvas-boneMuted transition-colors",
+            isProfilePage && "bg-canvas-boneMuted",
+          )}
+          title="Reader Profile"
+        >
+          <Sparkles className="h-5 w-5 text-text-inkMuted" />
+        </Link>
       </div>
 
       {/* Center: Brand */}

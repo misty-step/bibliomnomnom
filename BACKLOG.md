@@ -14,6 +14,11 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
   * the raw transcription of the ramble
   * an organized synthesis of it
   * pushback / feedback / followup questions / challenges / things to mull over etc
+  * one or more notes
+
+### [PRODUCT] I want to be able to sort my queue (ie unread books) by a number of things: date added, alphabetically (title and author), but most importantly i want to be able to totally shuffle it
+
+### [PRODUCT] I want AI powered suggestions / recommendations for what to read next and why
 
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
 

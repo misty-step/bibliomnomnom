@@ -2,12 +2,15 @@
 :root {
   --color-accent-ember: #dc2626;
   --color-accent-favorite: #f59e0b;
+  --color-accent-rose: #e11d48;
+  --color-accent-teal: #0d9488;
   --color-canvas-bone: #faf8f5;
   --color-canvas-bone-muted: #f2ede5;
   --color-deco-gold: #c5a059;
   --color-deco-gold-dark: #aa771c;
   --color-deco-gold-light: #e6c786;
   --color-deco-gold-shine: #d4af37;
+  --color-deco-plum: #9333ea;
   --color-line-ember: rgba(28, 25, 23, 0.15);
   --color-line-ghost: rgba(28, 25, 23, 0.08);
   --color-status-danger: #ff4d4f;
