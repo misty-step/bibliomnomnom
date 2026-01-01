@@ -14,6 +14,11 @@ Analyzed by: 8 specialized perspectives (complexity, architecture, security, per
   * the raw transcription of the ramble
   * an organized synthesis of it
   * pushback / feedback / followup questions / challenges / things to mull over etc
+  * one or more notes
+
+### [PRODUCT] I want to be able to sort my queue (ie unread books) by a number of things: date added, alphabetically (title and author), but most importantly i want to be able to totally shuffle it
+
+### [PRODUCT] I want AI powered suggestions / recommendations for what to read next and why
 
 ### [ADOPTION BLOCKER] Export to JSON/CSV/Markdown
 
@@ -64,6 +69,54 @@ export const exportAllData = query({
 
 **Effort**: 1d (JSON) + 1d (CSV/Markdown) = 2d | **Impact**: Removes adoption barrier
 **ROI**: Paradox of data freedom - easier to leave → more likely to stay
+
+---
+
+### [REFACTOR] Add Zod Schema Validation for LLM Response Parsing
+
+**Source**: PR #30 review (gemini-code-assist)
+**File**: `convex/actions/profileInsights.ts`
+**Problem**: The `parseInsightsResponse` function relies on manual checks to validate JSON response from LLM. This is brittle and hard to maintain as schema evolves.
+
+**Recommended fix**: Use Zod for schema validation (already used in `convex/profiles.ts` for mutations).
+
+```typescript
+import { z } from 'zod';
+
+const insightsSchema = z.object({
+  tasteTagline: z.string(),
+  readerArchetype: z.string().optional(),
+  literaryTaste: z.object({
+    genres: z.array(z.string()),
+    moods: z.array(z.string()),
+  }).optional(),
+  // ... other fields
+});
+
+function parseInsightsResponse(...) {
+  const result = insightsSchema.safeParse(parsedJson);
+  if (!result.success) {
+    throw new Error(`LLM response validation failed: ${result.error.message}`);
+  }
+  return result.data;
+}
+```
+
+**Effort**: 2-3h | **Impact**: Better maintainability, self-documenting validation
+**Priority**: LOW - current manual parsing works, improvement for future maintenance
+
+---
+
+### [DOCS] Sync DESIGN.md Model Names with Implementation
+
+**Source**: PR #30 review (gemini-code-assist)
+**File**: `DESIGN.md:345`, `lib/ai/models.ts`
+**Problem**: Model names in documentation differ from implementation (e.g., `deepseek/deepseek-v3.2-20251201` vs `deepseek/deepseek-chat`).
+
+**Fix**: Update DESIGN.md fallback model section to match `lib/ai/models.ts`.
+
+**Effort**: 15m | **Impact**: Documentation accuracy
+**Priority**: LOW - purely documentation sync
 
 ---
 

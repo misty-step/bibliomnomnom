@@ -30,7 +30,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       {/* Content layer */}
       <div className="relative">
         <Masthead />
-        <main className="px-6 py-8 sm:px-8 md:px-12 lg:px-16">
+        <main className="py-8">
           <FadeInContent>{children}</FadeInContent>
         </main>
       </div>

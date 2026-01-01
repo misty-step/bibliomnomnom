@@ -7,7 +7,10 @@ export default defineSchema({
     email: v.string(),
     name: v.optional(v.string()),
     imageUrl: v.optional(v.string()),
-  }).index("by_clerk_id", ["clerkId"]),
+    username: v.optional(v.string()), // URL-safe slug for public profiles
+  })
+    .index("by_clerk_id", ["clerkId"])
+    .index("by_username", ["username"]),
   books: defineTable({
     userId: v.id("users"),
     title: v.string(),
@@ -97,4 +100,163 @@ export default defineSchema({
   })
     .index("by_user_run_page", ["userId", "importRunId", "page"])
     .index("by_run_page", ["importRunId", "page"]),
+  readerProfiles: defineTable({
+    userId: v.id("users"),
+
+    // User identity (for public display)
+    username: v.string(), // unique, URL-safe slug
+    displayName: v.optional(v.string()),
+    avatarUrl: v.optional(v.string()),
+
+    // Computed stats (refreshed on access)
+    stats: v.object({
+      totalBooks: v.number(),
+      booksRead: v.number(),
+      pagesRead: v.number(),
+      audiobookRatio: v.number(),
+      averagePace: v.number(),
+      topAuthors: v.array(
+        v.object({
+          author: v.string(),
+          count: v.number(),
+        }),
+      ),
+    }),
+
+    // AI-generated insights (cached)
+    insights: v.optional(
+      v.object({
+        tasteTagline: v.string(),
+        readerArchetype: v.optional(v.string()), // "The Polymath", "Digital Sovereign", etc.
+        literaryTaste: v.object({
+          genres: v.array(v.string()),
+          moods: v.array(v.string()),
+          complexity: v.union(
+            v.literal("accessible"),
+            v.literal("moderate"),
+            v.literal("literary"),
+          ),
+        }),
+        thematicConnections: v.array(
+          v.object({
+            theme: v.string(),
+            description: v.optional(v.string()), // Theme description for detail panel
+            // Support both legacy string format and new object format
+            books: v.array(
+              v.union(
+                v.string(), // Legacy: just title
+                v.object({
+                  title: v.string(),
+                  author: v.string(),
+                  coverUrl: v.optional(v.string()), // From user's library
+                }),
+              ),
+            ),
+          }),
+        ),
+        // Enhanced reading evolution with timeline phases (replaces simple string)
+        readingEvolution: v.optional(
+          v.union(
+            // Legacy: simple string format
+            v.string(),
+            // New: structured timeline format
+            v.object({
+              phases: v.array(
+                v.object({
+                  title: v.string(), // "The Thriller Years"
+                  period: v.string(), // "2019-2021"
+                  description: v.string(),
+                  keyBooks: v.array(v.string()), // 2-4 representative titles
+                  catalyst: v.optional(v.string()), // Book that triggered shift
+                }),
+              ),
+              narrative: v.string(), // Overall 2-3 paragraph story
+              trajectory: v.string(), // Future speculation
+            }),
+          ),
+        ),
+        evolutionSpeculation: v.optional(v.string()), // Legacy: kept for backward compat
+        confidence: v.union(v.literal("early"), v.literal("developing"), v.literal("strong")),
+        // Enhanced recommendation structure with reasoning and badges
+        recommendations: v.optional(
+          v.object({
+            // Primary format with rich reasoning
+            goDeeper: v.optional(
+              v.array(
+                v.object({
+                  title: v.string(),
+                  author: v.string(),
+                  reason: v.string(), // Short hook < 80 chars
+                  detailedReason: v.optional(v.string()), // 2-3 sentence explanation
+                  connectionBooks: v.optional(v.array(v.string())), // Titles from user's library
+                  badges: v.optional(v.array(v.string())), // "similar-atmosphere", "award-winner", etc.
+                  isReread: v.optional(v.boolean()),
+                }),
+              ),
+            ),
+            goWider: v.optional(
+              v.array(
+                v.object({
+                  title: v.string(),
+                  author: v.string(),
+                  reason: v.string(), // Short hook < 80 chars
+                  detailedReason: v.optional(v.string()), // 2-3 sentence explanation
+                  connectionBooks: v.optional(v.array(v.string())), // Titles from user's library
+                  badges: v.optional(v.array(v.string())), // "genre-defining", "cult-classic", etc.
+                }),
+              ),
+            ),
+            // Legacy format - for backward compatibility
+            continueReading: v.optional(
+              v.array(
+                v.object({
+                  title: v.string(),
+                  author: v.string(),
+                  reason: v.string(),
+                }),
+              ),
+            ),
+            freshPerspective: v.optional(
+              v.array(
+                v.object({
+                  title: v.string(),
+                  author: v.string(),
+                  reason: v.string(),
+                }),
+              ),
+            ),
+            revisit: v.optional(
+              v.array(
+                v.object({
+                  title: v.string(),
+                  author: v.string(),
+                  reason: v.string(),
+                }),
+              ),
+            ),
+          }),
+        ),
+      }),
+    ),
+
+    // Generation state
+    generationStatus: v.union(
+      v.literal("pending"),
+      v.literal("generating"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    generationError: v.optional(v.string()),
+    lastGeneratedAt: v.optional(v.number()),
+    bookCountAtGeneration: v.optional(v.number()),
+
+    // Sharing
+    isPublic: v.boolean(),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_username", ["username"])
+    .index("by_public", ["isPublic"]),
 });

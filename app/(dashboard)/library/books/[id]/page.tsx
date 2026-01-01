@@ -1,4 +1,5 @@
 import { BookDetail } from "@/components/book/BookDetail";
+import { PageContainer } from "@/components/layout/PageContainer";
 import type { Id } from "@/convex/_generated/dataModel";
 
 type Params = {
@@ -9,5 +10,9 @@ type Params = {
 
 export default async function BookDetailPage({ params }: Params) {
   const { id } = await params;
-  return <BookDetail bookId={id as Id<"books">} />;
+  return (
+    <PageContainer>
+      <BookDetail bookId={id as Id<"books">} />
+    </PageContainer>
+  );
 }

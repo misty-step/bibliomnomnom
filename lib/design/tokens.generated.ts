@@ -23,12 +23,15 @@ export const designTokens = {
     accent: {
       ember: "#DC2626",
       favorite: "#F59E0B",
+      rose: "#E11D48",
+      teal: "#0D9488",
     },
     deco: {
       gold: "#C5A059",
       goldLight: "#E6C786",
       goldDark: "#AA771C",
       goldShine: "#D4AF37",
+      plum: "#9333EA",
     },
     status: {
       positive: "#46D549",
@@ -92,6 +95,8 @@ export const tokenVars = {
     accent: {
       ember: "var(--color-accent-ember)",
       favorite: "var(--color-accent-favorite)",
+      rose: "var(--color-accent-rose)",
+      teal: "var(--color-accent-teal)",
     },
     canvas: {
       bone: "var(--color-canvas-bone)",
@@ -102,6 +107,7 @@ export const tokenVars = {
       goldDark: "var(--color-deco-gold-dark)",
       goldLight: "var(--color-deco-gold-light)",
       goldShine: "var(--color-deco-gold-shine)",
+      plum: "var(--color-deco-plum)",
     },
     line: {
       ember: "var(--color-line-ember)",
