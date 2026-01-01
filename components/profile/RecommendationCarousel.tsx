@@ -1,7 +1,7 @@
 /* eslint-disable design-tokens/no-raw-design-values -- Framer Motion viewport margin, Tailwind bracket notation */
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -67,6 +67,11 @@ export function RecommendationCarousel({
     setCanScrollLeft(scrollLeft > 0);
     setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
   }, []);
+
+  // Compute initial scroll state after mount
+  useEffect(() => {
+    updateScrollState();
+  }, [updateScrollState]);
 
   const scroll = useCallback((direction: "left" | "right") => {
     if (!scrollRef.current) return;

@@ -14,7 +14,6 @@ export const DEFAULT_PROFILE_MODEL = DEFAULT_MODEL;
 
 // Fallback models for profile generation (used if primary fails with 429).
 export const PROFILE_FALLBACK_MODELS = [
-  "google/gemini-3-flash-preview",
   "deepseek/deepseek-chat", // DeepSeek V3, 10x cheaper
   "qwen/qwen3-235b-a22b", // Qwen3 235B, extremely cheap
 ];

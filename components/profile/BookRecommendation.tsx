@@ -41,6 +41,15 @@ const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string; classNam
   },
 };
 
+// Hostnames that Next.js Image can optimize (configured in next.config.ts)
+const OPTIMIZABLE_IMAGE_HOSTNAMES = [
+  "books.googleusercontent.com",
+  "books.google.com",
+  "covers.openlibrary.org",
+  "lh3.googleusercontent.com",
+  "images.unsplash.com",
+];
+
 export type BookRecommendationProps = {
   title: string;
   author: string;
@@ -94,13 +103,8 @@ export function BookRecommendation({
     try {
       const url = new URL(src);
       return (
-        [
-          "books.googleusercontent.com",
-          "books.google.com",
-          "covers.openlibrary.org",
-          "lh3.googleusercontent.com",
-          "images.unsplash.com",
-        ].includes(url.hostname) || url.hostname.endsWith(".public.blob.vercel-storage.com")
+        OPTIMIZABLE_IMAGE_HOSTNAMES.includes(url.hostname) ||
+        url.hostname.endsWith(".public.blob.vercel-storage.com")
       );
     } catch {
       return false;

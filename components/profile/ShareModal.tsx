@@ -92,15 +92,15 @@ export function ShareModal({
               <p className="text-sm font-medium text-text-ink mb-xs">Public profile includes:</p>
               <ul className="text-sm text-text-inkMuted space-y-xs">
                 <li className="flex items-center gap-sm">
-                  <Check className="w-4 h-4 text-status-success" />
+                  <Check className="w-4 h-4 text-status-positive" />
                   Books read count and reading pace
                 </li>
                 <li className="flex items-center gap-sm">
-                  <Check className="w-4 h-4 text-status-success" />
+                  <Check className="w-4 h-4 text-status-positive" />
                   AI-generated taste profile
                 </li>
                 <li className="flex items-center gap-sm">
-                  <Check className="w-4 h-4 text-status-success" />
+                  <Check className="w-4 h-4 text-status-positive" />
                   Thematic connections and genres
                 </li>
               </ul>

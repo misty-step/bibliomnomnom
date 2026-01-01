@@ -5,6 +5,9 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 
+// Module-level cache for Open Library cover URLs
+const coverCache = new Map<string, string | null>();
+
 type ProfileBookCoverProps = {
   title: string;
   author?: string;
@@ -19,23 +22,34 @@ type ProfileBookCoverProps = {
 /**
  * Fetch cover from Open Library API.
  * Returns cover URL or null if not found.
+ * Uses module-level cache to avoid redundant API calls.
  */
 async function fetchOpenLibraryCover(title: string, author?: string): Promise<string | null> {
+  const cacheKey = `${title}|${author ?? ""}`;
+
+  // Check cache first
+  if (coverCache.has(cacheKey)) {
+    return coverCache.get(cacheKey) ?? null;
+  }
+
   try {
     const query = encodeURIComponent(`${title}${author ? ` ${author}` : ""}`);
     const searchUrl = `https://openlibrary.org/search.json?q=${query}&limit=1&fields=cover_i`;
-    const res = await fetch(searchUrl, { next: { revalidate: 86400 } }); // Cache 24h
+    const res = await fetch(searchUrl);
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      coverCache.set(cacheKey, null);
+      return null;
+    }
 
     const data = await res.json();
     const coverId = data.docs?.[0]?.cover_i;
 
-    if (coverId) {
-      return `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
-    }
-    return null;
+    const result = coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null;
+    coverCache.set(cacheKey, result);
+    return result;
   } catch {
+    coverCache.set(cacheKey, null);
     return null;
   }
 }

@@ -563,13 +563,8 @@ export const generate = internalAction({
           const bookTitle = typeof themeBook === "string" ? themeBook : themeBook.title;
           const bookAuthor = typeof themeBook === "string" ? "" : themeBook.author;
 
-          // Try to find matching book in user's library
-          const match = booksWithCovers.find(
-            (b) =>
-              b.title === bookTitle.toLowerCase() ||
-              b.title.includes(bookTitle.toLowerCase()) ||
-              bookTitle.toLowerCase().includes(b.title),
-          );
+          // Try to find matching book in user's library (exact match only)
+          const match = booksWithCovers.find((b) => b.title === bookTitle.toLowerCase());
           return {
             title: bookTitle,
             author: bookAuthor,

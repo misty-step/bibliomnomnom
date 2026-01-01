@@ -40,7 +40,6 @@ export type ProfileInsights = {
 
 // Thresholds
 const MIN_BOOKS_FOR_PROFILE = 20;
-const BOOKS_FOR_FULL_INSIGHTS = 50;
 const STALENESS_DAYS = 7;
 const STALENESS_BOOK_DELTA = 5;
 const STALENESS_BOOK_RATIO = 0.2;

@@ -15,7 +15,8 @@ type ProfileThresholdProps = {
  * Clean, aspirational design motivating users to add more books.
  */
 export function ProfileThreshold({ bookCount, booksNeeded }: ProfileThresholdProps) {
-  const progressPercent = Math.round((bookCount / 20) * 100);
+  const threshold = bookCount + booksNeeded;
+  const progressPercent = Math.round((bookCount / threshold) * 100);
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center px-md">
@@ -51,7 +52,9 @@ export function ProfileThreshold({ bookCount, booksNeeded }: ProfileThresholdPro
               transition={{ duration: 0.8, delay: 0.2 }}
             />
           </div>
-          <p className="mt-xs text-sm text-text-inkSubtle">{bookCount} / 20 books</p>
+          <p className="mt-xs text-sm text-text-inkSubtle">
+            {bookCount} / {threshold} books
+          </p>
         </div>
 
         {/* CTA */}

@@ -12,22 +12,22 @@ export function ProfileSkeleton() {
         <div className="max-w-6xl mx-auto px-md py-2xl md:py-3xl animate-pulse">
           {/* Avatar + Name row */}
           <div className="flex items-center gap-lg mb-md">
-            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-canvas-boneMuted" />
-            <div className="h-12 w-48 bg-canvas-boneMuted rounded" />
+            <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-canvas-bone-muted" />
+            <div className="h-12 w-48 bg-canvas-bone-muted rounded" />
           </div>
 
           {/* Tagline */}
-          <div className="h-6 w-96 max-w-full bg-canvas-boneMuted rounded mb-lg" />
+          <div className="h-6 w-96 max-w-full bg-canvas-bone-muted rounded mb-lg" />
 
           {/* Divider */}
-          <div className="w-16 h-px bg-canvas-boneMuted mb-md" />
+          <div className="w-16 h-px bg-canvas-bone-muted mb-md" />
 
           {/* Stats + Buttons row */}
           <div className="flex flex-wrap items-center gap-md">
-            <div className="h-4 w-32 bg-canvas-boneMuted rounded" />
+            <div className="h-4 w-32 bg-canvas-bone-muted rounded" />
             <div className="flex gap-sm">
-              <div className="h-8 w-24 bg-canvas-boneMuted rounded-full" />
-              <div className="h-8 w-20 bg-canvas-boneMuted/50 rounded-full" />
+              <div className="h-8 w-24 bg-canvas-bone-muted rounded-full" />
+              <div className="h-8 w-20 bg-canvas-bone-muted/50 rounded-full" />
             </div>
           </div>
         </div>
@@ -38,10 +38,10 @@ export function ProfileSkeleton() {
         <div className="max-w-6xl mx-auto px-md py-xl animate-pulse">
           <div className="flex flex-col md:flex-row gap-xl md:gap-3xl">
             <div className="space-y-sm">
-              <div className="h-4 w-32 bg-canvas-boneMuted rounded mb-md" />
-              <div className="h-4 w-48 bg-canvas-boneMuted rounded" />
-              <div className="h-4 w-40 bg-canvas-boneMuted rounded" />
-              <div className="h-4 w-44 bg-canvas-boneMuted rounded" />
+              <div className="h-4 w-32 bg-canvas-bone-muted rounded mb-md" />
+              <div className="h-4 w-48 bg-canvas-bone-muted rounded" />
+              <div className="h-4 w-40 bg-canvas-bone-muted rounded" />
+              <div className="h-4 w-44 bg-canvas-bone-muted rounded" />
             </div>
           </div>
         </div>
@@ -76,7 +76,7 @@ export function ProfileGenerating() {
         </div>
 
         <h2 className="font-display text-2xl text-text-ink mb-sm">Analyzing your library...</h2>
-        <p className="font-sans text-base text-text-inkMuted">This usually takes 30-60 seconds</p>
+        <p className="font-sans text-base text-text-ink-muted">This usually takes 30-60 seconds</p>
       </div>
     </div>
   );
