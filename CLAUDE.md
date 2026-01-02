@@ -368,8 +368,28 @@ From global CLAUDE.md and DESIGN.md:
 - **Red flags**: `Manager`, `Util`, `Helper` class names; pass-through methods; excessive config
 - **Strategic programming** - Invest 10-20% time in design improvement, not just features
 
+## Key Learnings
+
+From quality infrastructure audit (2025-11-20):
+
+1. **Quality gates prevent production fires** - No CI/CD = type errors in production. No git hooks = secrets committed. No backend tests = privacy bugs ship. Infrastructure isn't overhead—it's prevention.
+
+2. **Convex build order is critical** - `npx convex deploy && next build` (not just `next build`). Types depend on Convex schema. Wrong order = guaranteed Vercel deploy failures.
+
+3. **Coverage for confidence, not vanity** - Track critical paths only (auth, privacy, payments) at 75% threshold. Don't waste time testing shadcn components or hitting 100% everywhere.
+
+From previous grooming sessions:
+
+4. **Import/Export is existential, not nice-to-have** - Every competitor has import. Data portability is ethical table stakes. Build before public launch.
+
+5. **Silent failures are killing UX** - Users losing work without feedback → trust erosion → churn. Toast notifications cost 2h but prevent massive frustration.
+
+6. **Design system is already exceptional** - 8.5/10 maturity for MVP. Token architecture is best-in-class. Fix quick bugs, then focus on features.
+
+7. **Testing is strategic, not tactical** - Backend mutations untested = data corruption risk. Invest in critical path tests before major refactors.
+
 ---
 
-**Last Updated**: 2025-12-04
+**Last Updated**: 2026-01-01
 **Architecture Version**: 1.0 (Complete)
 **Status**: MVP in active development
