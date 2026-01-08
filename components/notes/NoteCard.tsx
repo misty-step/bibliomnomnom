@@ -12,6 +12,17 @@ import { NoteTypeSelector, NoteType } from "./NoteTypeSelector";
 import { cn } from "@/lib/utils";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type NoteCardProps = {
   note: Doc<"notes">;
@@ -39,6 +50,7 @@ export function NoteCard({ note }: NoteCardProps) {
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Edit State
   const [content, setContent] = useState(note.content);
@@ -69,10 +81,10 @@ export function NoteCard({ note }: NoteCardProps) {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this note?")) return;
-    setIsSaving(true); // visually indicate work
+    setIsSaving(true);
     try {
       await deleteNote({ id: note._id });
+      setShowDeleteDialog(false);
     } catch (err) {
       console.error("Failed to delete note:", err);
       toast({
@@ -117,15 +129,33 @@ export function NoteCard({ note }: NoteCardProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              className="text-accent-ember hover:bg-accent-ember/10 hover:text-accent-ember mr-auto sm:mr-0"
-              title="Delete note"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-accent-ember hover:bg-accent-ember/10 hover:text-accent-ember mr-auto sm:mr-0"
+                  title="Delete note"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete this note?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete this {meta.label.toLowerCase()}. This cannot be
+                    undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} disabled={isSaving}>
+                    {isSaving ? "Deleting…" : "Delete Forever"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <div className="h-4 w-px bg-line-ghost hidden sm:block" />
             <Button
               variant="ghost"
