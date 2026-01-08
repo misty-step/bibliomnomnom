@@ -29,7 +29,7 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://bibliomnomnom.com"),
+  metadataBase: new URL(process.env.SITE_URL || "https://bibliomnomnom.com"),
   title: {
     default: "bibliomnomnom",
     template: "%s | bibliomnomnom",
@@ -37,9 +37,6 @@ export const metadata: Metadata = {
   description: "A digital garden for voracious readers",
   manifest: "/manifest.webmanifest",
   openGraph: {
-    title: "bibliomnomnom",
-    description: "A digital garden for voracious readers",
-    url: "https://bibliomnomnom.com",
     siteName: "bibliomnomnom",
     type: "website",
     images: [
@@ -53,8 +50,6 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "bibliomnomnom",
-    description: "A digital garden for voracious readers",
     images: ["/api/og"],
   },
 };
