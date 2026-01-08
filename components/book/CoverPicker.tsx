@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable design-tokens/no-raw-design-values */
-
 import { useEffect, useState, useCallback } from "react";
 import { useAction } from "convex/react";
 import Image from "next/image";
@@ -66,12 +64,9 @@ export function CoverPicker({ title, author, isbn, currentCoverUrl, onSelect }: 
           size="sm"
           onClick={handleSearch}
           disabled={isLoading}
-          style={{ fontSize: 12 }}
+          className="text-xs"
         >
-          <RefreshCw
-            className={cn(isLoading && "animate-spin")}
-            style={{ width: 12, height: 12, marginRight: 8 }}
-          />
+          <RefreshCw className={cn("w-3 h-3 mr-2", isLoading && "animate-spin")} />
           Refresh
         </Button>
       </div>
@@ -85,7 +80,7 @@ export function CoverPicker({ title, author, isbn, currentCoverUrl, onSelect }: 
           <Loader2 className="h-8 w-8 animate-spin text-text-inkSubtle" />
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-96 overflow-y-auto pr-2 custom-scrollbar">
           {candidates.map((candidate, idx) => {
             const isSelected = currentCoverUrl === candidate.url;
             return (
@@ -109,11 +104,8 @@ export function CoverPicker({ title, author, isbn, currentCoverUrl, onSelect }: 
                 />
 
                 {/* Source Badge */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 bg-black/60 text-white backdrop-blur-[2px] opacity-0 transition-opacity group-hover:opacity-100"
-                  style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 4, paddingBottom: 4 }}
-                >
-                  <span style={{ fontSize: 12 }}>
+                <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white backdrop-blur-sm opacity-0 transition-opacity group-hover:opacity-100 px-2 py-1">
+                  <span className="text-xs">
                     {candidate.source === "google-books" ? "Google Books" : "Open Library"}
                   </span>
                 </div>

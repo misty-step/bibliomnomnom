@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable design-tokens/no-raw-design-values */
-
 import { useState, useEffect, useCallback, type ChangeEvent } from "react";
 import { useAction, useMutation } from "convex/react";
 import Image from "next/image";
@@ -353,12 +351,11 @@ export function AddBookSheet({
                       onClick={() => setShowCoverPicker(true)}
                       disabled={isSubmitting}
                       className={cn(
-                        "w-full rounded-md border border-line-ghost bg-canvas-bone/80 text-xs font-medium text-text-ink backdrop-blur-sm transition",
+                        "w-full rounded-md border border-line-ghost bg-canvas-bone/80 text-xs font-medium text-text-ink backdrop-blur-sm transition px-2 py-1.5",
                         "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn flex items-center justify-center gap-2",
                       )}
-                      style={{ paddingLeft: 8, paddingRight: 8, paddingTop: 6, paddingBottom: 6 }}
                     >
-                      <Globe style={{ width: 12, height: 12 }} />
+                      <Globe className="w-3.5 h-3.5" />
                       Web Search
                     </button>{" "}
                     <label
@@ -409,9 +406,7 @@ export function AddBookSheet({
                 </label>
                 <div className="flex items-center gap-2">
                   <div className="h-px flex-1 bg-line-ghost"></div>
-                  <span className="text-[10px] text-text-inkSubtle uppercase tracking-wider">
-                    OR
-                  </span>
+                  <span className="text-xs text-text-inkSubtle uppercase tracking-wider">OR</span>
                   <div className="h-px flex-1 bg-line-ghost"></div>
                 </div>
                 <Button
@@ -421,11 +416,11 @@ export function AddBookSheet({
                   disabled={isSubmitting || !title}
                   className="w-full border border-line-ghost"
                 >
-                  <Search style={{ width: 16, height: 16, marginRight: 8 }} />
+                  <Search className="w-4 h-4 mr-2" />
                   Search Web for Cover
                 </Button>
                 {!title && (
-                  <p className="text-[10px] text-center text-text-inkSubtle">
+                  <p className="text-xs text-center text-text-inkSubtle">
                     Enter a title first to search for covers
                   </p>
                 )}
