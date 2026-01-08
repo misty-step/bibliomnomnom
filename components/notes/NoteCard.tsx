@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Editor } from "./Editor";
 import { NoteTypeSelector, NoteType } from "./NoteTypeSelector";
 import { cn } from "@/lib/utils";
-import { Pencil, Trash2, Loader2, X, Check } from "lucide-react";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type NoteCardProps = {
   note: Doc<"notes">;
@@ -34,6 +35,7 @@ const TYPE_STYLES: Record<NoteType, { label: string; className: string }> = {
 export function NoteCard({ note }: NoteCardProps) {
   const updateNote = useMutation(api.notes.update);
   const deleteNote = useMutation(api.notes.remove);
+  const { toast } = useToast();
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -56,6 +58,11 @@ export function NoteCard({ note }: NoteCardProps) {
       setIsEditing(false);
     } catch (err) {
       console.error("Failed to update note:", err);
+      toast({
+        title: "Failed to update note",
+        description: "Your changes weren't saved. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -68,6 +75,11 @@ export function NoteCard({ note }: NoteCardProps) {
       await deleteNote({ id: note._id });
     } catch (err) {
       console.error("Failed to delete note:", err);
+      toast({
+        title: "Failed to delete note",
+        description: "The note couldn't be deleted. Please try again.",
+        variant: "destructive",
+      });
       setIsSaving(false);
     }
   };

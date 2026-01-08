@@ -89,6 +89,11 @@ export function BookDetail({ bookId }: BookDetailProps) {
     } catch (err) {
       console.error(err);
       setLocalStatus(book.status);
+      toast({
+        title: "Failed to update status",
+        description: "The reading status couldn't be changed. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -98,6 +103,11 @@ export function BookDetail({ bookId }: BookDetailProps) {
       await toggleFavorite({ id: book._id });
     } catch (err) {
       console.error(err);
+      toast({
+        title: "Failed to update favorite",
+        description: "Couldn't update favorite status. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsTogglingFavorite(false);
     }
@@ -109,6 +119,11 @@ export function BookDetail({ bookId }: BookDetailProps) {
       await updateBook({ id: book._id, isAudiobook: !book.isAudiobook });
     } catch (err) {
       console.error(err);
+      toast({
+        title: "Failed to update audiobook status",
+        description: "Couldn't mark as audiobook. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsTogglingAudiobook(false);
     }
@@ -124,6 +139,11 @@ export function BookDetail({ bookId }: BookDetailProps) {
     } catch (err) {
       console.error(err);
       setLocalPrivacy(previousPrivacy);
+      toast({
+        title: "Failed to update privacy",
+        description: "Couldn't change privacy setting. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsTogglingPrivacy(false);
     }

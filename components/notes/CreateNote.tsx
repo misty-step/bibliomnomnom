@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Surface } from "@/components/ui/Surface";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 type CreateNoteProps = {
   bookId: Id<"books">;
@@ -18,6 +19,7 @@ type CreateNoteProps = {
 
 export function CreateNote({ bookId }: CreateNoteProps) {
   const createNote = useMutation(api.notes.create);
+  const { toast } = useToast();
   const [content, setContent] = useState("");
   const [type, setType] = useState<NoteType>("note");
   const [page, setPage] = useState("");
@@ -61,7 +63,12 @@ export function CreateNote({ bookId }: CreateNoteProps) {
       setIsExpanded(false);
     } catch (err) {
       console.error("Failed to create note:", err);
-      // TODO: Toast error
+      toast({
+        title: "Failed to save note",
+        description: "Your note wasn't saved. Please try again.",
+        variant: "destructive",
+      });
+      // Content preserved in editor so user can retry
     } finally {
       setIsSaving(false);
     }
