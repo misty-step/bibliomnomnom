@@ -6,15 +6,15 @@ import { cn } from "@/lib/utils";
 const STATUS_MAP = {
   "want-to-read": {
     label: "Want to Read",
-    className: "bg-ink/5 text-ink",
+    className: "bg-text-ink/5 text-text-ink",
   },
   "currently-reading": {
     label: "Reading",
-    className: "bg-primary/10 text-primary",
+    className: "bg-canvas-boneMuted text-text-ink",
   },
   read: {
     label: "Read",
-    className: "bg-leather/10 text-leather",
+    className: "bg-text-ink/10 text-text-ink",
   },
 };
 

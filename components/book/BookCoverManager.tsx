@@ -1,7 +1,5 @@
 "use client";
 
-/* eslint-disable design-tokens/no-raw-design-values */
-
 import { useState, useRef, type ChangeEvent } from "react";
 import { useMutation, useAction } from "convex/react";
 import { upload } from "@vercel/blob/client";
@@ -257,7 +255,7 @@ export function BookCoverManager({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 p-4 backdrop-blur-[2px]"
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 p-4 backdrop-blur-sm"
                 >
                   {isUploading ? (
                     <div className="flex flex-col items-center gap-2 text-white">
@@ -272,7 +270,7 @@ export function BookCoverManager({
                         className="w-full"
                         onClick={() => setShowPicker(true)}
                       >
-                        <Search style={{ width: 14, height: 14, marginRight: 8 }} />
+                        <Search className="w-3.5 h-3.5 mr-2" />
                         Search Web
                       </Button>
                       <Button
@@ -281,16 +279,16 @@ export function BookCoverManager({
                         className="w-full"
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Upload style={{ width: 14, height: 14, marginRight: 8 }} />
+                        <Upload className="w-3.5 h-3.5 mr-2" />
                         Upload File
                       </Button>
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="w-full mt-2 bg-red-500/20 hover:bg-red-500/40 text-white border border-red-500/50"
+                        className="w-full mt-2 bg-accent-ember/20 hover:bg-accent-ember/40 text-surface-dawn border border-accent-ember/50"
                         onClick={handleRemove}
                       >
-                        <Trash2 style={{ width: 14, height: 14, marginRight: 8 }} />
+                        <Trash2 className="w-3.5 h-3.5 mr-2" />
                         Remove
                       </Button>
                     </>
@@ -324,7 +322,7 @@ export function BookCoverManager({
                     className="w-full justify-start"
                     onClick={handleAutoFetch}
                   >
-                    <ImageIcon style={{ width: 14, height: 14, marginRight: 8 }} />
+                    <ImageIcon className="w-3.5 h-3.5 mr-2" />
                     Auto-Fetch
                   </Button>
                   <Button
@@ -332,7 +330,7 @@ export function BookCoverManager({
                     className="w-full justify-start"
                     onClick={() => setShowPicker(true)}
                   >
-                    <Globe style={{ width: 14, height: 14, marginRight: 8 }} />
+                    <Globe className="w-3.5 h-3.5 mr-2" />
                     Search Web
                   </Button>
                   <Button
@@ -340,7 +338,7 @@ export function BookCoverManager({
                     className="w-full justify-start border border-dashed border-line-ember bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
                     onClick={() => fileInputRef.current?.click()}
                   >
-                    <Upload style={{ width: 14, height: 14, marginRight: 8 }} />
+                    <Upload className="w-3.5 h-3.5 mr-2" />
                     Upload File
                   </Button>
                 </>
