@@ -1,14 +1,26 @@
+import Link from "next/link";
+
 export function Footer() {
   return (
-    <footer className="py-8 text-center">
-      <a
-        href="https://mistystep.io"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
-      >
-        a misty step project
-      </a>
+    <footer className="py-8">
+      <div className="flex flex-col items-center gap-4">
+        <nav className="flex gap-6">
+          <Link
+            href="/pricing"
+            className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
+          >
+            Pricing
+          </Link>
+        </nav>
+        <a
+          href="https://mistystep.io"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
+        >
+          a misty step project
+        </a>
+      </div>
     </footer>
   );
 }
