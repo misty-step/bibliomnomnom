@@ -29,9 +29,34 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "bibliomnomnom",
+  metadataBase: new URL("https://bibliomnomnom.com"),
+  title: {
+    default: "bibliomnomnom",
+    template: "%s | bibliomnomnom",
+  },
   description: "A digital garden for voracious readers",
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "bibliomnomnom",
+    description: "A digital garden for voracious readers",
+    url: "https://bibliomnomnom.com",
+    siteName: "bibliomnomnom",
+    type: "website",
+    images: [
+      {
+        url: "/api/og",
+        width: 1200,
+        height: 630,
+        alt: "bibliomnomnom - A digital garden for voracious readers",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "bibliomnomnom",
+    description: "A digital garden for voracious readers",
+    images: ["/api/og"],
+  },
 };
 
 export default function RootLayout({
