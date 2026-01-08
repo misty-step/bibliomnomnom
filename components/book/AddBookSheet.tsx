@@ -355,7 +355,7 @@ export function AddBookSheet({
                         "hover:bg-canvas-bone dark:border-line-ember dark:bg-surface-dawn/80 dark:hover:bg-surface-dawn flex items-center justify-center gap-2",
                       )}
                     >
-                      <Globe className="w-3 h-3" />
+                      <Globe className="w-3.5 h-3.5" />
                       Web Search
                     </button>{" "}
                     <label

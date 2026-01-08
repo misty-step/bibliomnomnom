@@ -285,7 +285,7 @@ export function BookCoverManager({
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="w-full mt-2 bg-accent-ember/20 hover:bg-accent-ember/40 text-surface-dawn border border-accent-ember/50"
+                        className="w-full mt-2 bg-accent-ember/20 hover:bg-accent-ember/40 text-white border border-accent-ember/50"
                         onClick={handleRemove}
                       >
                         <Trash2 className="w-3.5 h-3.5 mr-2" />
