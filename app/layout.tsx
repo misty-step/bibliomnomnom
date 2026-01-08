@@ -29,9 +29,29 @@ const fontMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "bibliomnomnom",
+  metadataBase: new URL(process.env.SITE_URL || "https://bibliomnomnom.com"),
+  title: {
+    default: "bibliomnomnom",
+    template: "%s | bibliomnomnom",
+  },
   description: "A digital garden for voracious readers",
   manifest: "/manifest.webmanifest",
+  openGraph: {
+    siteName: "bibliomnomnom",
+    type: "website",
+    images: [
+      {
+        url: "/api/og",
+        width: 1200,
+        height: 630,
+        alt: "bibliomnomnom - A digital garden for voracious readers",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/api/og"],
+  },
 };
 
 export default function RootLayout({
