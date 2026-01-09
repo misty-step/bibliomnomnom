@@ -259,4 +259,24 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_username", ["username"])
     .index("by_public", ["isPublic"]),
+  subscriptions: defineTable({
+    userId: v.id("users"),
+    stripeCustomerId: v.string(),
+    stripeSubscriptionId: v.optional(v.string()),
+    status: v.union(
+      v.literal("trialing"),
+      v.literal("active"),
+      v.literal("canceled"),
+      v.literal("past_due"),
+      v.literal("expired"),
+    ),
+    priceId: v.optional(v.string()),
+    currentPeriodEnd: v.optional(v.number()),
+    trialEndsAt: v.optional(v.number()),
+    cancelAtPeriodEnd: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_stripe_customer", ["stripeCustomerId"]),
 });

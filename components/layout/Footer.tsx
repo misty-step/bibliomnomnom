@@ -2,28 +2,28 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="border-t border-line-ghost py-8">
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-6 px-8">
-        <div className="flex items-center gap-8">
+    <footer className="border-t border-line-ghost/50 py-12">
+      <div className="mx-auto max-w-5xl px-8 text-center">
+        <div className="flex items-center justify-center gap-6">
           <Link
             href="/pricing"
-            className="font-mono text-sm text-text-inkMuted transition-colors hover:text-text-ink"
+            className="font-serif text-sm tracking-wide text-text-inkMuted transition-colors hover:text-text-ink"
           >
             Pricing
           </Link>
-          <span className="text-line-ember">·</span>
+          <span className="text-text-inkSubtle">—</span>
           <a
-            href="mailto:hello@bibliomnomnom.com"
-            className="font-mono text-sm text-text-inkMuted transition-colors hover:text-text-ink"
+            href="mailto:hello@mistystep.io"
+            className="font-serif text-sm tracking-wide text-text-inkMuted transition-colors hover:text-text-ink"
           >
-            Contact
+            Feedback
           </a>
         </div>
         <a
           href="https://mistystep.io"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
+          className="mt-8 inline-block font-mono text-xs tracking-widest text-text-inkSubtle transition-colors hover:text-text-inkMuted"
         >
           a misty step project
         </a>

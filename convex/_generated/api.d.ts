@@ -16,6 +16,7 @@ import type * as books from "../books.js";
 import type * as imports from "../imports.js";
 import type * as notes from "../notes.js";
 import type * as profiles from "../profiles.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as users from "../users.js";
 
 import type {
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   imports: typeof imports;
   notes: typeof notes;
   profiles: typeof profiles;
+  subscriptions: typeof subscriptions;
   users: typeof users;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
