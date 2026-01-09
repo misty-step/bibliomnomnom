@@ -4,14 +4,14 @@ export function Footer() {
   return (
     <footer className="py-8">
       <div className="flex flex-col items-center gap-4">
-        <nav className="flex gap-6">
+        <div className="flex gap-6">
           <Link
             href="/pricing"
             className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
           >
             Pricing
           </Link>
-        </nav>
+        </div>
         <a
           href="https://mistystep.io"
           target="_blank"
