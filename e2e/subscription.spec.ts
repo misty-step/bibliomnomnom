@@ -88,7 +88,8 @@ test.describe("Footer on Pricing Page", () => {
   test("displays footer with pricing and feedback links", async ({ page }) => {
     await page.goto("/pricing");
 
-    const footer = page.locator("footer");
+    // Use getByRole to get the first contentinfo (footer) element
+    const footer = page.getByRole("contentinfo").first();
     await expect(footer).toBeVisible();
     await expect(footer.getByRole("link", { name: /pricing/i })).toBeVisible();
     await expect(footer.getByRole("link", { name: /feedback/i })).toBeVisible();
@@ -97,7 +98,8 @@ test.describe("Footer on Pricing Page", () => {
   test("feedback link has correct mailto", async ({ page }) => {
     await page.goto("/pricing");
 
-    const feedbackLink = page.locator("footer").getByRole("link", { name: /feedback/i });
+    const footer = page.getByRole("contentinfo").first();
+    const feedbackLink = footer.getByRole("link", { name: /feedback/i });
     const href = await feedbackLink.getAttribute("href");
     expect(href).toBe("mailto:hello@mistystep.io");
   });
