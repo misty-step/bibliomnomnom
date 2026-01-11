@@ -18,9 +18,15 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json-summary", "html", "lcov"],
-      // Phase 1: Only measure critical business logic in lib/import
-      // Exclude Convex backend (integration-tested, not unit-tested)
-      include: ["lib/import/**/*.{ts,tsx}"],
+      // Measure critical business logic
+      // - lib/import: Import processing logic
+      // - lib/stripe-utils.ts: Pure Stripe utility functions
+      // Note: convex/*.ts excluded (requires runtime mocking, tested via E2E)
+      // Note: lib/stripe.ts excluded (lazy init, env-dependent)
+      include: [
+        "lib/import/**/*.{ts,tsx}",
+        "lib/stripe-utils.ts",
+      ],
       exclude: [
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}",

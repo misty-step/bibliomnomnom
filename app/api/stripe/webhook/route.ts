@@ -2,36 +2,10 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { stripe, stripeTimestampToMs } from "@/lib/stripe";
+import { mapStripeStatus } from "@/lib/stripe-utils";
 import type Stripe from "stripe";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
-/**
- * Map Stripe subscription status to our status enum.
- */
-function mapStripeStatus(
-  status: Stripe.Subscription.Status,
-): "trialing" | "active" | "canceled" | "past_due" | "expired" {
-  switch (status) {
-    case "trialing":
-      return "trialing";
-    case "active":
-      return "active";
-    case "canceled":
-      return "expired";
-    case "past_due":
-      return "past_due";
-    case "unpaid":
-      return "expired";
-    case "incomplete":
-    case "incomplete_expired":
-      return "expired";
-    case "paused":
-      return "canceled";
-    default:
-      return "expired";
-  }
-}
 
 /**
  * Handle checkout.session.completed event.
