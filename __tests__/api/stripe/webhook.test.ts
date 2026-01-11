@@ -13,8 +13,8 @@ describe("mapStripeStatus", () => {
     expect(mapStripeStatus("active")).toBe("active");
   });
 
-  it("maps canceled to expired", () => {
-    expect(mapStripeStatus("canceled")).toBe("expired");
+  it("maps canceled to canceled", () => {
+    expect(mapStripeStatus("canceled")).toBe("canceled");
   });
 
   it("maps past_due to past_due", () => {

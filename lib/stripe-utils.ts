@@ -15,7 +15,7 @@ export function mapStripeStatus(
     case "active":
       return "active";
     case "canceled":
-      return "expired";
+      return "canceled";
     case "past_due":
       return "past_due";
     case "unpaid":
