@@ -15,14 +15,15 @@ test.describe("Pricing Page", () => {
   });
 
   test("shows monthly price of $15 when toggled", async ({ page }) => {
-    // Click monthly toggle first (annual is default)
-    await page.getByRole("button", { name: /monthly/i }).click();
+    // Click the Monthly text button (exact match to avoid toggle switch)
+    await page.getByRole("button", { name: "Monthly", exact: true }).click();
     await expect(page.getByText("$15")).toBeVisible();
   });
 
   test("has monthly/annual toggle", async ({ page }) => {
-    const monthlyButton = page.getByRole("button", { name: /monthly/i });
-    const annualButton = page.getByRole("button", { name: /annual/i });
+    // Use exact matching to avoid ambiguity with toggle switch aria-labels
+    const monthlyButton = page.getByRole("button", { name: "Monthly", exact: true });
+    const annualButton = page.getByRole("button", { name: /^Annual/ });
 
     await expect(monthlyButton).toBeVisible();
     await expect(annualButton).toBeVisible();
@@ -33,13 +34,13 @@ test.describe("Pricing Page", () => {
     await expect(page.getByText("$129")).toBeVisible();
     await expect(page.getByText("/year")).toBeVisible();
 
-    // Switch to monthly
-    await page.getByRole("button", { name: /monthly/i }).click();
+    // Switch to monthly (use exact match)
+    await page.getByRole("button", { name: "Monthly", exact: true }).click();
     await expect(page.getByText("$15")).toBeVisible();
     await expect(page.getByText("/month")).toBeVisible();
 
-    // Switch back to annual
-    await page.getByRole("button", { name: /annual/i }).click();
+    // Switch back to annual (starts with "Annual")
+    await page.getByRole("button", { name: /^Annual/ }).click();
     await expect(page.getByText("$129")).toBeVisible();
   });
 
