@@ -9,14 +9,15 @@ test.describe("Pricing Page", () => {
     await expect(page.getByRole("heading", { name: /your ai reading companion/i })).toBeVisible();
   });
 
-  test("shows monthly price of $15", async ({ page }) => {
-    await expect(page.getByText("$15")).toBeVisible();
+  test("shows annual price of $129 by default", async ({ page }) => {
+    // Annual is the default
+    await expect(page.getByText("$129")).toBeVisible();
   });
 
-  test("shows annual price of $129", async ({ page }) => {
-    // Click annual toggle first
-    await page.getByRole("button", { name: /annual/i }).click();
-    await expect(page.getByText("$129")).toBeVisible();
+  test("shows monthly price of $15 when toggled", async ({ page }) => {
+    // Click monthly toggle first (annual is default)
+    await page.getByRole("button", { name: /monthly/i }).click();
+    await expect(page.getByText("$15")).toBeVisible();
   });
 
   test("has monthly/annual toggle", async ({ page }) => {
@@ -27,19 +28,19 @@ test.describe("Pricing Page", () => {
     await expect(annualButton).toBeVisible();
   });
 
-  test("toggle switches between monthly and annual pricing", async ({ page }) => {
-    // Start with monthly selected (default)
-    await expect(page.getByText("$15")).toBeVisible();
-    await expect(page.getByText("/month")).toBeVisible();
-
-    // Switch to annual
-    await page.getByRole("button", { name: /annual/i }).click();
+  test("toggle switches between annual and monthly pricing", async ({ page }) => {
+    // Start with annual selected (default)
     await expect(page.getByText("$129")).toBeVisible();
     await expect(page.getByText("/year")).toBeVisible();
 
-    // Switch back to monthly
+    // Switch to monthly
     await page.getByRole("button", { name: /monthly/i }).click();
     await expect(page.getByText("$15")).toBeVisible();
+    await expect(page.getByText("/month")).toBeVisible();
+
+    // Switch back to annual
+    await page.getByRole("button", { name: /annual/i }).click();
+    await expect(page.getByText("$129")).toBeVisible();
   });
 
   test("shows 14-day free trial CTA", async ({ page }) => {
@@ -76,7 +77,7 @@ test.describe("Pricing Page", () => {
   });
 
   test("shows annual savings badge", async ({ page }) => {
-    await page.getByRole("button", { name: /annual/i }).click();
+    // Annual is default, badge should be visible
     await expect(page.getByText(/2 months free/i)).toBeVisible();
   });
 });
