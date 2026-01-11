@@ -30,6 +30,15 @@ export const POST = withObservability(async (request: Request) => {
 
   const email = user.emailAddresses[0].emailAddress;
 
+  // Ensure user exists in Convex before creating checkout session.
+  // Critical: the Stripe webhook needs the user to exist when it fires.
+  await convex.mutation(api.users.createOrUpdateUser, {
+    clerkId,
+    email,
+    name: user.fullName ?? user.firstName ?? undefined,
+    imageUrl: user.imageUrl,
+  });
+
   // Parse request body
   let body: { priceType?: string };
   try {
