@@ -49,17 +49,18 @@ test.describe("Pricing Page", () => {
   });
 
   test("displays feature list", async ({ page }) => {
+    // Check for feature headings (h3 elements) to avoid matching FAQ text
     const features = [
-      /ai reading insights/i,
-      /smart recommendations/i,
-      /ocr note capture/i,
-      /reading analytics/i,
-      /goodreads import/i,
-      /export your data/i,
+      "AI Reading Insights",
+      "Smart Recommendations",
+      "OCR Note Capture",
+      "Reading Analytics",
+      "Goodreads Import",
+      "Export Your Data",
     ];
 
     for (const feature of features) {
-      await expect(page.getByText(feature)).toBeVisible();
+      await expect(page.getByRole("heading", { name: feature })).toBeVisible();
     }
   });
 
