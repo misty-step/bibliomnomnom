@@ -261,7 +261,7 @@ export default defineSchema({
     .index("by_public", ["isPublic"]),
   subscriptions: defineTable({
     userId: v.id("users"),
-    stripeCustomerId: v.string(),
+    stripeCustomerId: v.optional(v.string()),
     stripeSubscriptionId: v.optional(v.string()),
     status: v.union(
       v.literal("trialing"),

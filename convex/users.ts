@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth } from "./auth";
+import { TRIAL_DURATION_MS } from "@/lib/constants";
 
 // Query current authenticated user
 export const getCurrentUser = query({
@@ -46,10 +47,26 @@ export const createOrUpdateUser = mutation({
       return existingUser._id;
     }
 
-    return await ctx.db.insert("users", {
+    // Create new user
+    const newUserId = await ctx.db.insert("users", {
       clerkId: args.clerkId,
       ...userData,
     });
+
+    // Auto-create trial subscription for new users
+    const now = Date.now();
+    const trialEnd = now + TRIAL_DURATION_MS;
+    await ctx.db.insert("subscriptions", {
+      userId: newUserId,
+      status: "trialing",
+      currentPeriodEnd: trialEnd,
+      trialEndsAt: trialEnd,
+      cancelAtPeriodEnd: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return newUserId;
   },
 });
 

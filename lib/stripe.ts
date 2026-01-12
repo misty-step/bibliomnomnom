@@ -51,10 +51,8 @@ export const PRICES = {
   annual: process.env.STRIPE_PRICE_ANNUAL!,
 } as const;
 
-/**
- * Trial duration in days.
- */
-export const TRIAL_DAYS = 14;
+// Re-export from shared constants for backwards compatibility
+export { TRIAL_DAYS } from "./constants";
 
 /**
  * Convert Stripe timestamp (seconds) to JavaScript timestamp (milliseconds).

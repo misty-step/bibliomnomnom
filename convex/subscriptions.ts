@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { requireAuth, getAuthOrNull } from "./auth";
+import { TRIAL_DAYS, TRIAL_DURATION_MS } from "@/lib/constants";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
@@ -130,6 +131,58 @@ export const checkAccess = query({
       hasAccess: false,
       reason: subscription.status === "trialing" ? "trial_expired" : "subscription_expired",
       status: subscription.status,
+    };
+  },
+});
+
+// ============================================================================
+// User-Facing Mutations
+// ============================================================================
+
+/**
+ * Ensure trial exists for authenticated user.
+ * Called from dashboard to auto-enroll existing users without subscriptions.
+ *
+ * Returns the subscription (existing or newly created trial).
+ */
+export const ensureTrialExists = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+
+    // Check for existing subscription
+    const existing = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (existing) {
+      return {
+        ...existing,
+        hasAccess: hasAccess(existing),
+        daysRemaining: getDaysRemaining(existing),
+      };
+    }
+
+    // Create new trial for existing user
+    const now = Date.now();
+    const trialEnd = now + TRIAL_DURATION_MS;
+
+    const subscriptionId = await ctx.db.insert("subscriptions", {
+      userId,
+      status: "trialing",
+      currentPeriodEnd: trialEnd,
+      trialEndsAt: trialEnd,
+      cancelAtPeriodEnd: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const subscription = await ctx.db.get(subscriptionId);
+    return {
+      ...subscription!,
+      hasAccess: true,
+      daysRemaining: TRIAL_DAYS,
     };
   },
 });

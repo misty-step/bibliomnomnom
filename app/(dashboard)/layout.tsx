@@ -5,6 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { Masthead } from "@/components/navigation/Masthead";
 import { FadeInContent } from "@/components/layout/FadeInContent";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
+import { SubscriptionGate } from "@/components/subscription/SubscriptionGate";
 
 type DashboardLayoutProps = {
   children: ReactNode;
@@ -33,7 +34,9 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
         <Masthead />
         <TrialBanner />
         <main className="py-8">
-          <FadeInContent>{children}</FadeInContent>
+          <SubscriptionGate>
+            <FadeInContent>{children}</FadeInContent>
+          </SubscriptionGate>
         </main>
       </div>
     </div>
