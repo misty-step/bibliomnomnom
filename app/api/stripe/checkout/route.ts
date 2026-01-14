@@ -50,9 +50,11 @@ export const POST = withObservability(async (request: Request) => {
     // Create request-scoped Convex client with auth token
     const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
     const token = await getToken({ template: "convex" });
-    if (token) {
-      convex.setAuth(token);
+    if (!token) {
+      console.error("Could not retrieve Convex auth token for authenticated user");
+      return NextResponse.json({ error: "Authentication token missing" }, { status: 401 });
     }
+    convex.setAuth(token);
 
     // Check if user already has a Stripe customer
     const existingSubscription = await convex.query(api.subscriptions.get);

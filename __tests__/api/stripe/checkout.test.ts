@@ -176,6 +176,24 @@ describe("Stripe Checkout Route", () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
+    it("returns 401 when Convex auth token is missing", async () => {
+      mockGetToken.mockResolvedValue(null);
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: "user@example.com" }],
+      });
+
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: "Authentication token missing" });
+      expect(mockCreate).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
+    });
+
     it("returns 400 when user has no email", async () => {
       mockGetToken.mockResolvedValue("mock_convex_token");
       mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
