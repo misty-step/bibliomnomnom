@@ -1,15 +1,15 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Hoist mock functions
-const { mockMutation, mockSubscriptionsRetrieve, mockConstructEvent } = vi.hoisted(() => ({
-  mockMutation: vi.fn(),
+const { mockAction, mockSubscriptionsRetrieve, mockConstructEvent } = vi.hoisted(() => ({
+  mockAction: vi.fn(),
   mockSubscriptionsRetrieve: vi.fn(),
   mockConstructEvent: vi.fn(),
 }));
 
 vi.mock("convex/browser", () => ({
   ConvexHttpClient: class MockConvexHttpClient {
-    mutation = mockMutation;
+    action = mockAction;
   },
 }));
 
@@ -44,7 +44,11 @@ describe("Stripe Webhook Route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv, STRIPE_WEBHOOK_SECRET: "whsec_test" };
+    process.env = {
+      ...originalEnv,
+      STRIPE_WEBHOOK_SECRET: "whsec_test",
+      CONVEX_WEBHOOK_TOKEN: "test_webhook_token",
+    };
   });
 
   afterEach(() => {
@@ -94,9 +98,10 @@ describe("Stripe Webhook Route", () => {
 
       expect(response.status).toBe(200);
       expect(mockSubscriptionsRetrieve).toHaveBeenCalledWith("sub_456");
-      expect(mockMutation).toHaveBeenCalledWith(
+      expect(mockAction).toHaveBeenCalledWith(
         expect.anything(), // api.subscriptions.upsertFromWebhook
         {
+          webhookToken: "test_webhook_token",
           clerkId: "user_abc123",
           stripeCustomerId: "cus_123",
           stripeSubscriptionId: "sub_456",
@@ -125,7 +130,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(mockMutation).not.toHaveBeenCalled();
+      expect(mockAction).not.toHaveBeenCalled();
     });
 
     it("logs error when clerkId missing from metadata", async () => {
@@ -149,7 +154,7 @@ describe("Stripe Webhook Route", () => {
 
       expect(response.status).toBe(200); // Still returns 200 to avoid Stripe retries
       expect(consoleSpy).toHaveBeenCalledWith("No clerkId in checkout session metadata");
-      expect(mockMutation).not.toHaveBeenCalled();
+      expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });
@@ -183,9 +188,10 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(mockMutation).toHaveBeenCalledWith(
+      expect(mockAction).toHaveBeenCalledWith(
         expect.anything(), // api.subscriptions.updateByStripeCustomer
         {
+          webhookToken: "test_webhook_token",
           stripeCustomerId: "cus_123",
           stripeSubscriptionId: "sub_456",
           status: "active",
@@ -223,9 +229,10 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(mockMutation).toHaveBeenCalledWith(
+      expect(mockAction).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
+          webhookToken: "test_webhook_token",
           cancelAtPeriodEnd: true,
           status: "active", // Still active until period ends
         }),
@@ -250,9 +257,10 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(mockMutation).toHaveBeenCalledWith(
+      expect(mockAction).toHaveBeenCalledWith(
         expect.anything(), // api.subscriptions.updateByStripeCustomer
         {
+          webhookToken: "test_webhook_token",
           stripeCustomerId: "cus_123",
           stripeSubscriptionId: "sub_456",
           status: "expired",
@@ -279,7 +287,7 @@ describe("Stripe Webhook Route", () => {
 
       expect(response.status).toBe(200);
       expect(consoleSpy).toHaveBeenCalledWith("Invoice payment succeeded");
-      expect(mockMutation).not.toHaveBeenCalled();
+      expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });
@@ -354,7 +362,7 @@ describe("Stripe Webhook Route", () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
-      mockMutation.mockRejectedValue(new Error("Database error"));
+      mockAction.mockRejectedValue(new Error("Database error"));
 
       const response = await POST(makeRequest());
 
@@ -380,7 +388,7 @@ describe("Stripe Webhook Route", () => {
 
       expect(response.status).toBe(200);
       expect(consoleSpy).toHaveBeenCalledWith("Unhandled event type: customer.created");
-      expect(mockMutation).not.toHaveBeenCalled();
+      expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
     });
