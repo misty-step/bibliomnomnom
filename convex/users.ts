@@ -71,6 +71,7 @@ export const createOrUpdateUser = mutation({
 });
 
 // Delete user from Clerk webhook (idempotent)
+// Also cleans up associated subscription to prevent orphaned records
 export const deleteUser = mutation({
   args: {
     clerkId: v.string(),
@@ -82,6 +83,16 @@ export const deleteUser = mutation({
       .unique();
 
     if (!user) return;
+
+    // Clean up subscription first (foreign key pattern)
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .unique();
+
+    if (subscription) {
+      await ctx.db.delete(subscription._id);
+    }
 
     await ctx.db.delete(user._id);
   },
