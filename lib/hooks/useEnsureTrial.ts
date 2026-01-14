@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "convex/react";
+import { useAuth } from "@clerk/nextjs";
 import { api } from "@/convex/_generated/api";
 
 /**
@@ -19,13 +20,26 @@ import { api } from "@/convex/_generated/api";
  *   - isLoading: true while checking subscription or creating trial
  */
 export function useEnsureTrial() {
+  const { userId } = useAuth();
   const mutationTriggered = useRef(false);
+  const lastUserId = useRef<string | null | undefined>(undefined);
 
   const subscription = useQuery(api.subscriptions.get);
   const ensureTrialExists = useMutation(api.subscriptions.ensureTrialExists);
 
+  // Reset trigger when user changes (logout/login with different account)
+  useEffect(() => {
+    if (lastUserId.current !== undefined && lastUserId.current !== userId) {
+      mutationTriggered.current = false;
+    }
+    lastUserId.current = userId;
+  }, [userId]);
+
   // Trigger mutation only once when we detect no subscription
   useEffect(() => {
+    // Skip if not authenticated
+    if (!userId) return;
+
     // Skip if still loading query
     if (subscription === undefined) return;
 
@@ -40,7 +54,7 @@ export function useEnsureTrial() {
 
     // Fire and forget - Convex query will update when mutation completes
     ensureTrialExists().catch(console.error);
-  }, [subscription, ensureTrialExists]);
+  }, [userId, subscription, ensureTrialExists]);
 
   // Loading until subscription is loaded and not null
   // Once mutation creates subscription, Convex will update query automatically
