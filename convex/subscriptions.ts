@@ -1,8 +1,25 @@
 import { v } from "convex/values";
-import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { requireAuth, getAuthOrNull } from "./auth";
 import { TRIAL_DAYS, TRIAL_DURATION_MS } from "@/lib/constants";
 import type { Doc, Id } from "./_generated/dataModel";
+
+/**
+ * Validates webhook token from environment variable.
+ * This prevents unauthorized calls to webhook handlers.
+ *
+ * @throws Error if token is missing or invalid
+ */
+function validateWebhookToken(providedToken: string): void {
+  const expectedToken = process.env.CONVEX_WEBHOOK_TOKEN;
+  if (!expectedToken) {
+    throw new Error("CONVEX_WEBHOOK_TOKEN not configured");
+  }
+  if (providedToken !== expectedToken) {
+    throw new Error("Invalid webhook token");
+  }
+}
 
 /**
  * Subscription status types for access control.
@@ -144,6 +161,12 @@ export const checkAccess = query({
  * Called from dashboard to auto-enroll existing users without subscriptions.
  *
  * Returns the subscription (existing or newly created trial).
+ *
+ * Race condition handling: If two requests arrive simultaneously, both might
+ * pass the existence check. We handle this by:
+ * 1. Attempting insert (may succeed or fail due to race)
+ * 2. On any error, re-query to find existing subscription
+ * 3. If duplicates exist, keep earliest and delete rest (de-duplication)
  */
 export const ensureTrialExists = mutation({
   args: {},
@@ -164,56 +187,142 @@ export const ensureTrialExists = mutation({
       };
     }
 
-    // Create new trial for existing user
+    // Attempt to create new trial
     const now = Date.now();
     const trialEnd = now + TRIAL_DURATION_MS;
 
-    const subscriptionId = await ctx.db.insert("subscriptions", {
-      userId,
-      status: "trialing",
-      currentPeriodEnd: trialEnd,
-      trialEndsAt: trialEnd,
-      cancelAtPeriodEnd: false,
-      createdAt: now,
-      updatedAt: now,
-    });
+    let insertError: unknown;
+    try {
+      const subscriptionId = await ctx.db.insert("subscriptions", {
+        userId,
+        status: "trialing",
+        currentPeriodEnd: trialEnd,
+        trialEndsAt: trialEnd,
+        cancelAtPeriodEnd: false,
+        createdAt: now,
+        updatedAt: now,
+      });
 
-    const subscription = await ctx.db.get(subscriptionId);
-    return {
-      ...subscription!,
-      hasAccess: true,
-      daysRemaining: TRIAL_DAYS,
-    };
+      const subscription = await ctx.db.get(subscriptionId);
+      return {
+        ...subscription!,
+        hasAccess: true,
+        daysRemaining: TRIAL_DAYS,
+      };
+    } catch (err) {
+      insertError = err;
+      // Fall through to de-duplication logic
+    }
+
+    // Race condition: another request may have inserted. Find and de-duplicate.
+    const matches = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    if (matches.length > 0) {
+      // Keep earliest subscription, delete duplicates
+      const sorted = matches.sort((a, b) => a._creationTime - b._creationTime);
+      const keeper = sorted[0]!;
+      const duplicates = sorted.slice(1);
+
+      for (const dupe of duplicates) {
+        await ctx.db.delete(dupe._id);
+      }
+
+      return {
+        ...keeper,
+        hasAccess: hasAccess(keeper),
+        daysRemaining: getDaysRemaining(keeper),
+      };
+    }
+
+    // No subscription found and insert failed - bubble error
+    if (insertError) {
+      throw insertError;
+    }
+
+    // Should not reach here, but TypeScript needs a return
+    throw new Error("Failed to ensure trial exists");
   },
 });
 
 // ============================================================================
-// Webhook Mutations (called from Next.js after Stripe signature verification)
+// Webhook Actions (secure entry points called from Next.js API routes)
+// ============================================================================
+
+/** Subscription data args shared by webhook handlers */
+const subscriptionDataArgs = {
+  stripeCustomerId: v.string(),
+  stripeSubscriptionId: v.optional(v.string()),
+  status: v.union(
+    v.literal("trialing"),
+    v.literal("active"),
+    v.literal("canceled"),
+    v.literal("past_due"),
+    v.literal("expired"),
+  ),
+  priceId: v.optional(v.string()),
+  currentPeriodEnd: v.optional(v.number()),
+  trialEndsAt: v.optional(v.number()),
+  cancelAtPeriodEnd: v.optional(v.boolean()),
+};
+
+/**
+ * Secure action: Create or update subscription for a user.
+ * Called from Next.js API route after Stripe signature verification.
+ *
+ * Security: Validates webhook token before processing. Token must match
+ * CONVEX_WEBHOOK_TOKEN environment variable.
+ */
+export const upsertFromWebhook = action({
+  args: {
+    webhookToken: v.string(),
+    clerkId: v.string(),
+    ...subscriptionDataArgs,
+  },
+  handler: async (ctx, args): Promise<Id<"subscriptions"> | null> => {
+    validateWebhookToken(args.webhookToken);
+
+    const { webhookToken: _, ...mutationArgs } = args;
+    return await ctx.runMutation(internal.subscriptions.upsertFromWebhookInternal, mutationArgs);
+  },
+});
+
+/**
+ * Secure action: Update subscription by Stripe customer ID.
+ * Called from Next.js API route after Stripe signature verification.
+ *
+ * Security: Validates webhook token before processing.
+ */
+export const updateByStripeCustomer = action({
+  args: {
+    webhookToken: v.string(),
+    ...subscriptionDataArgs,
+  },
+  handler: async (ctx, args): Promise<Id<"subscriptions"> | null> => {
+    validateWebhookToken(args.webhookToken);
+
+    const { webhookToken: _, ...mutationArgs } = args;
+    return await ctx.runMutation(
+      internal.subscriptions.updateByStripeCustomerInternal,
+      mutationArgs,
+    );
+  },
+});
+
+// ============================================================================
+// Internal Webhook Mutations (only callable from Convex actions)
 // ============================================================================
 
 /**
- * Create or update subscription for a user.
- * Called when a Stripe checkout session completes.
- *
- * Note: This mutation doesn't require auth because it's called from the
- * webhook handler after Stripe signature verification.
+ * Internal: Create or update subscription for a user.
+ * Only callable from upsertFromWebhook action after token validation.
  */
-export const upsertFromWebhook = mutation({
+export const upsertFromWebhookInternal = internalMutation({
   args: {
     clerkId: v.string(),
-    stripeCustomerId: v.string(),
-    stripeSubscriptionId: v.optional(v.string()),
-    status: v.union(
-      v.literal("trialing"),
-      v.literal("active"),
-      v.literal("canceled"),
-      v.literal("past_due"),
-      v.literal("expired"),
-    ),
-    priceId: v.optional(v.string()),
-    currentPeriodEnd: v.optional(v.number()),
-    trialEndsAt: v.optional(v.number()),
-    cancelAtPeriodEnd: v.optional(v.boolean()),
+    ...subscriptionDataArgs,
   },
   handler: async (ctx, args) => {
     // Find user by Clerk ID
@@ -229,14 +338,15 @@ export const upsertFromWebhook = mutation({
 
     const now = Date.now();
 
-    // Check for existing subscription
+    // Check for existing subscription (by userId, not stripeCustomerId)
+    // This ensures we update the internal trial subscription when user converts to paid
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .unique();
 
     if (existing) {
-      // Update existing subscription
+      // Update existing subscription (including internal trial → paid conversion)
       await ctx.db.patch(existing._id, {
         stripeCustomerId: args.stripeCustomerId,
         stripeSubscriptionId: args.stripeSubscriptionId ?? existing.stripeSubscriptionId,
@@ -267,25 +377,11 @@ export const upsertFromWebhook = mutation({
 });
 
 /**
- * Update subscription by Stripe customer ID.
- * Called when subscription is updated (e.g., renewal, cancellation).
+ * Internal: Update subscription by Stripe customer ID.
+ * Only callable from updateByStripeCustomer action after token validation.
  */
-export const updateByStripeCustomer = mutation({
-  args: {
-    stripeCustomerId: v.string(),
-    stripeSubscriptionId: v.optional(v.string()),
-    status: v.union(
-      v.literal("trialing"),
-      v.literal("active"),
-      v.literal("canceled"),
-      v.literal("past_due"),
-      v.literal("expired"),
-    ),
-    priceId: v.optional(v.string()),
-    currentPeriodEnd: v.optional(v.number()),
-    trialEndsAt: v.optional(v.number()),
-    cancelAtPeriodEnd: v.optional(v.boolean()),
-  },
+export const updateByStripeCustomerInternal = internalMutation({
+  args: subscriptionDataArgs,
   handler: async (ctx, args) => {
     const subscription = await ctx.db
       .query("subscriptions")

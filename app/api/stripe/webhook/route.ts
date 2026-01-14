@@ -8,6 +8,18 @@ import type Stripe from "stripe";
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 /**
+ * Get webhook token for secure Convex action calls.
+ * Must match CONVEX_WEBHOOK_TOKEN set in Convex dashboard.
+ */
+function getWebhookToken(): string {
+  const token = process.env.CONVEX_WEBHOOK_TOKEN;
+  if (!token) {
+    throw new Error("CONVEX_WEBHOOK_TOKEN environment variable is not set");
+  }
+  return token;
+}
+
+/**
  * Handle checkout.session.completed event.
  * This is fired when a customer completes checkout with a trial.
  */
@@ -18,8 +30,14 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
-  const customerId = session.customer as string;
-  const subscriptionId = session.subscription as string;
+  // Type-safe extraction of Stripe IDs (can be string, object, or null)
+  const customerId = typeof session.customer === "string" ? session.customer : null;
+  const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
+
+  if (!customerId || !subscriptionId) {
+    console.error("Missing customer or subscription ID in checkout session");
+    return;
+  }
 
   // Retrieve the subscription to get trial details
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
@@ -28,7 +46,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const subscriptionItem = subscription.items.data[0];
   const currentPeriodEnd = subscriptionItem?.current_period_end;
 
-  await convex.mutation(api.subscriptions.upsertFromWebhook, {
+  await convex.action(api.subscriptions.upsertFromWebhook, {
+    webhookToken: getWebhookToken(),
     clerkId,
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscriptionId,
@@ -46,13 +65,19 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
  * Handle subscription updates (renewals, cancellations, etc.).
  */
 async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
-  const customerId = subscription.customer as string;
+  // Type-safe extraction (customer can be string or object)
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+  if (!customerId) {
+    console.error("Missing customer ID in subscription update");
+    return;
+  }
 
   // In newer Stripe API versions, billing period is on the item
   const subscriptionItem = subscription.items.data[0];
   const currentPeriodEnd = subscriptionItem?.current_period_end;
 
-  await convex.mutation(api.subscriptions.updateByStripeCustomer, {
+  await convex.action(api.subscriptions.updateByStripeCustomer, {
+    webhookToken: getWebhookToken(),
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     status: mapStripeStatus(subscription.status),
@@ -69,9 +94,15 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
  * Handle subscription deletion.
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
-  const customerId = subscription.customer as string;
+  // Type-safe extraction
+  const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
+  if (!customerId) {
+    console.error("Missing customer ID in subscription deletion");
+    return;
+  }
 
-  await convex.mutation(api.subscriptions.updateByStripeCustomer, {
+  await convex.action(api.subscriptions.updateByStripeCustomer, {
+    webhookToken: getWebhookToken(),
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     status: "expired",
@@ -88,6 +119,13 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * Verifies the webhook signature before processing.
  */
 export async function POST(request: Request) {
+  // Validate required environment variables upfront
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecret) {
+    console.error("Missing STRIPE_WEBHOOK_SECRET environment variable");
+    return NextResponse.json({ error: "Webhook not configured" }, { status: 500 });
+  }
+
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
 
@@ -99,7 +137,7 @@ export async function POST(request: Request) {
   let event: Stripe.Event;
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, process.env.STRIPE_WEBHOOK_SECRET!);
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature";
     console.error("Webhook signature verification failed:", message);
