@@ -5,22 +5,27 @@ import { api } from "@/convex/_generated/api";
 import { stripe, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
 /**
  * POST /api/stripe/portal
  *
  * Creates a Stripe Customer Portal session for managing subscriptions.
  * Allows users to update payment methods, cancel, or change plans.
  */
-export const POST = withObservability(async () => {
-  const { userId: clerkId } = await auth();
+export const POST = withObservability(async (request: Request) => {
+  const { userId: clerkId, getToken } = await auth();
 
   if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
+    // Create request-scoped Convex client with auth token
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    const token = await getToken({ template: "convex" });
+    if (token) {
+      convex.setAuth(token);
+    }
+
     // Get user's subscription to find Stripe customer ID
     const subscription = await convex.query(api.subscriptions.get);
 

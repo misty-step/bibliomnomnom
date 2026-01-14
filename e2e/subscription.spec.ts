@@ -70,12 +70,12 @@ test.describe("Pricing Page", () => {
     await expect(page.getByText(/can i cancel anytime/i)).toBeVisible();
   });
 
-  test("trial CTA links to pricing (for unauthenticated users)", async ({ page }) => {
+  test("trial CTA links to auth (for unauthenticated users)", async ({ page }) => {
     const ctaLink = page.getByRole("link", { name: /start.*14.*day.*free.*trial/i });
-    // For unauthenticated users, this should redirect through auth
-    // The href should contain /sign-in or /sign-up
     const href = await ctaLink.getAttribute("href");
+    // For unauthenticated users, this should redirect through auth
     expect(href).toBeTruthy();
+    expect(href!).toMatch(/\/sign-(in|up)\b/);
   });
 
   test("shows annual savings badge", async ({ page }) => {

@@ -1,16 +1,21 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Hoist mock functions
-const { mockQuery, mockCreate, mockAuth, mockCurrentUser } = vi.hoisted(() => ({
-  mockQuery: vi.fn(),
-  mockCreate: vi.fn(),
-  mockAuth: vi.fn(),
-  mockCurrentUser: vi.fn(),
-}));
+const { mockQuery, mockCreate, mockAuth, mockCurrentUser, mockSetAuth, mockGetToken } = vi.hoisted(
+  () => ({
+    mockQuery: vi.fn(),
+    mockCreate: vi.fn(),
+    mockAuth: vi.fn(),
+    mockCurrentUser: vi.fn(),
+    mockSetAuth: vi.fn(),
+    mockGetToken: vi.fn(),
+  }),
+);
 
 vi.mock("convex/browser", () => ({
   ConvexHttpClient: class MockConvexHttpClient {
     query = mockQuery;
+    setAuth = mockSetAuth;
   },
 }));
 
@@ -62,7 +67,8 @@ describe("Stripe Checkout Route", () => {
 
   describe("successful checkout", () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: "clerk_user_123" });
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ emailAddress: "user@example.com" }],
       });
@@ -161,7 +167,7 @@ describe("Stripe Checkout Route", () => {
 
   describe("authentication errors", () => {
     it("returns 401 when not authenticated", async () => {
-      mockAuth.mockResolvedValue({ userId: null });
+      mockAuth.mockResolvedValue({ userId: null, getToken: mockGetToken });
 
       const response = await POST(makeRequest());
 
@@ -171,7 +177,8 @@ describe("Stripe Checkout Route", () => {
     });
 
     it("returns 400 when user has no email", async () => {
-      mockAuth.mockResolvedValue({ userId: "clerk_user_123" });
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [],
       });
@@ -183,7 +190,8 @@ describe("Stripe Checkout Route", () => {
     });
 
     it("returns 400 when user object is null", async () => {
-      mockAuth.mockResolvedValue({ userId: "clerk_user_123" });
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
       mockCurrentUser.mockResolvedValue(null);
 
       const response = await POST(makeRequest());
@@ -195,7 +203,8 @@ describe("Stripe Checkout Route", () => {
 
   describe("request validation", () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: "clerk_user_123" });
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ emailAddress: "user@example.com" }],
       });
@@ -217,7 +226,8 @@ describe("Stripe Checkout Route", () => {
 
   describe("Stripe errors", () => {
     beforeEach(() => {
-      mockAuth.mockResolvedValue({ userId: "clerk_user_123" });
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
       mockCurrentUser.mockResolvedValue({
         emailAddresses: [{ emailAddress: "user@example.com" }],
       });

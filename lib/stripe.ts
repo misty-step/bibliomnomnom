@@ -45,10 +45,25 @@ export const stripe = {
 /**
  * Price IDs from environment variables.
  * Set these in Stripe dashboard after creating the product.
+ *
+ * Uses getters to validate at runtime rather than module load time,
+ * ensuring clear error messages when env vars are missing.
  */
+function getPriceId(key: string): string {
+  const value = process.env[key];
+  if (!value) {
+    throw new Error(`${key} environment variable is not set`);
+  }
+  return value;
+}
+
 export const PRICES = {
-  monthly: process.env.STRIPE_PRICE_MONTHLY!,
-  annual: process.env.STRIPE_PRICE_ANNUAL!,
+  get monthly() {
+    return getPriceId("STRIPE_PRICE_MONTHLY");
+  },
+  get annual() {
+    return getPriceId("STRIPE_PRICE_ANNUAL");
+  },
 } as const;
 
 // Re-export from shared constants for backwards compatibility

@@ -5,8 +5,6 @@ import { api, internal } from "@/convex/_generated/api";
 import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
 /**
  * POST /api/stripe/checkout
  *
@@ -17,7 +15,7 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
  * - priceType: "monthly" | "annual"
  */
 export const POST = withObservability(async (request: Request) => {
-  const { userId: clerkId } = await auth();
+  const { userId: clerkId, getToken } = await auth();
 
   if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -49,6 +47,13 @@ export const POST = withObservability(async (request: Request) => {
   }
 
   try {
+    // Create request-scoped Convex client with auth token
+    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    const token = await getToken({ template: "convex" });
+    if (token) {
+      convex.setAuth(token);
+    }
+
     // Check if user already has a Stripe customer
     const existingSubscription = await convex.query(api.subscriptions.get);
     let customerId: string | undefined;

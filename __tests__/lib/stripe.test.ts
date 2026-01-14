@@ -21,9 +21,34 @@ describe("stripe utilities", () => {
   });
 
   describe("PRICES", () => {
-    it("has monthly and annual price keys", () => {
-      expect(PRICES).toHaveProperty("monthly");
-      expect(PRICES).toHaveProperty("annual");
+    const originalEnv = process.env;
+
+    beforeEach(() => {
+      process.env = { ...originalEnv };
+    });
+
+    afterEach(() => {
+      process.env = originalEnv;
+    });
+
+    it("returns price IDs when env vars are set", () => {
+      process.env.STRIPE_PRICE_MONTHLY = "price_monthly_test";
+      process.env.STRIPE_PRICE_ANNUAL = "price_annual_test";
+
+      expect(PRICES.monthly).toBe("price_monthly_test");
+      expect(PRICES.annual).toBe("price_annual_test");
+    });
+
+    it("throws when STRIPE_PRICE_MONTHLY is not set", () => {
+      delete process.env.STRIPE_PRICE_MONTHLY;
+
+      expect(() => PRICES.monthly).toThrow("STRIPE_PRICE_MONTHLY environment variable is not set");
+    });
+
+    it("throws when STRIPE_PRICE_ANNUAL is not set", () => {
+      delete process.env.STRIPE_PRICE_ANNUAL;
+
+      expect(() => PRICES.annual).toThrow("STRIPE_PRICE_ANNUAL environment variable is not set");
     });
   });
 

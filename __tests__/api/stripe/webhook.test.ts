@@ -55,9 +55,12 @@ describe("stripeTimestampToMs", () => {
   });
 
   it("handles current-ish timestamps", () => {
-    const nowSeconds = Math.floor(Date.now() / 1000);
+    // Capture single timestamp to avoid second-boundary flakiness
+    const nowMs = Date.now();
+    const nowSeconds = Math.floor(nowMs / 1000);
     const result = stripeTimestampToMs(nowSeconds);
-    expect(result).toBeGreaterThan(Date.now() - 1000);
-    expect(result).toBeLessThanOrEqual(Date.now());
+    // Result is floored to nearest second, so should be within [nowMs - 999, nowMs]
+    expect(result).toBeGreaterThanOrEqual(nowMs - 999);
+    expect(result).toBeLessThanOrEqual(nowMs);
   });
 });
