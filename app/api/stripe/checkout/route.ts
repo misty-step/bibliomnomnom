@@ -9,7 +9,7 @@ import { withObservability } from "@/lib/api/withObservability";
  * POST /api/stripe/checkout
  *
  * Creates a Stripe Checkout session for subscription signup.
- * Includes a 14-day free trial.
+ * Trial period is only granted if user hasn't had a trial before.
  *
  * Request body:
  * - priceType: "monthly" | "annual"
@@ -56,12 +56,24 @@ export const POST = withObservability(async (request: Request) => {
     }
     convex.setAuth(token);
 
-    // Check if user already has a Stripe customer
+    // Check existing subscription for customer ID and trial eligibility
     const existingSubscription = await convex.query(api.subscriptions.get);
-    let customerId: string | undefined;
+    const customerId = existingSubscription?.stripeCustomerId;
 
-    if (existingSubscription?.stripeCustomerId) {
-      customerId = existingSubscription.stripeCustomerId;
+    // Prevent double-dipping: only grant trial if user hasn't had one
+    // trialEndsAt is set for both internal trials and Stripe trials
+    const hasHadTrial = Boolean(existingSubscription?.trialEndsAt);
+
+    // Build subscription_data conditionally
+    const subscriptionData: {
+      metadata: { clerkId: string };
+      trial_period_days?: number;
+    } = {
+      metadata: { clerkId },
+    };
+
+    if (!hasHadTrial) {
+      subscriptionData.trial_period_days = TRIAL_DAYS;
     }
 
     // Create checkout session
@@ -76,12 +88,7 @@ export const POST = withObservability(async (request: Request) => {
           quantity: 1,
         },
       ],
-      subscription_data: {
-        trial_period_days: TRIAL_DAYS,
-        metadata: {
-          clerkId,
-        },
-      },
+      subscription_data: subscriptionData,
       success_url: `${getBaseUrl()}/library?checkout=success`,
       cancel_url: `${getBaseUrl()}/pricing?checkout=canceled`,
       metadata: {
