@@ -6,8 +6,23 @@ import { TRIAL_DAYS, TRIAL_DURATION_MS } from "@/lib/constants";
 import type { Doc, Id } from "./_generated/dataModel";
 
 /**
+ * Timing-safe string comparison to prevent timing attacks.
+ * Compares all characters even if mismatch is found early.
+ */
+function timingSafeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
  * Validates webhook token from environment variable.
  * This prevents unauthorized calls to webhook handlers.
+ *
+ * Uses timing-safe comparison to prevent timing attacks.
  *
  * @throws Error if token is missing or invalid
  */
@@ -16,7 +31,8 @@ function validateWebhookToken(providedToken: string): void {
   if (!expectedToken) {
     throw new Error("CONVEX_WEBHOOK_TOKEN not configured");
   }
-  if (providedToken !== expectedToken) {
+
+  if (!timingSafeCompare(providedToken, expectedToken)) {
     throw new Error("Invalid webhook token");
   }
 }
@@ -332,8 +348,9 @@ export const upsertFromWebhookInternal = internalMutation({
       .unique();
 
     if (!user) {
-      console.error(`No user found for Clerk ID: ${args.clerkId}`);
-      return null;
+      // Throw error to trigger Stripe webhook retry. This handles the race condition
+      // where Stripe checkout completes before Clerk user sync finishes.
+      throw new Error(`User not found for Clerk ID: ${args.clerkId}, will retry`);
     }
 
     const now = Date.now();
