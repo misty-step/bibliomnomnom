@@ -44,8 +44,11 @@ test.describe("Pricing Page", () => {
     await expect(page.getByText("$129")).toBeVisible();
   });
 
-  test("shows 14-day free trial CTA", async ({ page }) => {
-    await expect(page.getByRole("link", { name: /start.*14.*day.*free.*trial/i })).toBeVisible();
+  test("shows trial CTA for unauthenticated users", async ({ page }) => {
+    // Unauthenticated users see "Get Started" CTA with trial messaging below
+    await expect(page.getByRole("link", { name: "Get Started", exact: true })).toBeVisible();
+    // Verify the trial messaging is shown (no credit card required, full access for 14 days)
+    await expect(page.getByText(/no credit card required.*14 days/i)).toBeVisible();
   });
 
   test("displays feature list", async ({ page }) => {
@@ -70,8 +73,8 @@ test.describe("Pricing Page", () => {
     await expect(page.getByText(/can i cancel anytime/i)).toBeVisible();
   });
 
-  test("trial CTA links to auth (for unauthenticated users)", async ({ page }) => {
-    const ctaLink = page.getByRole("link", { name: /start.*14.*day.*free.*trial/i });
+  test("CTA links to auth (for unauthenticated users)", async ({ page }) => {
+    const ctaLink = page.getByRole("link", { name: "Get Started", exact: true });
     const href = await ctaLink.getAttribute("href");
     // For unauthenticated users, this should redirect through auth
     expect(href).toBeTruthy();
