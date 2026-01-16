@@ -54,3 +54,4 @@ storybook-static
 # AI tooling output
 thinktank_*/
 thinktank.log
+.env.production
