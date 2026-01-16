@@ -58,7 +58,7 @@ describe("TrialBanner", () => {
 
       expect(screen.getByText("Welcome!")).toBeInTheDocument();
       expect(screen.getByText(/Start your 14-day free trial/)).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: /Start Free Trial/i })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: /Get Started/i })).toHaveAttribute(
         "href",
         "/pricing",
       );
@@ -127,7 +127,7 @@ describe("TrialBanner", () => {
       expect(screen.getByRole("button", { name: /dismiss/i })).toBeInTheDocument();
     });
 
-    it("shows Subscribe Now link", () => {
+    it("shows Become a Member link", () => {
       useQueryMock.mockReturnValue({
         hasAccess: true,
         status: "trialing",
@@ -136,7 +136,7 @@ describe("TrialBanner", () => {
 
       render(<TrialBanner />);
 
-      expect(screen.getByRole("link", { name: /Subscribe Now/i })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: /Become a Member/i })).toHaveAttribute(
         "href",
         "/pricing",
       );

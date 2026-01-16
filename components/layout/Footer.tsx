@@ -1,6 +1,11 @@
+"use client";
+
 import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
 
 export function Footer() {
+  const { isSignedIn, isLoaded } = useAuth();
+
   return (
     <footer className="border-t border-line-ghost/50 py-12">
       <div className="mx-auto max-w-5xl px-8 text-center">
@@ -11,6 +16,18 @@ export function Footer() {
           >
             Pricing
           </Link>
+          {/* Show "Get Started Free" for unauthenticated users */}
+          {isLoaded && !isSignedIn && (
+            <>
+              <span className="text-text-inkSubtle">—</span>
+              <Link
+                href="/sign-up"
+                className="font-serif text-sm tracking-wide text-text-inkMuted transition-colors hover:text-text-ink"
+              >
+                Get Started Free
+              </Link>
+            </>
+          )}
           <span className="text-text-inkSubtle">—</span>
           <a
             href="mailto:hello@mistystep.io"

@@ -50,7 +50,7 @@ export function TrialBanner() {
               href="/pricing"
               className="shrink-0 rounded-md bg-text-ink px-4 py-1.5 text-sm font-medium text-canvas-bone transition-colors hover:bg-text-inkMuted"
             >
-              Start Free Trial
+              Get Started
             </Link>
             <button
               onClick={() => setDismissed(true)}
@@ -90,7 +90,7 @@ export function TrialBanner() {
                   : "bg-text-ink text-canvas-bone hover:bg-text-inkMuted"
               }`}
             >
-              Subscribe Now
+              {isUrgent ? "Keep Your Library" : "Become a Member"}
             </Link>
             {!isUrgent && (
               <button
@@ -124,7 +124,7 @@ export function TrialBanner() {
             href="/pricing"
             className="shrink-0 rounded-md bg-status-error px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-status-error/90"
           >
-            Subscribe Now
+            Restore Access
           </Link>
         </div>
       </div>
