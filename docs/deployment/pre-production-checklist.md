@@ -12,6 +12,27 @@ A comprehensive checklist before deploying bibliomnomnom to production.
 ./scripts/validate-env.sh --prod-only
 ```
 
+## Local Environment Files
+
+| File              | Purpose            | Contains                               |
+| ----------------- | ------------------ | -------------------------------------- |
+| `.env.local`      | Local development  | Test/dev keys (`sk_test_`, `pk_test_`) |
+| `.env.production` | Local prod testing | Live keys (`sk_live_`, `pk_live_`)     |
+
+**Rules:**
+
+- `.env.local` is loaded by default during `pnpm dev`
+- `.env.production` must be explicitly sourced: `source .env.production`
+- Both are gitignored - never commit secrets
+- Never use `.env.production.local` - Vercel pulls can corrupt values with `\n`
+
+**To sync production vars from Vercel:**
+
+```bash
+npx vercel env pull .env.production --environment production --yes
+# Then manually verify no trailing \n in values!
+```
+
 ## Manual Checklist
 
 ### 1. Environment Variables
