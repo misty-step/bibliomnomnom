@@ -7,11 +7,11 @@
 
 ## Problem Statement
 
-User (phrazzld@pm.me) completed Stripe checkout and paid for a monthly subscription. The UI displayed "14 days left in your free trial" instead of recognizing the active paid subscription.
+User completed Stripe checkout and paid for a monthly subscription. The UI displayed "14 days left in your free trial" instead of recognizing the active paid subscription.
 
 ## User Context
 
-- **Logged in as**: phrazzld@pm.me (confirmed via screenshot)
+- **Logged in as**: [REDACTED] (confirmed via screenshot)
 - **URL**: https://www.bibliomnomnom.com/library
 - **Expected**: No trial banner (active subscription)
 - **Actual**: Banner shows "14 days left in your free trial"
@@ -43,7 +43,7 @@ The `CONVEX_WEBHOOK_TOKEN` environment variable was:
 The `CONVEX_WEBHOOK_TOKEN` on Vercel was stored as:
 
 ```
-f36a732710cfe0f114f6fe93fa4f9fb4226e69a338f3fb0a7ac57f59e5441650\n
+<token-value>\n
 ```
 
 The literal `\n` at the end would cause token mismatch even after fixing Convex.
@@ -54,14 +54,14 @@ The literal `\n` at the end would cause token mismatch even after fixing Convex.
 
 **Production Convex** (doting-spider-972):
 
-- 1 user: `jn7c3qeb04xmrq33yjgbqwrfbx7wjpye` (phrazzld@pm.me, clerkId: `user_36LJMX4KAFMcPgXwptu6l9XyS7h`)
+- 1 user: `[REDACTED-convex-id]` ([REDACTED-email], clerkId: `[REDACTED-clerk-id]`)
 - 1 subscription: `status: "trialing"`, **NO stripeCustomerId, NO stripeSubscriptionId**
 
 **Stripe** (live):
 
-- Subscription `sub_1SqcfmDIyumDtWyUiY4o0WIy` with `status: "active"`
-- Customer `cus_ToFArcmOE62mvU`
-- metadata.clerkId: `user_36LJMX4KAFMcPgXwptu6l9XyS7h` (matches Convex user)
+- Subscription `[REDACTED-stripe-sub-id]` with `status: "active"`
+- Customer `[REDACTED-stripe-cus-id]`
+- metadata.clerkId: `[REDACTED-clerk-id]` (matches Convex user)
 
 ---
 
@@ -79,26 +79,26 @@ The literal `\n` at the end would cause token mismatch even after fixing Convex.
 2. **CONVEX_WEBHOOK_TOKEN on Convex**: Set via CLI
 
    ```bash
-   npx convex env set --prod CONVEX_WEBHOOK_TOKEN "f36a732710cfe0f114f6fe93fa4f9fb4226e69a338f3fb0a7ac57f59e5441650"
+   npx convex env set --prod CONVEX_WEBHOOK_TOKEN "<token-value>"
    ```
 
 3. **CONVEX_WEBHOOK_TOKEN on Vercel**: Removed and re-added without trailing `\n`
 
    ```bash
    npx vercel env rm CONVEX_WEBHOOK_TOKEN production -y
-   printf '%s' 'f36a732710cfe0f114f6fe93fa4f9fb4226e69a338f3fb0a7ac57f59e5441650' | npx vercel env add CONVEX_WEBHOOK_TOKEN production
+   printf '%s' '<token-value>' | npx vercel env add CONVEX_WEBHOOK_TOKEN production
    ```
 
 4. **User subscription data**: Synced via Convex action
    ```bash
    npx convex run --prod subscriptions:upsertFromWebhook '{
-     "webhookToken": "...",
-     "clerkId": "user_36LJMX4KAFMcPgXwptu6l9XyS7h",
-     "stripeCustomerId": "cus_ToFArcmOE62mvU",
-     "stripeSubscriptionId": "sub_1SqcfmDIyumDtWyUiY4o0WIy",
+     "webhookToken": "<token>",
+     "clerkId": "<clerk-id>",
+     "stripeCustomerId": "<stripe-cus-id>",
+     "stripeSubscriptionId": "<stripe-sub-id>",
      "status": "active",
-     "priceId": "price_1SqFF5DIyumDtWyUaTrI4RTG",
-     "currentPeriodEnd": 1771346904000,
+     "priceId": "<price-id>",
+     "currentPeriodEnd": <timestamp>,
      "cancelAtPeriodEnd": false
    }'
    ```

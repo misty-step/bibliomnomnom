@@ -36,7 +36,7 @@ Repository pattern for database operations. Enables testing with in-memory imple
 
 ## Data Flow
 
-```
+```text
 File Upload
     │
     ▼

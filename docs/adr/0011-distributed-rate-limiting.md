@@ -31,7 +31,7 @@ The application needs rate limiting for sensitive endpoints (Stripe checkout, im
 
 Vercel serverless functions are ephemeral. Each request may hit a different instance:
 
-```
+```text
 Request 1 → Instance A → Map has 1 entry
 Request 2 → Instance B → Map is empty → Bypass limit!
 ```

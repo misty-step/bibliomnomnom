@@ -103,11 +103,13 @@ check_whitespace() {
 }
 
 # Validate Stripe key format
+# Args: var_name, expected_prefix, [value] (optional, uses indirect expansion if not provided)
 # Returns 0 if valid, 1 if invalid
+# Appends to format_errors array on failure
 check_stripe_key_format() {
   local var_name=$1
-  local value="${!var_name}"
   local expected_prefix=$2  # e.g., "sk" or "pk" or "whsec" or "price"
+  local value="${3:-${!var_name}}"  # Use 3rd arg if provided, else indirect expansion
 
   if [[ -z "$value" ]]; then
     return 0  # Missing handled elsewhere
@@ -174,9 +176,7 @@ check_local_env() {
         STRIPE_PRICE_*)
           check_stripe_key_format "$var" "price"
           ;;
-        STRIPE_PUBLISHABLE_KEY)
-          check_stripe_key_format "$var" "pk"
-          ;;
+        # Note: STRIPE_PUBLISHABLE_KEY is in RECOMMENDED_VARS, not STRIPE_VARS
       esac
     fi
   done
@@ -269,7 +269,9 @@ check_convex_prod_env() {
   local prod_format_errors=()
 
   for var in "${CONVEX_PROD_REQUIRED[@]}"; do
-    local value=$(echo "$prod_env" | grep "^$var=" | cut -d= -f2-)
+    # Separate declaration and assignment per ShellCheck SC2155
+    local value
+    value=$(echo "$prod_env" | grep "^$var=" | cut -d= -f2-)
 
     # Strip surrounding quotes (convex env list may quote values)
     value="${value%\"}"
@@ -285,37 +287,37 @@ check_convex_prod_env() {
         prod_format_errors+=("$var has trailing whitespace or newline")
       fi
 
-      # Check format based on var name (allow underscores in suffix)
+      # Use shared format validation, passing value directly
+      # Temporarily use prod_format_errors as format_errors for the function
+      local old_errors=("${format_errors[@]}")
+      format_errors=()
+
       case "$var" in
         STRIPE_SECRET_KEY)
-          if ! [[ "$value" =~ ^sk_(test|live)_[A-Za-z0-9_]+$ ]]; then
-            prod_format_errors+=("$var has invalid format (expected: sk_test_... or sk_live_...)")
-          fi
-          # Warn if test key in production
+          check_stripe_key_format "$var" "sk" "$value"
+          # Additional prod check: warn if test key
           if [[ "$value" =~ ^sk_test_ ]]; then
-            prod_format_errors+=("$var is a TEST key - use sk_live_ for production")
+            format_errors+=("$var is a TEST key - use sk_live_ for production")
           fi
           ;;
         STRIPE_WEBHOOK_SECRET)
-          if ! [[ "$value" =~ ^whsec_[A-Za-z0-9_]+$ ]]; then
-            prod_format_errors+=("$var has invalid format (expected: whsec_...)")
-          fi
+          check_stripe_key_format "$var" "whsec" "$value"
           ;;
         STRIPE_PRICE_*)
-          if ! [[ "$value" =~ ^price_[A-Za-z0-9_]+$ ]]; then
-            prod_format_errors+=("$var has invalid format (expected: price_...)")
-          fi
+          check_stripe_key_format "$var" "price" "$value"
           ;;
         STRIPE_PUBLISHABLE_KEY)
-          if ! [[ "$value" =~ ^pk_(test|live)_[A-Za-z0-9_]+$ ]]; then
-            prod_format_errors+=("$var has invalid format (expected: pk_test_... or pk_live_...)")
-          fi
-          # Warn if test key in production
+          check_stripe_key_format "$var" "pk" "$value"
+          # Additional prod check: warn if test key
           if [[ "$value" =~ ^pk_test_ ]]; then
-            prod_format_errors+=("$var is a TEST key - use pk_live_ for production")
+            format_errors+=("$var is a TEST key - use pk_live_ for production")
           fi
           ;;
       esac
+
+      # Move any new errors to prod_format_errors
+      prod_format_errors+=("${format_errors[@]}")
+      format_errors=("${old_errors[@]}")
     fi
   done
 
