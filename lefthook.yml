@@ -35,9 +35,15 @@ pre-push:
   parallel: true
   commands:
     env-check:
+      # Validates local env vars (presence check)
       run: ./scripts/validate-env.sh
 
     env-check-prod:
+      # Validates production env vars including:
+      # - Presence of required vars
+      # - Format validation (Stripe key patterns)
+      # - Trailing whitespace detection
+      # - Parity warning for CONVEX_WEBHOOK_TOKEN
       run: ./scripts/validate-env.sh --prod-only
       skip:
         - merge
