@@ -38,18 +38,6 @@ if [[ -f .env.local ]]; then
   set +a
 fi
 
-# Load .env.production.local for prod deployment info
-if [[ -f .env.production.local ]]; then
-  # Try CONVEX_PROD_DEPLOYMENT first, then fall back to CONVEX_DEPLOYMENT
-  prod_deploy=$(grep "^CONVEX_PROD_DEPLOYMENT=" .env.production.local 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" || true)
-  if [[ -z "$prod_deploy" ]]; then
-    prod_deploy=$(grep "^CONVEX_DEPLOYMENT=" .env.production.local 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" || true)
-  fi
-  if [[ -n "$prod_deploy" ]] && [[ "$prod_deploy" == prod:* ]]; then
-    export CONVEX_PROD_DEPLOYMENT="$prod_deploy"
-  fi
-fi
-
 # Critical env vars required for the app to function
 REQUIRED_VARS=(
   "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY"
@@ -85,6 +73,78 @@ CONVEX_PROD_REQUIRED=(
 missing_required=()
 missing_stripe=()
 missing_recommended=()
+format_errors=()
+
+# Check for trailing whitespace or newlines in a variable
+# Returns 0 if clean, 1 if has issues
+check_whitespace() {
+  local var_name=$1
+  local value="${!var_name}"
+
+  # Check for trailing whitespace (space, tab, newline)
+  if [[ "$value" =~ [[:space:]]$ ]]; then
+    format_errors+=("$var_name has trailing whitespace")
+    return 1
+  fi
+
+  # Check for literal \n sequence (sometimes gets stored this way)
+  if [[ "$value" == *'\n'* ]] || [[ "$value" == *$'\n'* ]]; then
+    format_errors+=("$var_name contains newline character")
+    return 1
+  fi
+
+  # Check for empty value (var set but no content)
+  if [[ -z "$value" ]] || [[ "$value" == '""' ]] || [[ "$value" == "''" ]]; then
+    format_errors+=("$var_name is empty")
+    return 1
+  fi
+
+  return 0
+}
+
+# Validate Stripe key format
+# Args: var_name, expected_prefix, [value] (optional, uses indirect expansion if not provided)
+# Returns 0 if valid, 1 if invalid
+# Appends to format_errors array on failure
+check_stripe_key_format() {
+  local var_name=$1
+  local expected_prefix=$2  # e.g., "sk" or "pk" or "whsec" or "price"
+  local value="${3:-${!var_name}}"  # Use 3rd arg if provided, else indirect expansion
+
+  if [[ -z "$value" ]]; then
+    return 0  # Missing handled elsewhere
+  fi
+
+  case "$expected_prefix" in
+    sk)
+      # Allow underscores in suffix (some Stripe keys have them)
+      if ! [[ "$value" =~ ^sk_(test|live)_[A-Za-z0-9_]+$ ]]; then
+        format_errors+=("$var_name has invalid format (expected: sk_test_... or sk_live_...)")
+        return 1
+      fi
+      ;;
+    pk)
+      if ! [[ "$value" =~ ^pk_(test|live)_[A-Za-z0-9_]+$ ]]; then
+        format_errors+=("$var_name has invalid format (expected: pk_test_... or pk_live_...)")
+        return 1
+      fi
+      ;;
+    whsec)
+      if ! [[ "$value" =~ ^whsec_[A-Za-z0-9_]+$ ]]; then
+        format_errors+=("$var_name has invalid format (expected: whsec_...)")
+        return 1
+      fi
+      ;;
+    price)
+      if ! [[ "$value" =~ ^price_[A-Za-z0-9_]+$ ]]; then
+        format_errors+=("$var_name has invalid format (expected: price_...)")
+        return 1
+      fi
+      ;;
+  esac
+
+  return 0
+}
 
 check_local_env() {
   echo -e "${CYAN}Checking local environment variables...${NC}"
@@ -94,13 +154,30 @@ check_local_env() {
   for var in "${REQUIRED_VARS[@]}"; do
     if [[ -z "${!var}" ]]; then
       missing_required+=("$var")
+    else
+      check_whitespace "$var"
     fi
   done
 
-  # Check Stripe vars
+  # Check Stripe vars with format validation
   for var in "${STRIPE_VARS[@]}"; do
     if [[ -z "${!var}" ]]; then
       missing_stripe+=("$var")
+    else
+      check_whitespace "$var"
+      # Validate format based on var name
+      case "$var" in
+        STRIPE_SECRET_KEY)
+          check_stripe_key_format "$var" "sk"
+          ;;
+        STRIPE_WEBHOOK_SECRET)
+          check_stripe_key_format "$var" "whsec"
+          ;;
+        STRIPE_PRICE_*)
+          check_stripe_key_format "$var" "price"
+          ;;
+        # Note: STRIPE_PUBLISHABLE_KEY is in RECOMMENDED_VARS, not STRIPE_VARS
+      esac
     fi
   done
 
@@ -108,6 +185,12 @@ check_local_env() {
   for var in "${RECOMMENDED_VARS[@]}"; do
     if [[ -z "${!var}" ]]; then
       missing_recommended+=("$var")
+    else
+      check_whitespace "$var"
+      # Format check for publishable key
+      if [[ "$var" == "STRIPE_PUBLISHABLE_KEY" ]]; then
+        check_stripe_key_format "$var" "pk"
+      fi
     fi
   done
 
@@ -142,6 +225,18 @@ check_local_env() {
     echo -e "${YELLOW}  The app will work but some features may be limited.${NC}"
   fi
 
+  # Report format errors
+  if [[ ${#format_errors[@]} -gt 0 ]]; then
+    echo -e "${RED}  Environment variable format errors:${NC}"
+    for err in "${format_errors[@]}"; do
+      echo -e "    ${RED}- $err${NC}"
+    done
+    echo ""
+    echo -e "${YELLOW}  Fix: Use 'printf \"%s\" \"value\"' instead of 'echo' when setting env vars${NC}"
+    echo -e "${YELLOW}  This prevents trailing newlines that cause cryptic errors.${NC}"
+    return 1
+  fi
+
   if [[ ${#missing_required[@]} -eq 0 ]] && [[ ${#missing_stripe[@]} -eq 0 ]] && [[ ${#missing_recommended[@]} -eq 0 ]]; then
     echo -e "${GREEN}  All local environment variables are set${NC}"
   elif [[ ${#missing_required[@]} -eq 0 ]]; then
@@ -156,46 +251,77 @@ check_convex_prod_env() {
   echo -e "${CYAN}Checking Convex production environment variables...${NC}"
   echo ""
 
-  # Find production deployment
-  local prod_deployment=""
-
-  # Try CONVEX_PROD_DEPLOYMENT first
-  if [[ -n "${CONVEX_PROD_DEPLOYMENT}" ]]; then
-    prod_deployment="${CONVEX_PROD_DEPLOYMENT}"
-  else
-    # Try to find it from convex deployment list
-    if command -v npx &> /dev/null; then
-      prod_deployment=$(npx convex deployment list 2>/dev/null | grep "^prod:" | head -1 || true)
-    fi
-  fi
-
-  if [[ -z "$prod_deployment" ]]; then
-    echo -e "${YELLOW}  Could not determine production deployment.${NC}"
-    echo -e "${YELLOW}  Set CONVEX_PROD_DEPLOYMENT in .env.production.local${NC}"
-    echo -e "${YELLOW}  Example: CONVEX_PROD_DEPLOYMENT=prod:doting-spider-972${NC}"
-    return 1
-  fi
-
-  echo -e "  Production deployment: ${CYAN}${prod_deployment}${NC}"
-  echo ""
-
-  # Get current prod env vars
+  # Get current prod env vars using --prod flag (more reliable than env var)
   local prod_env=""
-  prod_env=$(CONVEX_DEPLOYMENT="$prod_deployment" npx convex env list 2>/dev/null || echo "")
+  prod_env=$(npx convex env list --prod 2>/dev/null || echo "")
 
   if [[ -z "$prod_env" ]]; then
     echo -e "${RED}  Failed to fetch production environment variables.${NC}"
-    echo -e "${YELLOW}  Check your Convex authentication.${NC}"
+    echo -e "${YELLOW}  Check your Convex authentication and that a prod deployment exists.${NC}"
     return 1
   fi
 
+  echo -e "  ${GREEN}Connected to production deployment${NC}"
+  echo ""
+
   # Check each required var
   local missing_prod=()
+  local prod_format_errors=()
+
   for var in "${CONVEX_PROD_REQUIRED[@]}"; do
-    if ! echo "$prod_env" | grep -q "^$var="; then
+    # Separate declaration and assignment per ShellCheck SC2155
+    local value
+    value=$(echo "$prod_env" | grep "^$var=" | cut -d= -f2-)
+
+    # Strip surrounding quotes (convex env list may quote values)
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+
+    if [[ -z "$value" ]]; then
       missing_prod+=("$var")
+    else
+      # Check for trailing whitespace or newlines
+      if [[ "$value" =~ [[:space:]]$ ]] || [[ "$value" == *'\n'* ]]; then
+        prod_format_errors+=("$var has trailing whitespace or newline")
+      fi
+
+      # Use shared format validation, passing value directly
+      # Temporarily use prod_format_errors as format_errors for the function
+      local old_errors=("${format_errors[@]}")
+      format_errors=()
+
+      case "$var" in
+        STRIPE_SECRET_KEY)
+          check_stripe_key_format "$var" "sk" "$value"
+          # Additional prod check: warn if test key
+          if [[ "$value" =~ ^sk_test_ ]]; then
+            format_errors+=("$var is a TEST key - use sk_live_ for production")
+          fi
+          ;;
+        STRIPE_WEBHOOK_SECRET)
+          check_stripe_key_format "$var" "whsec" "$value"
+          ;;
+        STRIPE_PRICE_*)
+          check_stripe_key_format "$var" "price" "$value"
+          ;;
+        STRIPE_PUBLISHABLE_KEY)
+          check_stripe_key_format "$var" "pk" "$value"
+          # Additional prod check: warn if test key
+          if [[ "$value" =~ ^pk_test_ ]]; then
+            format_errors+=("$var is a TEST key - use pk_live_ for production")
+          fi
+          ;;
+      esac
+
+      # Move any new errors to prod_format_errors
+      prod_format_errors+=("${format_errors[@]}")
+      format_errors=("${old_errors[@]}")
     fi
   done
+
+  local has_errors=false
 
   if [[ ${#missing_prod[@]} -gt 0 ]]; then
     echo -e "${RED}  Missing production Convex environment variables:${NC}"
@@ -204,11 +330,34 @@ check_convex_prod_env() {
     done
     echo ""
     echo -e "${YELLOW}  Set these with:${NC}"
-    echo -e "    ${CYAN}CONVEX_DEPLOYMENT=\"$prod_deployment\" npx convex env set <VAR_NAME>${NC}"
+    echo -e "    ${CYAN}npx convex env set --prod <VAR_NAME> \"value\"${NC}"
+    has_errors=true
+  fi
+
+  if [[ ${#prod_format_errors[@]} -gt 0 ]]; then
+    echo -e "${RED}  Production environment variable format errors:${NC}"
+    for err in "${prod_format_errors[@]}"; do
+      echo -e "    ${RED}- $err${NC}"
+    done
+    echo ""
+    echo -e "${YELLOW}  Fix: Re-set the variable without trailing whitespace:${NC}"
+    echo -e "    ${CYAN}npx convex env set --prod <VAR_NAME> \"\$(printf '%s' 'value')\"${NC}"
+    has_errors=true
+  fi
+
+  if [[ "$has_errors" == "true" ]]; then
     return 1
   fi
 
-  echo -e "${GREEN}  All production Convex environment variables are set${NC}"
+  echo -e "${GREEN}  All production Convex environment variables are set and valid${NC}"
+  echo ""
+
+  # Parity warning for shared tokens
+  echo -e "${YELLOW}  IMPORTANT: Verify Vercel-Convex parity for shared tokens${NC}"
+  echo -e "${YELLOW}  CONVEX_WEBHOOK_TOKEN must be identical on both platforms.${NC}"
+  echo -e "${YELLOW}  Run: vercel env ls --environment=production | grep CONVEX_WEBHOOK_TOKEN${NC}"
+  echo ""
+
   return 0
 }
 

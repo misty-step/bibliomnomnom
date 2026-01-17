@@ -457,10 +457,12 @@ bibliomnomnom/
 │
 ├── public/                     # Static assets
 │
-├── CLAUDE.md                   # Architecture & patterns (internal docs)
+├── CLAUDE.md                   # AI assistant patterns & troubleshooting
 ├── DESIGN-SYSTEM.md            # Design tokens & components
-├── BACKLOG.md                  # Feature roadmap
-└── TODO.md                     # Implementation tasks
+└── docs/
+    ├── adr/                    # Architecture Decision Records
+    ├── flows/                  # User journey diagrams
+    └── postmortems/            # Incident reports
 ```
 
 ## Documentation
@@ -470,3 +472,4 @@ bibliomnomnom/
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide for Vercel/Convex/Clerk
 - **[DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md)** - Design tokens, colors, typography
 - **[docs/adr/](./docs/adr/)** - Architecture Decision Records
+- **[docs/flows/](./docs/flows/)** - User journey diagrams

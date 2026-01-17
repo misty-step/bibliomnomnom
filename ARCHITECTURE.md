@@ -2,7 +2,7 @@
 
 ## Overview
 
-bibliomnomnom is a privacy-first book tracking application built with Next.js 15, React 19, and Convex. The architecture follows a "Convex-First with Actions" pattern where Convex is the single source of truth, providing real-time updates, type safety, and clean module boundaries.
+bibliomnomnom is a privacy-first book tracking application built with Next.js 16, React 19, and Convex. The architecture follows a "Convex-First with Actions" pattern where Convex is the single source of truth, providing real-time updates, type safety, and clean module boundaries.
 
 **Core Philosophy**: Deep modules with simple interfaces that hide complexity behind clear contracts. Authentication, privacy filtering, auto-dating, and file uploads are abstracted into focused modules that can be understood and modified independently.
 

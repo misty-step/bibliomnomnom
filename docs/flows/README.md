@@ -13,12 +13,14 @@ Mermaid diagrams for complex state machines and data flows in bibliomnomnom.
 | [Profile Generation](./profile-generation.md)   | `components/profile/ProfilePage.tsx`      | 6 states | Medium - long-running AI generation    |
 | [User Provisioning](./user-provisioning.md)     | `app/ConvexClientProvider.tsx`            | 3 states | High - first-login race condition      |
 | [Subscription Banner](./subscription-banner.md) | `components/subscription/TrialBanner.tsx` | 4 states | Low - display only                     |
+| [Stripe Subscription](./stripe-subscription.md) | `convex/subscriptions.ts`, `api/stripe/*` | 6 states | High - payments, webhooks, race conds  |
 
 ### Complex Forms (Diagrammed)
 
-| Flow                                  | File                               | Complexity                            |
-| ------------------------------------- | ---------------------------------- | ------------------------------------- |
-| [Add Book Sheet](./add-book-sheet.md) | `components/book/AddBookSheet.tsx` | 15+ state variables, multiple sources |
+| Flow                                          | File                                   | Complexity                             |
+| --------------------------------------------- | -------------------------------------- | -------------------------------------- |
+| [Add Book Sheet](./add-book-sheet.md)         | `components/book/AddBookSheet.tsx`     | 15+ state variables, multiple sources  |
+| [Book Cover Manager](./book-cover-manager.md) | `components/book/BookCoverManager.tsx` | 4 cover sources, async upload/download |
 
 ## Undocumented (Simple Enough)
 
