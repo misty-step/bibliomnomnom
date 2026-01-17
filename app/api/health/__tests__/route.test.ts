@@ -17,10 +17,12 @@ vi.mock("@/lib/health/probes", () => ({
   probeConvex: vi.fn().mockResolvedValue({ status: "up", latencyMs: 10 }),
   probeClerk: vi.fn().mockResolvedValue({ status: "up", latencyMs: 12 }),
   probeBlob: vi.fn().mockResolvedValue({ status: "up", latencyMs: 8 }),
+  probeStripe: vi.fn().mockResolvedValue({ status: "up", latencyMs: 15 }),
   makeUnknownServices: () => ({
     convex: { status: "unknown" },
     clerk: { status: "unknown" },
     blob: { status: "unknown" },
+    stripe: { status: "unknown" },
   }),
 }));
 
