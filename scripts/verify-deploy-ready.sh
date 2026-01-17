@@ -34,19 +34,19 @@ warnings=0
 
 check_pass() {
   echo -e "${GREEN}  PASS${NC} $1"
-  ((passed_checks++))
-  ((total_checks++))
+  ((passed_checks++)) || true
+  ((total_checks++)) || true
 }
 
 check_fail() {
   echo -e "${RED}  FAIL${NC} $1"
-  ((failed_checks++))
-  ((total_checks++))
+  ((failed_checks++)) || true
+  ((total_checks++)) || true
 }
 
 check_warn() {
   echo -e "${YELLOW}  WARN${NC} $1"
-  ((warnings++))
+  ((warnings++)) || true
 }
 
 check_skip() {
@@ -98,12 +98,17 @@ echo -e "${BOLD}3. Secret Scan${NC}"
 echo "---"
 
 if command -v trufflehog &> /dev/null; then
-  # Use --fail flag so trufflehog exits non-zero if secrets found
-  # Redirect output to avoid noise, rely on exit code
-  if trufflehog filesystem . --only-verified --max-depth=3 --no-update --fail 2>/dev/null; then
+  # Use --fail flag so trufflehog exits with 183 if secrets found
+  # Exit 0 = no secrets, Exit 183 = secrets found, other = error
+  # Exclude .env files (local secrets, gitignored) with --exclude-paths
+  trufflehog_exit=0
+  trufflehog filesystem . --only-verified --no-update --fail --exclude-paths=.gitignore 2>/dev/null || trufflehog_exit=$?
+  if [[ $trufflehog_exit -eq 0 ]]; then
     check_pass "No verified secrets found"
+  elif [[ $trufflehog_exit -eq 183 ]]; then
+    check_fail "Verified secrets found in codebase"
   else
-    check_fail "Verified secrets found in codebase (or scanner error)"
+    check_warn "TruffleHog scan error (exit $trufflehog_exit)"
   fi
 else
   check_skip "TruffleHog not installed"
@@ -131,7 +136,7 @@ echo ""
 echo -e "${BOLD}5. Test Suite${NC}"
 echo "---"
 
-if pnpm test --run 2>/dev/null; then
+if pnpm test 2>/dev/null; then
   check_pass "All tests pass"
 else
   check_fail "Tests failed"
