@@ -1,10 +1,9 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
-import { api, internal } from "@/convex/_generated/api";
+import { api } from "@/convex/_generated/api";
 import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
-import { rateLimit } from "@/lib/api/rateLimit";
 
 /**
  * POST /api/stripe/checkout
@@ -24,8 +23,12 @@ export const POST = withObservability(async (request: Request) => {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limit: 5 checkout attempts per hour per user
-  const rateLimitResult = rateLimit(`checkout:${clerkId}`, {
+  // Create Convex client for rate limiting (no auth needed for rate limit check)
+  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
+  // Rate limit: 5 checkout attempts per hour per user (distributed via Convex)
+  const rateLimitResult = await convex.mutation(api.rateLimit.check, {
+    key: `checkout:${clerkId}`,
     limit: 5,
     windowMs: 60 * 60 * 1000, // 1 hour
   });
@@ -63,8 +66,7 @@ export const POST = withObservability(async (request: Request) => {
   }
 
   try {
-    // Create request-scoped Convex client with auth token
-    const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+    // Set auth token on Convex client for authenticated queries
     const token = await getToken({ template: "convex" });
     if (!token) {
       console.error("Could not retrieve Convex auth token for authenticated user");

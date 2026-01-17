@@ -3,25 +3,26 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 // Hoist mock functions
 const {
   mockQuery,
+  mockMutation,
   mockCreate,
   mockAuth,
   mockCurrentUser,
   mockSetAuth,
   mockGetToken,
-  mockRateLimit,
 } = vi.hoisted(() => ({
   mockQuery: vi.fn(),
+  mockMutation: vi.fn(),
   mockCreate: vi.fn(),
   mockAuth: vi.fn(),
   mockCurrentUser: vi.fn(),
   mockSetAuth: vi.fn(),
   mockGetToken: vi.fn(),
-  mockRateLimit: vi.fn(),
 }));
 
 vi.mock("convex/browser", () => ({
   ConvexHttpClient: class MockConvexHttpClient {
     query = mockQuery;
+    mutation = mockMutation;
     setAuth = mockSetAuth;
   },
 }));
@@ -51,11 +52,6 @@ vi.mock("@/lib/api/withObservability", () => ({
   withObservability: (handler: Function) => handler,
 }));
 
-// Mock rate limiter to always allow requests in tests
-vi.mock("@/lib/api/rateLimit", () => ({
-  rateLimit: mockRateLimit,
-}));
-
 import { POST } from "../../../app/api/stripe/checkout/route";
 
 describe("Stripe Checkout Route", () => {
@@ -64,8 +60,8 @@ describe("Stripe Checkout Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
-    // Default: rate limit allows requests
-    mockRateLimit.mockReturnValue({ success: true, remaining: 4, resetMs: 3600000 });
+    // Default: rate limit allows requests (Convex-based)
+    mockMutation.mockResolvedValue({ success: true, remaining: 4, resetMs: 3600000 });
   });
 
   afterEach(() => {
@@ -266,7 +262,7 @@ describe("Stripe Checkout Route", () => {
     });
 
     it("returns 429 when rate limit exceeded", async () => {
-      mockRateLimit.mockReturnValue({ success: false, remaining: 0, resetMs: 3600000 });
+      mockMutation.mockResolvedValue({ success: false, remaining: 0, resetMs: 3600000 });
 
       const response = await POST(makeRequest());
 
@@ -277,16 +273,21 @@ describe("Stripe Checkout Route", () => {
       expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    it("calls rateLimit with correct key", async () => {
+    it("calls Convex rate limit mutation with correct args", async () => {
+      mockMutation.mockResolvedValue({ success: true, remaining: 4, resetMs: 3600000 });
       mockQuery.mockResolvedValue(null);
       mockCreate.mockResolvedValue({ url: "https://checkout.stripe.com/session" });
 
       await POST(makeRequest());
 
-      expect(mockRateLimit).toHaveBeenCalledWith("checkout:clerk_user_123", {
-        limit: 5,
-        windowMs: 60 * 60 * 1000,
-      });
+      expect(mockMutation).toHaveBeenCalledWith(
+        expect.anything(), // api.rateLimit.check
+        {
+          key: "checkout:clerk_user_123",
+          limit: 5,
+          windowMs: 60 * 60 * 1000,
+        },
+      );
     });
   });
 

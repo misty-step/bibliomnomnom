@@ -71,15 +71,11 @@ describe("validateWebhookToken", () => {
 
   describe("environment variable validation", () => {
     it("throws when expected token is undefined", () => {
-      expect(() => validateWebhookToken("any", undefined)).toThrow(
-        "Webhook authentication not configured",
-      );
+      expect(() => validateWebhookToken("any", undefined)).toThrow("Webhook authentication failed");
     });
 
     it("throws when expected token is empty string", () => {
-      expect(() => validateWebhookToken("any", "")).toThrow(
-        "Webhook authentication not configured",
-      );
+      expect(() => validateWebhookToken("any", "")).toThrow("Webhook authentication failed");
     });
 
     it("uses CONVEX_WEBHOOK_TOKEN from env when not explicitly provided", () => {
@@ -90,11 +86,13 @@ describe("validateWebhookToken", () => {
 
   describe("provided token validation", () => {
     it("throws when provided token is empty string", () => {
-      expect(() => validateWebhookToken("", "expected")).toThrow("Invalid webhook token");
+      expect(() => validateWebhookToken("", "expected")).toThrow("Webhook authentication failed");
     });
 
     it("throws when provided token is wrong", () => {
-      expect(() => validateWebhookToken("wrong", "expected")).toThrow("Invalid webhook token");
+      expect(() => validateWebhookToken("wrong", "expected")).toThrow(
+        "Webhook authentication failed",
+      );
     });
   });
 

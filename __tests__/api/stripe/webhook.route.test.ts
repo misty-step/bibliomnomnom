@@ -1,15 +1,20 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Hoist mock functions
-const { mockAction, mockSubscriptionsRetrieve, mockConstructEvent } = vi.hoisted(() => ({
-  mockAction: vi.fn(),
-  mockSubscriptionsRetrieve: vi.fn(),
-  mockConstructEvent: vi.fn(),
-}));
+const { mockAction, mockQuery, mockMutation, mockSubscriptionsRetrieve, mockConstructEvent } =
+  vi.hoisted(() => ({
+    mockAction: vi.fn(),
+    mockQuery: vi.fn(),
+    mockMutation: vi.fn(),
+    mockSubscriptionsRetrieve: vi.fn(),
+    mockConstructEvent: vi.fn(),
+  }));
 
 vi.mock("convex/browser", () => ({
   ConvexHttpClient: class MockConvexHttpClient {
     action = mockAction;
+    query = mockQuery;
+    mutation = mockMutation;
   },
 }));
 
@@ -49,6 +54,9 @@ describe("Stripe Webhook Route", () => {
       STRIPE_WEBHOOK_SECRET: "whsec_test",
       CONVEX_WEBHOOK_TOKEN: "test_webhook_token",
     };
+    // Default: event not yet processed (idempotency)
+    mockQuery.mockResolvedValue(false);
+    mockMutation.mockResolvedValue({ _id: "event_123" });
   });
 
   afterEach(() => {
@@ -153,7 +161,9 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200); // Still returns 200 to avoid Stripe retries
-      expect(consoleSpy).toHaveBeenCalledWith("No clerkId in checkout session metadata");
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Webhook error: missing clerkId in checkout session metadata",
+      );
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -286,7 +296,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith("Invoice payment succeeded");
+      expect(consoleSpy).toHaveBeenCalledWith("Webhook processed: invoice payment succeeded");
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -307,7 +317,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith("Invoice payment failed");
+      expect(consoleSpy).toHaveBeenCalledWith("Webhook processed: invoice payment failed");
 
       consoleSpy.mockRestore();
     });
@@ -326,7 +336,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(request);
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: "Missing signature" });
+      expect(await response.json()).toEqual({ error: "Invalid request" });
 
       consoleSpy.mockRestore();
     });
@@ -341,7 +351,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(400);
-      expect(await response.json()).toEqual({ error: "Invalid signature" });
+      expect(await response.json()).toEqual({ error: "Invalid request" });
 
       consoleSpy.mockRestore();
     });
@@ -367,7 +377,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(500);
-      expect(await response.json()).toEqual({ error: "Database error" });
+      expect(await response.json()).toEqual({ error: "Internal server error" });
 
       consoleSpy.mockRestore();
     });
@@ -387,7 +397,9 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith("Unhandled event type: customer.created");
+      expect(consoleSpy).toHaveBeenCalledWith("Webhook skipped: unhandled event type", {
+        type: "customer.created",
+      });
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();

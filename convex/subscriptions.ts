@@ -17,6 +17,9 @@ import type { Doc, Id } from "./_generated/dataModel";
  */
 type SubscriptionStatus = "trialing" | "active" | "canceled" | "past_due" | "expired";
 
+// Grace period for past_due status (7 days)
+const PAST_DUE_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
+
 /**
  * Check if a subscription grants access to the application.
  *
@@ -24,6 +27,7 @@ type SubscriptionStatus = "trialing" | "active" | "canceled" | "past_due" | "exp
  * - Active subscriptions
  * - Trials that haven't expired
  * - Canceled subscriptions until their period ends
+ * - Past due subscriptions within grace period (7 days)
  */
 export function hasAccess(subscription: Doc<"subscriptions"> | null): boolean {
   if (!subscription) return false;
@@ -32,15 +36,19 @@ export function hasAccess(subscription: Doc<"subscriptions"> | null): boolean {
 
   switch (subscription.status) {
     case "trialing":
-      return subscription.trialEndsAt ? subscription.trialEndsAt > now : false;
+      return subscription.trialEndsAt ? subscription.trialEndsAt >= now : false;
     case "active":
       return true;
     case "canceled":
       // Still has access until period ends
-      return subscription.currentPeriodEnd ? subscription.currentPeriodEnd > now : false;
-    case "past_due":
-      // Grace period - still allow access while payment is being retried
-      return subscription.currentPeriodEnd ? subscription.currentPeriodEnd > now : false;
+      return subscription.currentPeriodEnd ? subscription.currentPeriodEnd >= now : false;
+    case "past_due": {
+      // Limited grace period for payment retry (7 days max)
+      // Don't grant indefinite access until period end (could be a year for annual plans)
+      if (!subscription.currentPeriodEnd) return false;
+      const gracePeriodEnd = subscription.updatedAt + PAST_DUE_GRACE_PERIOD_MS;
+      return now < gracePeriodEnd && subscription.currentPeriodEnd >= now;
+    }
     case "expired":
       return false;
     default:
@@ -333,9 +341,12 @@ export const upsertFromWebhookInternal = internalMutation({
       .unique();
 
     if (!user) {
-      // Throw error to trigger Stripe webhook retry. This handles the race condition
-      // where Stripe checkout completes before Clerk user sync finishes.
-      throw new Error(`User not found for Clerk ID: ${args.clerkId}, will retry`);
+      // Log internally, throw generic error to trigger Stripe webhook retry.
+      // This handles the race condition where Stripe checkout completes before Clerk user sync finishes.
+      console.error("Webhook retry: user not found for Clerk ID", {
+        clerkIdPrefix: args.clerkId.slice(0, 8),
+      });
+      throw new Error("User not found, will retry");
     }
 
     const now = Date.now();
@@ -386,13 +397,14 @@ export const upsertFromWebhookInternal = internalMutation({
 export const updateByStripeCustomerInternal = internalMutation({
   args: subscriptionDataArgs,
   handler: async (ctx, args) => {
+    // Use .first() to be resilient to potential duplicates from race conditions
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_customer", (q) => q.eq("stripeCustomerId", args.stripeCustomerId))
-      .unique();
+      .first();
 
     if (!subscription) {
-      console.error(`No subscription found for Stripe customer: ${args.stripeCustomerId}`);
+      console.error("Subscription lookup failed for Stripe customer");
       return null;
     }
 
@@ -484,13 +496,14 @@ export const updateFromStripe = internalMutation({
     cancelAtPeriodEnd: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    // Use .first() to be resilient to potential duplicates from race conditions
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_customer", (q) => q.eq("stripeCustomerId", args.stripeCustomerId))
-      .unique();
+      .first();
 
     if (!subscription) {
-      console.error(`No subscription found for Stripe customer: ${args.stripeCustomerId}`);
+      console.error("Subscription lookup failed for Stripe customer");
       return null;
     }
 
@@ -514,10 +527,11 @@ export const updateFromStripe = internalMutation({
 export const getByStripeCustomer = internalQuery({
   args: { stripeCustomerId: v.string() },
   handler: async (ctx, args) => {
+    // Use .first() to be resilient to potential duplicates from race conditions
     return await ctx.db
       .query("subscriptions")
       .withIndex("by_stripe_customer", (q) => q.eq("stripeCustomerId", args.stripeCustomerId))
-      .unique();
+      .first();
   },
 });
 
