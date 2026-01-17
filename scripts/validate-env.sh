@@ -115,25 +115,26 @@ check_stripe_key_format() {
 
   case "$expected_prefix" in
     sk)
-      if ! [[ "$value" =~ ^sk_(test|live)_[A-Za-z0-9]+$ ]]; then
+      # Allow underscores in suffix (some Stripe keys have them)
+      if ! [[ "$value" =~ ^sk_(test|live)_[A-Za-z0-9_]+$ ]]; then
         format_errors+=("$var_name has invalid format (expected: sk_test_... or sk_live_...)")
         return 1
       fi
       ;;
     pk)
-      if ! [[ "$value" =~ ^pk_(test|live)_[A-Za-z0-9]+$ ]]; then
+      if ! [[ "$value" =~ ^pk_(test|live)_[A-Za-z0-9_]+$ ]]; then
         format_errors+=("$var_name has invalid format (expected: pk_test_... or pk_live_...)")
         return 1
       fi
       ;;
     whsec)
-      if ! [[ "$value" =~ ^whsec_[A-Za-z0-9]+$ ]]; then
+      if ! [[ "$value" =~ ^whsec_[A-Za-z0-9_]+$ ]]; then
         format_errors+=("$var_name has invalid format (expected: whsec_...)")
         return 1
       fi
       ;;
     price)
-      if ! [[ "$value" =~ ^price_[A-Za-z0-9]+$ ]]; then
+      if ! [[ "$value" =~ ^price_[A-Za-z0-9_]+$ ]]; then
         format_errors+=("$var_name has invalid format (expected: price_...)")
         return 1
       fi
@@ -270,6 +271,12 @@ check_convex_prod_env() {
   for var in "${CONVEX_PROD_REQUIRED[@]}"; do
     local value=$(echo "$prod_env" | grep "^$var=" | cut -d= -f2-)
 
+    # Strip surrounding quotes (convex env list may quote values)
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+
     if [[ -z "$value" ]]; then
       missing_prod+=("$var")
     else
@@ -278,26 +285,34 @@ check_convex_prod_env() {
         prod_format_errors+=("$var has trailing whitespace or newline")
       fi
 
-      # Check format based on var name
+      # Check format based on var name (allow underscores in suffix)
       case "$var" in
         STRIPE_SECRET_KEY)
-          if ! [[ "$value" =~ ^sk_(test|live)_[A-Za-z0-9]+$ ]]; then
+          if ! [[ "$value" =~ ^sk_(test|live)_[A-Za-z0-9_]+$ ]]; then
             prod_format_errors+=("$var has invalid format (expected: sk_test_... or sk_live_...)")
+          fi
+          # Warn if test key in production
+          if [[ "$value" =~ ^sk_test_ ]]; then
+            prod_format_errors+=("$var is a TEST key - use sk_live_ for production")
           fi
           ;;
         STRIPE_WEBHOOK_SECRET)
-          if ! [[ "$value" =~ ^whsec_[A-Za-z0-9]+$ ]]; then
+          if ! [[ "$value" =~ ^whsec_[A-Za-z0-9_]+$ ]]; then
             prod_format_errors+=("$var has invalid format (expected: whsec_...)")
           fi
           ;;
         STRIPE_PRICE_*)
-          if ! [[ "$value" =~ ^price_[A-Za-z0-9]+$ ]]; then
+          if ! [[ "$value" =~ ^price_[A-Za-z0-9_]+$ ]]; then
             prod_format_errors+=("$var has invalid format (expected: price_...)")
           fi
           ;;
         STRIPE_PUBLISHABLE_KEY)
-          if ! [[ "$value" =~ ^pk_(test|live)_[A-Za-z0-9]+$ ]]; then
+          if ! [[ "$value" =~ ^pk_(test|live)_[A-Za-z0-9_]+$ ]]; then
             prod_format_errors+=("$var has invalid format (expected: pk_test_... or pk_live_...)")
+          fi
+          # Warn if test key in production
+          if [[ "$value" =~ ^pk_test_ ]]; then
+            prod_format_errors+=("$var is a TEST key - use pk_live_ for production")
           fi
           ;;
       esac

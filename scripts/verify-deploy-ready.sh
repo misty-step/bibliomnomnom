@@ -98,10 +98,12 @@ echo -e "${BOLD}3. Secret Scan${NC}"
 echo "---"
 
 if command -v trufflehog &> /dev/null; then
-  if trufflehog filesystem . --only-verified --max-depth=3 --no-update 2>/dev/null | grep -q "Verified"; then
-    check_fail "Verified secrets found in codebase!"
-  else
+  # Use --fail flag so trufflehog exits non-zero if secrets found
+  # Redirect output to avoid noise, rely on exit code
+  if trufflehog filesystem . --only-verified --max-depth=3 --no-update --fail 2>/dev/null; then
     check_pass "No verified secrets found"
+  else
+    check_fail "Verified secrets found in codebase (or scanner error)"
   fi
 else
   check_skip "TruffleHog not installed"
@@ -149,21 +151,49 @@ check_skip "Build check (run: pnpm build)"
 echo ""
 
 # ============================================
-# Check 7: Vercel-Convex Parity (Manual)
+# Check 7: Vercel-Convex Parity
 # ============================================
 echo -e "${BOLD}7. Cross-Platform Parity${NC}"
 echo "---"
 
-echo -e "${YELLOW}  MANUAL CHECK REQUIRED:${NC}"
-echo "  Verify CONVEX_WEBHOOK_TOKEN matches on both platforms:"
-echo ""
-echo "  Convex:"
-echo -e "    ${CYAN}npx convex env list --prod | grep CONVEX_WEBHOOK_TOKEN${NC}"
-echo ""
-echo "  Vercel:"
-echo -e "    ${CYAN}vercel env ls --environment=production | grep CONVEX_WEBHOOK_TOKEN${NC}"
-echo ""
-check_warn "Manual parity verification required"
+# Get CONVEX_WEBHOOK_TOKEN from Convex prod
+convex_token=$(npx convex env list --prod 2>/dev/null | grep "^CONVEX_WEBHOOK_TOKEN=" | cut -d= -f2-)
+# Strip quotes if present
+convex_token="${convex_token%\"}"
+convex_token="${convex_token#\"}"
+
+if [[ -z "$convex_token" ]]; then
+  check_fail "CONVEX_WEBHOOK_TOKEN not set on Convex production"
+else
+  # Try to get from Vercel (may fail if not logged in or no access)
+  # vercel env pull requires interactive or specific setup, so we do best-effort
+  if command -v vercel &> /dev/null || command -v npx &> /dev/null; then
+    # Pull vercel env to temp file
+    vercel_temp=$(mktemp)
+    if npx vercel env pull "$vercel_temp" --environment production --yes 2>/dev/null; then
+      vercel_token=$(grep "^CONVEX_WEBHOOK_TOKEN=" "$vercel_temp" | cut -d= -f2-)
+      # Strip quotes if present
+      vercel_token="${vercel_token%\"}"
+      vercel_token="${vercel_token#\"}"
+      rm -f "$vercel_temp"
+
+      if [[ -z "$vercel_token" ]]; then
+        check_fail "CONVEX_WEBHOOK_TOKEN not set on Vercel production"
+      elif [[ "$convex_token" == "$vercel_token" ]]; then
+        check_pass "CONVEX_WEBHOOK_TOKEN matches on Vercel and Convex"
+      else
+        check_fail "CONVEX_WEBHOOK_TOKEN MISMATCH between Vercel and Convex!"
+        echo -e "    ${RED}Webhooks will silently fail. Update tokens to match.${NC}"
+      fi
+    else
+      rm -f "$vercel_temp"
+      check_warn "Could not pull Vercel env (not logged in?)"
+      echo -e "    ${YELLOW}Manual check: vercel env ls --environment=production${NC}"
+    fi
+  else
+    check_warn "Vercel CLI not available for parity check"
+  fi
+fi
 
 echo ""
 
