@@ -332,10 +332,11 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 
 ## Documentation References
 
-- **Architecture details**: `DESIGN.md` (2182 lines of detailed module design)
-- **Implementation tasks**: `TODO.md` (MVP checklist with work logs)
+- **System architecture**: `ARCHITECTURE.md` (modules, data flow, decisions)
+- **Feature design (Reader Profile)**: `DESIGN.md` (detailed module spec for profiles feature)
 - **Getting started**: `README.md` (setup instructions)
-- **Backlog**: `BACKLOG.md` (future features)
+- **ADRs**: `docs/adr/` (architectural decision records)
+- **Flow diagrams**: `docs/flows/` (user journey diagrams)
 
 ## Important Notes
 
