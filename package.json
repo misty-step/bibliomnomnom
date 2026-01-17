@@ -10,7 +10,7 @@
   },
   "scripts": {
     "preinstall": "npx only-allow pnpm",
-    "prepare": "lefthook install",
+    "prepare": "node -e \"if(!process.env.CI&&!process.env.VERCEL)require('child_process').execSync('lefthook install',{stdio:'inherit'})\"",
     "tokens:build": "node scripts/build-tokens.mjs",
     "dev": "concurrently \"pnpm:convex:dev\" \"pnpm:next:dev\"",
     "next:dev": "next dev",
