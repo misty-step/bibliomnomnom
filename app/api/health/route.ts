@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { withObservability } from "@/lib/api/withObservability";
 import { overallStatus } from "@/lib/health/types";
-import { makeUnknownServices, probeBlob, probeClerk, probeConvex } from "@/lib/health/probes";
+import {
+  makeUnknownServices,
+  probeBlob,
+  probeClerk,
+  probeConvex,
+  probeStripe,
+} from "@/lib/health/probes";
 
 export const runtime = "nodejs";
 const OVERALL_TIMEOUT_MS = 750;
@@ -63,13 +69,14 @@ export const GET = withObservability(
 );
 
 async function runProbesWithinBudget() {
-  const perProbe = OVERALL_TIMEOUT_MS / 3;
+  const perProbe = OVERALL_TIMEOUT_MS / 4;
 
-  const [convex, clerk, blob] = await Promise.all([
+  const [convex, clerk, blob, stripe] = await Promise.all([
     probeConvex(process.env.NEXT_PUBLIC_CONVEX_URL, perProbe),
     probeClerk(process.env.CLERK_JWT_ISSUER_DOMAIN, perProbe),
     probeBlob(process.env.BLOB_READ_WRITE_TOKEN ? BLOB_HEALTH_URL : undefined, perProbe),
+    probeStripe(process.env.STRIPE_SECRET_KEY, perProbe),
   ]);
 
-  return { convex, clerk, blob };
+  return { convex, clerk, blob, stripe };
 }

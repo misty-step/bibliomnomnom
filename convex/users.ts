@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { requireAuth } from "./auth";
+import { TRIAL_DURATION_MS } from "@/lib/constants";
 
 // Query current authenticated user
 export const getCurrentUser = query({
@@ -46,14 +47,31 @@ export const createOrUpdateUser = mutation({
       return existingUser._id;
     }
 
-    return await ctx.db.insert("users", {
+    // Create new user
+    const newUserId = await ctx.db.insert("users", {
       clerkId: args.clerkId,
       ...userData,
     });
+
+    // Auto-create trial subscription for new users
+    const now = Date.now();
+    const trialEnd = now + TRIAL_DURATION_MS;
+    await ctx.db.insert("subscriptions", {
+      userId: newUserId,
+      status: "trialing",
+      currentPeriodEnd: trialEnd,
+      trialEndsAt: trialEnd,
+      cancelAtPeriodEnd: false,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    return newUserId;
   },
 });
 
 // Delete user from Clerk webhook (idempotent)
+// Also cleans up associated subscription to prevent orphaned records
 export const deleteUser = mutation({
   args: {
     clerkId: v.string(),
@@ -65,6 +83,16 @@ export const deleteUser = mutation({
       .unique();
 
     if (!user) return;
+
+    // Clean up all subscriptions (handles potential duplicates from race conditions)
+    const subscriptions = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    for (const subscription of subscriptions) {
+      await ctx.db.delete(subscription._id);
+    }
 
     await ctx.db.delete(user._id);
   },

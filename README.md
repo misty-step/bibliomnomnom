@@ -391,8 +391,8 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete contributor guidelines and
 
 ### Frontend
 
-- **Framework**: Next.js 15.1 (App Router, Turbopack)
-- **React**: 19.0 (with Server Components)
+- **Framework**: Next.js 16 (App Router, Turbopack)
+- **React**: 19 (with Server Components)
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS 3.4 + custom bibliophile palette
 - **Components**: shadcn/ui (Radix UI primitives)
@@ -465,8 +465,8 @@ bibliomnomnom/
 
 ## Documentation
 
-- **[CLAUDE.md](./CLAUDE.md)** - Architecture, patterns, conventions, troubleshooting
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System design, modules, data flow, key decisions
+- **[CLAUDE.md](./CLAUDE.md)** - Patterns, conventions, troubleshooting
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide for Vercel/Convex/Clerk
 - **[DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md)** - Design tokens, colors, typography
-- **[BACKLOG.md](./BACKLOG.md)** - Strategic roadmap with 8-perspective analysis
-- **[TODO.md](./TODO.md)** - Implementation tasks and work logs
+- **[docs/adr/](./docs/adr/)** - Architecture Decision Records

@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { BookTile, BookTileSkeleton } from "./BookTile";
 import { AddBookSheet } from "./AddBookSheet";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { pluralize } from "@/lib/format";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { WelcomeCard } from "@/components/onboarding/WelcomeCard";
 import { Button } from "@/components/ui/button";
 import { BookOpen, Star, Library, Upload, BookPlus } from "lucide-react";
 import {
@@ -302,21 +304,41 @@ function LibraryView({
   onManualAdd: () => void;
   onImport: () => void;
 }) {
+  // Get subscription to detect first-time users
+  const subscription = useQuery(api.subscriptions.get);
+
   const hasReading = readingBooks && readingBooks.length > 0;
   const hasFinished = finishedBooks && finishedBooks.length > 0;
   const isEmpty = !hasReading && !hasFinished;
 
+  // Detect first-time user: subscription created within last 60 seconds
+  // Capture mount time in state to avoid calling Date.now() during render
+  const [mountTime] = useState(() => Date.now());
+  const isFirstTime = subscription?.createdAt && mountTime - subscription.createdAt < 60_000;
+
   if (isEmpty) {
+    // Show WelcomeCard for first-time users
+    if (isFirstTime && subscription) {
+      return (
+        <WelcomeCard
+          daysRemaining={subscription.daysRemaining ?? 14}
+          onImport={onImport}
+          onAddBook={onManualAdd}
+        />
+      );
+    }
+
+    // Show standard EmptyState for returning users with empty library
     return (
       <EmptyState
-        title="Your shelves await"
-        description="Add your first book to start building your collection."
+        title="Your shelves are empty"
+        description="Add books to start tracking your reading journey."
         action={
           <div className="flex items-center gap-4">
             <Button onClick={onManualAdd}>Add a Book</Button>
             <button
               onClick={onImport}
-              className="font-sans text-sm text-text-inkMuted hover:text-text-ink transition-colors duration-fast"
+              className="font-sans text-sm text-text-inkMuted transition-colors duration-fast hover:text-text-ink"
             >
               or import
             </button>

@@ -259,4 +259,36 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_username", ["username"])
     .index("by_public", ["isPublic"]),
+  subscriptions: defineTable({
+    userId: v.id("users"),
+    stripeCustomerId: v.optional(v.string()),
+    stripeSubscriptionId: v.optional(v.string()),
+    status: v.union(
+      v.literal("trialing"),
+      v.literal("active"),
+      v.literal("canceled"),
+      v.literal("past_due"),
+      v.literal("expired"),
+    ),
+    priceId: v.optional(v.string()),
+    currentPeriodEnd: v.optional(v.number()),
+    trialEndsAt: v.optional(v.number()),
+    cancelAtPeriodEnd: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_stripe_customer", ["stripeCustomerId"]),
+  // Rate limiting for API endpoints (works across serverless instances)
+  rateLimits: defineTable({
+    key: v.string(), // e.g., "checkout:user_123"
+    timestamps: v.array(v.number()), // Request timestamps within window
+    updatedAt: v.number(),
+  }).index("by_key", ["key"]),
+  // Webhook event idempotency (prevents duplicate processing)
+  webhookEvents: defineTable({
+    eventId: v.string(), // Stripe event.id
+    eventType: v.string(), // e.g., "checkout.session.completed"
+    processedAt: v.number(),
+  }).index("by_event_id", ["eventId"]),
 });

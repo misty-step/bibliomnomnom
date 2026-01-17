@@ -76,10 +76,61 @@ export async function probeBlob(
   return probeUrl(url, { method: "HEAD" }, timeoutMs);
 }
 
-export function makeUnknownServices(): Record<"convex" | "clerk" | "blob", ServiceCheckResult> {
+/**
+ * Probe Stripe API connectivity.
+ * Uses balance.retrieve() which is the recommended health check endpoint.
+ */
+export async function probeStripe(
+  secretKey?: string,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<ServiceCheckResult> {
+  if (!secretKey) return { status: "unknown" };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const started = Date.now();
+
+  try {
+    // Use balance.retrieve() - the recommended Stripe health check endpoint
+    const response = await fetch("https://api.stripe.com/v1/balance", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+      },
+      signal: controller.signal,
+    });
+
+    const latencyMs = Date.now() - started;
+
+    if (!response.ok) {
+      return {
+        status: "down",
+        latencyMs,
+        error: `http-${response.status}`,
+      };
+    }
+
+    return { status: "up", latencyMs };
+  } catch (error) {
+    const latencyMs = Date.now() - started;
+    return {
+      status: "down",
+      latencyMs,
+      error: sanitizeError(error),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function makeUnknownServices(): Record<
+  "convex" | "clerk" | "blob" | "stripe",
+  ServiceCheckResult
+> {
   return {
     convex: { status: "unknown" },
     clerk: { status: "unknown" },
     blob: { status: "unknown" },
+    stripe: { status: "unknown" },
   };
 }

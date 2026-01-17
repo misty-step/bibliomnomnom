@@ -37,6 +37,12 @@ pre-push:
     env-check:
       run: ./scripts/validate-env.sh
 
+    env-check-prod:
+      run: ./scripts/validate-env.sh --prod-only
+      skip:
+        - merge
+        - rebase
+
     test:
       run: ./scripts/pnpm.sh test
 
