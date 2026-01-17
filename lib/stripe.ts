@@ -12,10 +12,16 @@ let _stripe: Stripe | null = null;
 
 export function getStripe(): Stripe {
   if (!_stripe) {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error("STRIPE_SECRET_KEY is not set");
+    const key = (process.env.STRIPE_SECRET_KEY || "").trim();
+
+    // Validate key format to catch misconfigured env vars early
+    if (!key || !/^sk_(test|live)_[a-zA-Z0-9]+$/.test(key)) {
+      throw new Error(
+        "STRIPE_SECRET_KEY is missing or invalid. Expected format: sk_test_... or sk_live_...",
+      );
     }
-    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+
+    _stripe = new Stripe(key, {
       apiVersion: "2025-12-15.clover",
       typescript: true,
     });

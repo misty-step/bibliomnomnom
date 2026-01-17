@@ -84,7 +84,11 @@ export async function probeStripe(
   secretKey?: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ): Promise<ServiceCheckResult> {
-  if (!secretKey) return { status: "unknown" };
+  // Trim and validate key format to prevent header injection errors
+  const key = (secretKey || "").trim();
+  if (!key || !/^sk_(test|live)_[a-zA-Z0-9]+$/.test(key)) {
+    return { status: "unknown" };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -95,7 +99,7 @@ export async function probeStripe(
     const response = await fetch("https://api.stripe.com/v1/balance", {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${secretKey}`,
+        Authorization: `Bearer ${key}`,
       },
       signal: controller.signal,
     });
