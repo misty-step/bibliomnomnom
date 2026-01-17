@@ -1,6 +1,6 @@
 "use client";
 
-import * as Sentry from "@sentry/nextjs";
+import { captureError, captureMessage } from "@/lib/sentry";
 
 /**
  * Test page to verify Sentry error reporting is working.
@@ -15,13 +15,15 @@ export default function TestErrorPage() {
     try {
       throw new Error("Captured exception test with email test@example.com");
     } catch (e) {
-      Sentry.captureException(e);
+      captureError(e, { tags: { test: "manual-capture" } });
       alert("Exception captured and sent to Sentry");
     }
   };
 
-  const captureMessage = () => {
-    Sentry.captureMessage("Test message from Sentry verification page");
+  const sendMessage = () => {
+    captureMessage("Test message from Sentry verification page", "info", {
+      tags: { test: "message" },
+    });
     alert("Message sent to Sentry");
   };
 
@@ -57,7 +59,7 @@ export default function TestErrorPage() {
         </button>
 
         <button
-          onClick={captureMessage}
+          onClick={sendMessage}
           className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
         >
           Send Test Message
