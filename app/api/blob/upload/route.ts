@@ -40,8 +40,11 @@ export const POST = withObservability(async (request: Request) => {
 
     return NextResponse.json(response);
   } catch (error) {
-    captureError(error, { tags: { api: "blob-upload" } });
-    const message = error instanceof Error ? error.message : "Unable to generate upload token";
-    return NextResponse.json({ error: message }, { status: 400 });
+    captureError(error, {
+      tags: { api: "blob-upload" },
+      extra: { userId },
+    });
+    // Return generic error to client - specific error logged to Sentry
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }, "blob-upload");

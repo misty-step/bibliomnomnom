@@ -113,9 +113,9 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL || 'https://placeholder.convex.cloud' }}
       - name: Clean problematic filenames
         run: |
-          # Remove files with colons in names (Turbopack node: protocol chunks)
-          # These cause issues with upload-artifact and NTFS compatibility
-          find .next -name '*:*' -delete 2>/dev/null || true
+          # Remove Turbopack node: protocol chunks (e.g., [externals]_node:inspector_*.js)
+          # These colons cause issues with upload-artifact and NTFS compatibility
+          find .next -name '*node:*' -delete 2>/dev/null || true
       - name: Upload build artifact
         uses: actions/upload-artifact@v6
         with:

@@ -68,9 +68,9 @@ export default withSentryConfig(nextConfig, {
   // Suppress build logs unless in CI
   silent: !process.env.CI,
 
-  // Only upload source maps in production builds
+  // Only upload source maps for production deployments (not previews)
   sourcemaps: {
-    disable: process.env.NODE_ENV !== "production",
+    disable: process.env.VERCEL_ENV !== "production",
   },
 
   // Tunnel Sentry requests through the app to avoid ad blockers
