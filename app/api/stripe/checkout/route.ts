@@ -4,12 +4,15 @@ import { ConvexHttpClient } from "convex/browser";
 import { api, internal } from "@/convex/_generated/api";
 import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
+import { rateLimit } from "@/lib/api/rateLimit";
 
 /**
  * POST /api/stripe/checkout
  *
  * Creates a Stripe Checkout session for subscription signup.
  * Trial period is only granted if user hasn't had a trial before.
+ *
+ * Rate limited to 5 requests per hour per user.
  *
  * Request body:
  * - priceType: "monthly" | "annual"
@@ -19,6 +22,19 @@ export const POST = withObservability(async (request: Request) => {
 
   if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit: 5 checkout attempts per hour per user
+  const rateLimitResult = rateLimit(`checkout:${clerkId}`, {
+    limit: 5,
+    windowMs: 60 * 60 * 1000, // 1 hour
+  });
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: "Too many checkout attempts. Please try again later." },
+      { status: 429 },
+    );
   }
 
   const user = await currentUser();

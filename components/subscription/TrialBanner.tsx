@@ -11,6 +11,7 @@ import { useState } from "react";
  * - No subscription: Prompt to start free trial
  * - Trialing: Show days remaining
  * - Active: No banner
+ * - Canceled (with access): Show end date warning
  * - Expired: Show upgrade prompt (non-dismissible)
  */
 export function TrialBanner() {
@@ -91,6 +92,48 @@ export function TrialBanner() {
               }`}
             >
               {isUrgent ? "Keep Your Library" : "Become a Member"}
+            </Link>
+            {!isUrgent && (
+              <button
+                onClick={() => setDismissed(true)}
+                className="text-text-inkMuted transition-colors hover:text-text-ink"
+                aria-label="Dismiss"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Canceled but still has access - show end date warning
+  if (accessCheck.hasAccess && accessCheck.status === "canceled") {
+    const days = accessCheck.daysRemaining ?? 0;
+    const isUrgent = days <= 3;
+
+    return (
+      <div
+        className={`border-b ${isUrgent ? "border-status-warning/30 bg-status-warning/5" : "border-line-ghost/50 bg-surface-dawn"}`}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-8 py-3">
+          <p className="text-sm text-text-inkMuted">
+            <span className={`font-medium ${isUrgent ? "text-status-warning" : "text-text-ink"}`}>
+              Subscription ends in {days} {days === 1 ? "day" : "days"}
+            </span>
+            . {isUrgent ? "Reactivate now to keep your library." : "Reactivate to continue access."}
+          </p>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/pricing"
+              className={`shrink-0 rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+                isUrgent
+                  ? "bg-status-warning text-white hover:bg-status-warning/90"
+                  : "bg-text-ink text-canvas-bone hover:bg-text-inkMuted"
+              }`}
+            >
+              Reactivate
             </Link>
             {!isUrgent && (
               <button

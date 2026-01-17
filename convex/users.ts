@@ -84,13 +84,13 @@ export const deleteUser = mutation({
 
     if (!user) return;
 
-    // Clean up subscription first (foreign key pattern)
-    const subscription = await ctx.db
+    // Clean up all subscriptions (handles potential duplicates from race conditions)
+    const subscriptions = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .unique();
+      .collect();
 
-    if (subscription) {
+    for (const subscription of subscriptions) {
       await ctx.db.delete(subscription._id);
     }
 

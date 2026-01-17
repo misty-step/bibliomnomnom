@@ -3,39 +3,8 @@ import { query, mutation, action, internalMutation, internalQuery } from "./_gen
 import { internal } from "./_generated/api";
 import { requireAuth, getAuthOrNull } from "./auth";
 import { TRIAL_DAYS, TRIAL_DURATION_MS } from "@/lib/constants";
+import { validateWebhookToken } from "@/lib/security/webhookToken";
 import type { Doc, Id } from "./_generated/dataModel";
-
-/**
- * Timing-safe string comparison to prevent timing attacks.
- * Compares all characters even if mismatch is found early.
- */
-function timingSafeCompare(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
-
-/**
- * Validates webhook token from environment variable.
- * This prevents unauthorized calls to webhook handlers.
- *
- * Uses timing-safe comparison to prevent timing attacks.
- *
- * @throws Error if token is missing or invalid
- */
-function validateWebhookToken(providedToken: string): void {
-  const expectedToken = process.env.CONVEX_WEBHOOK_TOKEN;
-  if (!expectedToken) {
-    throw new Error("CONVEX_WEBHOOK_TOKEN not configured");
-  }
-
-  if (!timingSafeCompare(providedToken, expectedToken)) {
-    throw new Error("Invalid webhook token");
-  }
-}
 
 /**
  * Subscription status types for access control.
@@ -119,10 +88,11 @@ export const get = query({
     const userId = await getAuthOrNull(ctx);
     if (!userId) return null;
 
+    // Use .first() to be resilient to potential duplicates from race conditions
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+      .first();
 
     if (!subscription) return null;
 
@@ -143,10 +113,11 @@ export const checkAccess = query({
     const userId = await getAuthOrNull(ctx);
     if (!userId) return { hasAccess: false, reason: "unauthenticated" as const };
 
+    // Use .first() to be resilient to potential duplicates from race conditions
     const subscription = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+      .first();
 
     if (!subscription) {
       return { hasAccess: false, reason: "no_subscription" as const };
@@ -189,13 +160,27 @@ export const ensureTrialExists = mutation({
   handler: async (ctx) => {
     const userId = await requireAuth(ctx);
 
-    // Check for existing subscription
+    // Check for existing subscription using .first() to handle potential duplicates
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
+      .first();
 
     if (existing) {
+      // Proactive de-duplication: clean up any duplicates from race conditions
+      const allMatches = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+
+      if (allMatches.length > 1) {
+        // Keep earliest by _creationTime, delete others
+        const sorted = allMatches.sort((a, b) => a._creationTime - b._creationTime);
+        for (const dupe of sorted.slice(1)) {
+          await ctx.db.delete(dupe._id);
+        }
+      }
+
       return {
         ...existing,
         hasAccess: hasAccess(existing),
@@ -357,10 +342,11 @@ export const upsertFromWebhookInternal = internalMutation({
 
     // Check for existing subscription (by userId, not stripeCustomerId)
     // This ensures we update the internal trial subscription when user converts to paid
+    // Use .first() to be resilient to potential duplicates from race conditions
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
-      .unique();
+      .first();
 
     if (existing) {
       // Update existing subscription (including internal trial → paid conversion)
@@ -448,10 +434,11 @@ export const createSubscription = internalMutation({
     const now = Date.now();
 
     // Check if subscription already exists
+    // Use .first() to be resilient to potential duplicates from race conditions
     const existing = await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .unique();
+      .first();
 
     if (existing) {
       // Update existing subscription
@@ -540,9 +527,10 @@ export const getByStripeCustomer = internalQuery({
 export const getByUser = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
+    // Use .first() to be resilient to potential duplicates from race conditions
     return await ctx.db
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .unique();
+      .first();
   },
 });

@@ -1,16 +1,23 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 // Hoist mock functions
-const { mockQuery, mockCreate, mockAuth, mockCurrentUser, mockSetAuth, mockGetToken } = vi.hoisted(
-  () => ({
-    mockQuery: vi.fn(),
-    mockCreate: vi.fn(),
-    mockAuth: vi.fn(),
-    mockCurrentUser: vi.fn(),
-    mockSetAuth: vi.fn(),
-    mockGetToken: vi.fn(),
-  }),
-);
+const {
+  mockQuery,
+  mockCreate,
+  mockAuth,
+  mockCurrentUser,
+  mockSetAuth,
+  mockGetToken,
+  mockRateLimit,
+} = vi.hoisted(() => ({
+  mockQuery: vi.fn(),
+  mockCreate: vi.fn(),
+  mockAuth: vi.fn(),
+  mockCurrentUser: vi.fn(),
+  mockSetAuth: vi.fn(),
+  mockGetToken: vi.fn(),
+  mockRateLimit: vi.fn(),
+}));
 
 vi.mock("convex/browser", () => ({
   ConvexHttpClient: class MockConvexHttpClient {
@@ -44,6 +51,11 @@ vi.mock("@/lib/api/withObservability", () => ({
   withObservability: (handler: Function) => handler,
 }));
 
+// Mock rate limiter to always allow requests in tests
+vi.mock("@/lib/api/rateLimit", () => ({
+  rateLimit: mockRateLimit,
+}));
+
 import { POST } from "../../../app/api/stripe/checkout/route";
 
 describe("Stripe Checkout Route", () => {
@@ -52,6 +64,8 @@ describe("Stripe Checkout Route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env = { ...originalEnv };
+    // Default: rate limit allows requests
+    mockRateLimit.mockReturnValue({ success: true, remaining: 4, resetMs: 3600000 });
   });
 
   afterEach(() => {
@@ -239,6 +253,40 @@ describe("Stripe Checkout Route", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: "Invalid request body" });
+    });
+  });
+
+  describe("rate limiting", () => {
+    beforeEach(() => {
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: "user@example.com" }],
+      });
+    });
+
+    it("returns 429 when rate limit exceeded", async () => {
+      mockRateLimit.mockReturnValue({ success: false, remaining: 0, resetMs: 3600000 });
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({
+        error: "Too many checkout attempts. Please try again later.",
+      });
+      expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it("calls rateLimit with correct key", async () => {
+      mockQuery.mockResolvedValue(null);
+      mockCreate.mockResolvedValue({ url: "https://checkout.stripe.com/session" });
+
+      await POST(makeRequest());
+
+      expect(mockRateLimit).toHaveBeenCalledWith("checkout:clerk_user_123", {
+        limit: 5,
+        windowMs: 60 * 60 * 1000,
+      });
     });
   });
 
