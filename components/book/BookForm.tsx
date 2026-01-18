@@ -5,6 +5,7 @@ import { Star } from "lucide-react";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { captureError } from "@/lib/sentry";
 
 export type BookFormValues = {
   title: string;
@@ -120,7 +121,7 @@ export function BookForm({
       }
       onSuccess?.();
     } catch (err) {
-      console.error(err);
+      captureError(err, { tags: { component: "BookForm" } });
       setError(failureMessage);
     } finally {
       setIsSubmitting(false);

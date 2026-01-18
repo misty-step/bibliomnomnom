@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { cn } from "@/lib/utils";
+import { captureError } from "@/lib/sentry";
 import { BookSearchInput, type BookSearchResult } from "./BookSearchInput";
 import { CoverPicker } from "./CoverPicker";
 
@@ -269,7 +270,7 @@ export function AddBookSheet({
 
       if (missingCover && COVER_BACKFILL_ENABLED && newBookId) {
         void fetchMissingCovers({ bookIds: [newBookId as any] }).catch((err) => {
-          console.error("Fetch missing covers failed", err);
+          captureError(err, { tags: { component: "AddBookSheet", action: "fetchMissingCovers" } });
         });
       }
 
@@ -280,7 +281,7 @@ export function AddBookSheet({
 
       handleClose();
     } catch (err) {
-      console.error(err);
+      captureError(err, { tags: { component: "AddBookSheet", action: "addBook" } });
       setError("Unable to add this book. Please try again.");
     } finally {
       setIsSubmitting(false);
