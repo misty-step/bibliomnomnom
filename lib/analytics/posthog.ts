@@ -29,7 +29,6 @@ export type AnalyticsEvent =
  */
 export function initPostHog() {
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  const host = process.env.NEXT_PUBLIC_POSTHOG_HOST;
 
   if (!key) {
     if (process.env.NODE_ENV === "development") {
@@ -38,21 +37,37 @@ export function initPostHog() {
     return;
   }
 
-  posthog.init(key, {
-    api_host: host || "https://us.i.posthog.com",
-    capture_pageview: true, // Auto-capture page views
-    capture_pageleave: true, // Capture when users leave
-    persistence: "localStorage+cookie",
-    autocapture: false, // Disable autocapture - we track explicitly
-    // Respect user privacy preferences
-    respect_dnt: true,
-    // Debug mode in development
-    loaded: (ph) => {
-      if (process.env.NODE_ENV === "development") {
-        ph.debug();
-      }
-    },
-  });
+  try {
+    posthog.init(key, {
+      // Use first-party proxy to bypass ad blockers (configured in next.config.ts rewrites)
+      api_host: "/ingest",
+      // Keep ui_host for PostHog toolbar and session replay playback
+      ui_host: "https://us.posthog.com",
+      capture_pageview: true, // Auto-capture page views
+      capture_pageleave: true, // Capture when users leave
+      persistence: "localStorage+cookie",
+      autocapture: false, // Disable autocapture - we track explicitly
+      // Respect user privacy preferences
+      respect_dnt: true,
+      // Debug mode in development
+      loaded: (ph) => {
+        if (process.env.NODE_ENV === "development") {
+          ph.debug();
+        }
+      },
+      // Graceful error handling for blocked requests
+      on_xhr_error: (failedRequest) => {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[PostHog] Request failed:", failedRequest);
+        }
+      },
+    });
+  } catch (e) {
+    // Prevent PostHog errors from breaking the app
+    if (process.env.NODE_ENV === "development") {
+      console.error("[PostHog] Init failed:", e);
+    }
+  }
 }
 
 /**

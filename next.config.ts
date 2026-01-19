@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Avoid 308 redirects for POST requests (needed for PostHog proxy)
+  skipTrailingSlashRedirect: true,
+
   images: {
     remotePatterns: [
       {
@@ -58,6 +61,25 @@ const nextConfig: NextConfig = {
             value: "max-age=31536000; includeSubDomains",
           },
         ],
+      },
+    ];
+  },
+
+  // PostHog reverse proxy to bypass ad blockers
+  // Routes /ingest/* to PostHog servers, making requests appear first-party
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/decide",
+        destination: "https://us.i.posthog.com/decide",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://us.i.posthog.com/:path*",
       },
     ];
   },
