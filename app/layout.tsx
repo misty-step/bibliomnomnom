@@ -5,7 +5,6 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { Footer } from "@/components/layout/Footer";
 import "./globals.css";
@@ -73,11 +72,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <ConvexClientProvider>
-              <PostHogProvider>
-                <div className="flex-1">{children}</div>
-                <Footer />
-                <Toaster />
-              </PostHogProvider>
+              <div className="flex-1">{children}</div>
+              <Footer />
+              <Toaster />
             </ConvexClientProvider>
             <Analytics />
             <SpeedInsights />

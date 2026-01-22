@@ -9,7 +9,6 @@ const isPublicRoute = createRouteMatcher([
   "/api/health", // Health check endpoint for uptime monitoring
   "/api/stripe/webhook", // Stripe webhook (uses own signature verification)
   "/api/webhooks/clerk", // Clerk webhook (uses Svix signature verification)
-  "/ingest(.*)", // PostHog analytics proxy (bypasses ad blockers)
   "/monitoring(.*)", // Sentry tunnel (bypasses ad blockers)
   "/",
 ]);

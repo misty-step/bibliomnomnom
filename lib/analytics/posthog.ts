@@ -24,53 +24,6 @@ export type AnalyticsEvent =
   | { name: "signup_completed"; properties: Record<string, never> };
 
 /**
- * Initialize PostHog with project configuration.
- * Called once on app load in the provider.
- */
-export function initPostHog() {
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-
-  if (!key) {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[Analytics] PostHog key not configured - tracking disabled");
-    }
-    return;
-  }
-
-  try {
-    posthog.init(key, {
-      // Use first-party proxy to bypass ad blockers (configured in next.config.ts rewrites)
-      api_host: "/ingest",
-      // Keep ui_host for PostHog toolbar and session replay playback
-      ui_host: "https://us.posthog.com",
-      capture_pageview: true, // Auto-capture page views
-      capture_pageleave: true, // Capture when users leave
-      persistence: "localStorage+cookie",
-      autocapture: false, // Disable autocapture - we track explicitly
-      // Respect user privacy preferences
-      respect_dnt: true,
-      // Debug mode in development
-      loaded: (ph) => {
-        if (process.env.NODE_ENV === "development") {
-          ph.debug();
-        }
-      },
-      // Graceful error handling for blocked requests
-      on_xhr_error: (failedRequest) => {
-        if (process.env.NODE_ENV === "development") {
-          console.warn("[PostHog] Request failed:", failedRequest);
-        }
-      },
-    });
-  } catch (e) {
-    // Prevent PostHog errors from breaking the app
-    if (process.env.NODE_ENV === "development") {
-      console.error("[PostHog] Init failed:", e);
-    }
-  }
-}
-
-/**
  * Identify a user with their Clerk user ID.
  * Called when user signs in to link anonymous events to their profile.
  */

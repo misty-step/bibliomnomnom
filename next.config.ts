@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
-  // Avoid 308 redirects for POST requests (needed for PostHog proxy)
+  // Avoid 308 redirects for POST requests
   skipTrailingSlashRedirect: true,
 
   images: {
@@ -42,12 +42,12 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://vercel.live https://*.vercel.live https://*.sentry.io", // Allow Clerk JS + Vercel Live feedback + worker blobs + Sentry
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://challenges.cloudflare.com https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://vercel.live https://*.vercel.live https://*.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com", // Allow Clerk JS + Vercel Live feedback + worker blobs + Sentry + PostHog
               "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline'", // Next.js requires unsafe-inline for styles
               "img-src 'self' data: blob: https:", // Allow external images from configured sources
               "font-src 'self' data:",
-              "connect-src 'self' https://*.convex.cloud https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://clerk-telemetry.com https://challenges.cloudflare.com https://vercel.com https://*.vercel.com wss://*.convex.cloud https://*.sentry.io https://*.ingest.sentry.io", // Convex, Clerk, Vercel Blob, Sentry
+              "connect-src 'self' https://*.convex.cloud https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://clerk-telemetry.com https://challenges.cloudflare.com https://vercel.com https://*.vercel.com wss://*.convex.cloud https://*.sentry.io https://*.ingest.sentry.io https://us.i.posthog.com", // Convex, Clerk, Vercel Blob, Sentry, PostHog
               "frame-src 'self' https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://challenges.cloudflare.com https://vercel.live https://*.vercel.live", // Clerk auth frames + Vercel overlay
               "object-src 'none'",
               "base-uri 'self'",
@@ -65,24 +65,7 @@ const nextConfig: NextConfig = {
     ];
   },
 
-  // PostHog reverse proxy to bypass ad blockers
-  // Routes /ingest/* to PostHog servers, making requests appear first-party
-  async rewrites() {
-    return [
-      {
-        source: "/ingest/static/:path*",
-        destination: "https://us-assets.i.posthog.com/static/:path*",
-      },
-      {
-        source: "/ingest/decide",
-        destination: "https://us.i.posthog.com/decide",
-      },
-      {
-        source: "/ingest/:path*",
-        destination: "https://us.i.posthog.com/:path*",
-      },
-    ];
-  },
+  // PostHog proxy handled by app/ingest/[...path]/route.ts
 };
 
 // Sentry configuration for Next.js
