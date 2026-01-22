@@ -361,13 +361,21 @@ export const upsertFromWebhookInternal = internalMutation({
 
     if (existing) {
       // Update existing subscription (including internal trial → paid conversion)
+      // CRITICAL: Clear trialEndsAt when status becomes "active" to prevent zombie trial access.
+      // When a user converts from trial to paid, their trial period is over.
+      // If we don't clear this, a user who later cancels could still have access via stale trialEndsAt.
+      const trialEndsAt =
+        args.status === "active"
+          ? undefined // Clear trial when subscription is active
+          : (args.trialEndsAt ?? existing.trialEndsAt);
+
       await ctx.db.patch(existing._id, {
         stripeCustomerId: args.stripeCustomerId,
         stripeSubscriptionId: args.stripeSubscriptionId ?? existing.stripeSubscriptionId,
         status: args.status,
         priceId: args.priceId ?? existing.priceId,
         currentPeriodEnd: args.currentPeriodEnd ?? existing.currentPeriodEnd,
-        trialEndsAt: args.trialEndsAt ?? existing.trialEndsAt,
+        trialEndsAt,
         cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? existing.cancelAtPeriodEnd,
         updatedAt: now,
       });
@@ -408,12 +416,16 @@ export const updateByStripeCustomerInternal = internalMutation({
       return null;
     }
 
+    // CRITICAL: Clear trialEndsAt when status becomes "active" to prevent zombie trial access.
+    const trialEndsAt =
+      args.status === "active" ? undefined : (args.trialEndsAt ?? subscription.trialEndsAt);
+
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
       status: args.status,
       priceId: args.priceId ?? subscription.priceId,
       currentPeriodEnd: args.currentPeriodEnd ?? subscription.currentPeriodEnd,
-      trialEndsAt: args.trialEndsAt ?? subscription.trialEndsAt,
+      trialEndsAt,
       cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? subscription.cancelAtPeriodEnd,
       updatedAt: Date.now(),
     });
@@ -507,12 +519,16 @@ export const updateFromStripe = internalMutation({
       return null;
     }
 
+    // CRITICAL: Clear trialEndsAt when status becomes "active" to prevent zombie trial access.
+    const trialEndsAt =
+      args.status === "active" ? undefined : (args.trialEndsAt ?? subscription.trialEndsAt);
+
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
       status: args.status,
       priceId: args.priceId ?? subscription.priceId,
       currentPeriodEnd: args.currentPeriodEnd ?? subscription.currentPeriodEnd,
-      trialEndsAt: args.trialEndsAt ?? subscription.trialEndsAt,
+      trialEndsAt,
       cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? subscription.cancelAtPeriodEnd,
       updatedAt: Date.now(),
     });
@@ -546,5 +562,59 @@ export const getByUser = internalQuery({
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
+  },
+});
+
+/**
+ * DEV ONLY: Clear stale Stripe customer data from all subscriptions.
+ * Use when database has stripeCustomerIds from a different Stripe account.
+ *
+ * Run with: npx convex run subscriptions:devClearStripeData
+ *
+ * Safety: Refuses to run if any subscription has a live Stripe customer ID.
+ */
+export const devClearStripeData = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const subscriptions = await ctx.db.query("subscriptions").collect();
+
+    // Safety check: refuse if any subscription has live (production) Stripe data
+    for (const sub of subscriptions) {
+      if (
+        sub.stripeCustomerId?.startsWith("cus_") &&
+        sub.stripeSubscriptionId?.startsWith("sub_")
+      ) {
+        // Check if it looks like it could be production data by checking if we're in dev
+        const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+        if (stripeKey.startsWith("sk_live_")) {
+          throw new Error("Refusing to clear data: production Stripe key detected");
+        }
+      }
+    }
+
+    let cleared = 0;
+    const details: string[] = [];
+
+    for (const sub of subscriptions) {
+      if (sub.stripeCustomerId || sub.stripeSubscriptionId) {
+        details.push(`Subscription ${sub._id}: cleared ${sub.stripeCustomerId || "no customer"}`);
+        await ctx.db.patch(sub._id, {
+          stripeCustomerId: undefined,
+          stripeSubscriptionId: undefined,
+          status: "trialing",
+          priceId: undefined,
+          cancelAtPeriodEnd: false,
+          updatedAt: Date.now(),
+        });
+        cleared++;
+      }
+    }
+
+    return {
+      success: true,
+      message: `Cleared Stripe data from ${cleared} subscription(s). All reset to trial state.`,
+      cleared,
+      details,
+    };
   },
 });

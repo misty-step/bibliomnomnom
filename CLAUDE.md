@@ -11,8 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Development
 
 ```bash
-# Start Next.js dev server (Turbopack is default in Next.js 16)
+# Start full dev environment (Next.js + Convex + Stripe webhook listener)
 pnpm dev
+
+# Start without Stripe listener (if running on different port)
+pnpm dev:no-stripe
 
 # Start Convex dev server (for live backend logs/updates)
 pnpm convex:dev
@@ -297,6 +300,27 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 
 **Cause**: External image domain not whitelisted in `next.config.ts`
 **Fix**: Add hostname to `images.remotePatterns` in `next.config.ts`
+
+### Stripe webhooks not received in local dev
+
+**Cause**: Stripe cannot reach `localhost` to deliver webhooks
+**Fix**: Use Stripe CLI to forward webhooks locally:
+
+```bash
+# 1. Install Stripe CLI (if not already)
+brew install stripe/stripe-cli/stripe
+
+# 2. Login to Stripe
+stripe login
+
+# 3. Forward webhooks to local dev server
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+
+# 4. Copy the webhook signing secret from CLI output to .env.local
+# It will look like: whsec_...
+```
+
+**Note**: `pnpm dev` now runs the Stripe listener automatically. If running on a different port, run `stripe listen` manually with the correct port. Use `pnpm dev:no-stripe` to run without the listener.
 
 ## Testing Strategy
 
