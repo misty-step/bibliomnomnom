@@ -616,29 +616,23 @@ export const getByUser = internalQuery({
  *
  * Safety:
  * - Internal mutation only (not callable from client)
- * - Refuses to run if any subscription has a live Stripe customer ID
+ * - Refuses to run if production Stripe key detected (checked BEFORE any mutations)
  */
 export const devClearStripeData = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const subscriptions = await ctx.db.query("subscriptions").collect();
-
-    // Safety check: refuse if any subscription has live (production) Stripe data
-    for (const sub of subscriptions) {
-      if (
-        sub.stripeCustomerId?.startsWith("cus_") &&
-        sub.stripeSubscriptionId?.startsWith("sub_")
-      ) {
-        // Check if it looks like it could be production data by checking if we're in dev
-        const stripeKey = process.env.STRIPE_SECRET_KEY || "";
-        if (stripeKey.startsWith("sk_live_")) {
-          throw new Error("Refusing to clear data: production Stripe key detected");
-        }
-      }
+    // CRITICAL: Check for production key BEFORE any mutations to avoid partial updates
+    const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+    if (stripeKey.startsWith("sk_live_")) {
+      throw new Error("Refusing to clear data: production Stripe key detected");
     }
+
+    const subscriptions = await ctx.db.query("subscriptions").collect();
 
     let cleared = 0;
     const details: string[] = [];
+    const now = Date.now();
+    const trialEnd = now + TRIAL_DURATION_MS;
 
     for (const sub of subscriptions) {
       if (sub.stripeCustomerId || sub.stripeSubscriptionId) {
@@ -649,7 +643,11 @@ export const devClearStripeData = internalMutation({
           status: "trialing",
           priceId: undefined,
           cancelAtPeriodEnd: false,
-          updatedAt: Date.now(),
+          // Restore valid trial window to prevent immediate access revocation
+          trialEndsAt: trialEnd,
+          currentPeriodEnd: trialEnd,
+          pastDueSince: undefined,
+          updatedAt: now,
         });
         cleared++;
       }
@@ -657,7 +655,7 @@ export const devClearStripeData = internalMutation({
 
     return {
       success: true,
-      message: `Cleared Stripe data from ${cleared} subscription(s). All reset to trial state.`,
+      message: `Cleared Stripe data from ${cleared} subscription(s). All reset to trial state with ${TRIAL_DAYS}-day trial.`,
       cleared,
       details,
     };

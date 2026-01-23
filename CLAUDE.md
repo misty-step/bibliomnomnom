@@ -379,13 +379,14 @@ Production monitoring uses Sentry for error tracking, pino for structured loggin
 - **Tunnel:** `/monitoring` route bypasses ad blockers
 
 **Alert Rules (5 active):**
+
 | Rule | Trigger |
 |------|---------|
 | New Error Alert | First occurrence of any new issue |
 | Regression Alert | Resolved issue resurfaces |
-| High Frequency Error | Same error 10+ times in 1 hour |
+| High-Frequency Error | Same error 10+ times in 1 hour |
 | Critical: Auth/Payment | Errors in stripe/clerk/webhook routes |
-| High Priority Issues | Default Sentry rule |
+| High-Priority Issues | Default Sentry rule |
 
 ### Key Files
 

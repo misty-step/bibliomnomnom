@@ -285,6 +285,11 @@ check_convex_dev_env() {
   # Check Stripe keys are TEST mode (not LIVE)
   local stripe_secret
   stripe_secret=$(echo "$dev_env" | grep "^STRIPE_SECRET_KEY=" | cut -d= -f2-)
+  # Strip surrounding quotes (convex env list may quote values)
+  stripe_secret="${stripe_secret%\"}"
+  stripe_secret="${stripe_secret#\"}"
+  stripe_secret="${stripe_secret%\'}"
+  stripe_secret="${stripe_secret#\'}"
   if [[ -n "$stripe_secret" ]]; then
     if [[ "$stripe_secret" =~ ^sk_live_ ]]; then
       dev_errors+=("STRIPE_SECRET_KEY is LIVE key (sk_live_) - dev should use TEST key (sk_test_)")
@@ -295,6 +300,11 @@ check_convex_dev_env() {
 
   local stripe_pub
   stripe_pub=$(echo "$dev_env" | grep "^STRIPE_PUBLISHABLE_KEY=" | cut -d= -f2-)
+  # Strip surrounding quotes (convex env list may quote values)
+  stripe_pub="${stripe_pub%\"}"
+  stripe_pub="${stripe_pub#\"}"
+  stripe_pub="${stripe_pub%\'}"
+  stripe_pub="${stripe_pub#\'}"
   if [[ -n "$stripe_pub" ]]; then
     if [[ "$stripe_pub" =~ ^pk_live_ ]]; then
       dev_errors+=("STRIPE_PUBLISHABLE_KEY is LIVE key (pk_live_) - dev should use TEST key (pk_test_)")
@@ -306,6 +316,11 @@ check_convex_dev_env() {
   # Check Clerk issuer domain is dev (not production custom domain)
   local clerk_issuer
   clerk_issuer=$(echo "$dev_env" | grep "^CLERK_JWT_ISSUER_DOMAIN=" | cut -d= -f2-)
+  # Strip surrounding quotes (convex env list may quote values)
+  clerk_issuer="${clerk_issuer%\"}"
+  clerk_issuer="${clerk_issuer#\"}"
+  clerk_issuer="${clerk_issuer%\'}"
+  clerk_issuer="${clerk_issuer#\'}"
   if [[ -n "$clerk_issuer" ]]; then
     if [[ "$clerk_issuer" =~ \.clerk\.accounts\.dev ]]; then
       echo -e "  ${GREEN}✓ CLERK_JWT_ISSUER_DOMAIN is dev mode (.clerk.accounts.dev)${NC}"
