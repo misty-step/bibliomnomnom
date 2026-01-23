@@ -5,6 +5,7 @@
  * - Structured JSON logging (captured by Vercel)
  * - Error capture to Sentry
  * - Request/response timing
+ * - PII scrubbing for sensitive query parameters
  *
  * Note: Uses console.log with JSON for compatibility with Next.js edge bundling.
  * Pino is available for server-only code but causes bundling issues in API routes.
@@ -18,6 +19,45 @@
  * ```
  */
 import * as Sentry from "@sentry/nextjs";
+
+/** Query parameter keys that should be redacted from logs */
+const SENSITIVE_PARAMS = new Set([
+  "token",
+  "key",
+  "secret",
+  "password",
+  "email",
+  "code",
+  "session",
+  "signature",
+]);
+
+/**
+ * Scrub sensitive query parameters from a URL for safe logging.
+ * Returns URL path + sanitized query string.
+ */
+function scrubUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const params = new URLSearchParams(parsed.search);
+    let hasSensitive = false;
+
+    for (const key of params.keys()) {
+      if (SENSITIVE_PARAMS.has(key.toLowerCase())) {
+        params.set(key, "[REDACTED]");
+        hasSensitive = true;
+      }
+    }
+
+    if (hasSensitive) {
+      return `${parsed.pathname}?${params.toString()}`;
+    }
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    // If URL parsing fails, return a safe placeholder
+    return "[invalid-url]";
+  }
+}
 
 type ObservabilityOptions = {
   metadata?: Record<string, unknown>;
@@ -59,7 +99,7 @@ export function withObservability(
         ...context,
         msg: "request_start",
         method: req.method,
-        url: req.url,
+        url: scrubUrl(req.url),
       });
 
       const response = await handler(req);
