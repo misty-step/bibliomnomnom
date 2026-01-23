@@ -9,7 +9,6 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
-import { trackEvent } from "@/lib/analytics/posthog";
 import { CreateNote } from "@/components/notes/CreateNote";
 import { NoteList } from "@/components/notes/NoteList";
 import { BOOK_STATUS_OPTIONS } from "./constants";
@@ -88,7 +87,6 @@ export function BookDetail({ bookId }: BookDetailProps) {
     setLocalStatus(nextStatus);
     try {
       await updateStatus({ id: book._id, status: nextStatus });
-      trackEvent("book_status_changed", { from: previousStatus, to: nextStatus });
     } catch (err) {
       console.error(err);
       setLocalStatus(book.status);
@@ -139,7 +137,6 @@ export function BookDetail({ bookId }: BookDetailProps) {
     setLocalPrivacy(nextPrivacy);
     try {
       await updatePrivacy({ id: book._id, privacy: nextPrivacy });
-      trackEvent("privacy_toggled", { value: nextPrivacy });
     } catch (err) {
       console.error(err);
       setLocalPrivacy(previousPrivacy);

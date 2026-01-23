@@ -14,7 +14,6 @@ import { useToast } from "@/hooks/use-toast";
 import { BOOK_STATUS_OPTIONS, type BookStatus } from "./constants";
 import { cn } from "@/lib/utils";
 import { captureError } from "@/lib/sentry";
-import { trackEvent } from "@/lib/analytics/posthog";
 import { BookSearchInput, type BookSearchResult } from "./BookSearchInput";
 import { CoverPicker } from "./CoverPicker";
 
@@ -268,8 +267,6 @@ export function AddBookSheet({
         publishedYear,
         pageCount,
       });
-
-      trackEvent("book_added", { source: "manual" });
 
       if (missingCover && COVER_BACKFILL_ENABLED && newBookId) {
         void fetchMissingCovers({ bookIds: [newBookId as any] }).catch((err) => {

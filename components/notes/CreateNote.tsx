@@ -12,7 +12,6 @@ import { Surface } from "@/components/ui/Surface";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { trackEvent } from "@/lib/analytics/posthog";
 
 type CreateNoteProps = {
   bookId: Id<"books">;
@@ -56,8 +55,6 @@ export function CreateNote({ bookId }: CreateNoteProps) {
         type,
         page: page || undefined,
       });
-
-      trackEvent("note_created", { type });
 
       // Reset state completely
       setContent("");
