@@ -83,7 +83,6 @@ export function BookDetail({ bookId }: BookDetailProps) {
   }
 
   const handleStatusChange = async (nextStatus: Doc<"books">["status"]) => {
-    const previousStatus = localStatus;
     setLocalStatus(nextStatus);
     try {
       await updateStatus({ id: book._id, status: nextStatus });
