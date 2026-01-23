@@ -99,11 +99,18 @@ function SubscriptionCard() {
     setError(null);
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
+      // Check response status before parsing JSON
+      if (!res.ok) {
+        setError("Failed to open subscription portal. Please try again.");
+        setIsLoading(false);
+        return;
+      }
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
-      } else if (data.error) {
-        setError(data.error);
+      } else {
+        // Handle unexpected response shape or explicit error
+        setError(data.error || "Unable to open subscription portal.");
         setIsLoading(false);
       }
     } catch (err) {
