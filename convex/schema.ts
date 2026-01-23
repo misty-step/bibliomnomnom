@@ -274,6 +274,9 @@ export default defineSchema({
     currentPeriodEnd: v.optional(v.number()),
     trialEndsAt: v.optional(v.number()),
     cancelAtPeriodEnd: v.boolean(),
+    // Timestamp when status transitioned to past_due (for grace period calculation)
+    // Only set on transition TO past_due, cleared when status changes to something else
+    pastDueSince: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

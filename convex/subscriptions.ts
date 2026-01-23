@@ -45,8 +45,10 @@ export function hasAccess(subscription: Doc<"subscriptions"> | null): boolean {
     case "past_due": {
       // Limited grace period for payment retry (7 days max)
       // Don't grant indefinite access until period end (could be a year for annual plans)
+      // Uses pastDueSince (set on transition TO past_due) to prevent reset on every webhook update
       if (!subscription.currentPeriodEnd) return false;
-      const gracePeriodEnd = subscription.updatedAt + PAST_DUE_GRACE_PERIOD_MS;
+      const pastDueStart = subscription.pastDueSince ?? subscription.updatedAt;
+      const gracePeriodEnd = pastDueStart + PAST_DUE_GRACE_PERIOD_MS;
       return now < gracePeriodEnd && subscription.currentPeriodEnd >= now;
     }
     case "expired":
@@ -184,9 +186,16 @@ export const ensureTrialExists = mutation({
       if (allMatches.length > 1) {
         // Keep earliest by _creationTime, delete others
         const sorted = allMatches.sort((a, b) => a._creationTime - b._creationTime);
+        const keeper = sorted[0]!;
         for (const dupe of sorted.slice(1)) {
           await ctx.db.delete(dupe._id);
         }
+        // Return the keeper (not `existing`, which might have been deleted if it wasn't earliest)
+        return {
+          ...keeper,
+          hasAccess: hasAccess(keeper),
+          daysRemaining: getDaysRemaining(keeper),
+        };
       }
 
       return {
@@ -369,6 +378,15 @@ export const upsertFromWebhookInternal = internalMutation({
           ? undefined // Clear trial when subscription is active
           : (args.trialEndsAt ?? existing.trialEndsAt);
 
+      // Track pastDueSince: set only on transition TO past_due, clear on any other status
+      const isTransitioningToPastDue = args.status === "past_due" && existing.status !== "past_due";
+      const pastDueSince =
+        args.status === "past_due"
+          ? isTransitioningToPastDue
+            ? now
+            : existing.pastDueSince
+          : undefined; // Clear when leaving past_due
+
       await ctx.db.patch(existing._id, {
         stripeCustomerId: args.stripeCustomerId,
         stripeSubscriptionId: args.stripeSubscriptionId ?? existing.stripeSubscriptionId,
@@ -376,6 +394,7 @@ export const upsertFromWebhookInternal = internalMutation({
         priceId: args.priceId ?? existing.priceId,
         currentPeriodEnd: args.currentPeriodEnd ?? existing.currentPeriodEnd,
         trialEndsAt,
+        pastDueSince,
         cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? existing.cancelAtPeriodEnd,
         updatedAt: now,
       });
@@ -420,14 +439,26 @@ export const updateByStripeCustomerInternal = internalMutation({
     const trialEndsAt =
       args.status === "active" ? undefined : (args.trialEndsAt ?? subscription.trialEndsAt);
 
+    // Track pastDueSince: set only on transition TO past_due, clear on any other status
+    const now = Date.now();
+    const isTransitioningToPastDue =
+      args.status === "past_due" && subscription.status !== "past_due";
+    const pastDueSince =
+      args.status === "past_due"
+        ? isTransitioningToPastDue
+          ? now
+          : subscription.pastDueSince
+        : undefined; // Clear when leaving past_due
+
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
       status: args.status,
       priceId: args.priceId ?? subscription.priceId,
       currentPeriodEnd: args.currentPeriodEnd ?? subscription.currentPeriodEnd,
       trialEndsAt,
+      pastDueSince,
       cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? subscription.cancelAtPeriodEnd,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     return subscription._id;
@@ -523,14 +554,26 @@ export const updateFromStripe = internalMutation({
     const trialEndsAt =
       args.status === "active" ? undefined : (args.trialEndsAt ?? subscription.trialEndsAt);
 
+    // Track pastDueSince: set only on transition TO past_due, clear on any other status
+    const now = Date.now();
+    const isTransitioningToPastDue =
+      args.status === "past_due" && subscription.status !== "past_due";
+    const pastDueSince =
+      args.status === "past_due"
+        ? isTransitioningToPastDue
+          ? now
+          : subscription.pastDueSince
+        : undefined; // Clear when leaving past_due
+
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
       status: args.status,
       priceId: args.priceId ?? subscription.priceId,
       currentPeriodEnd: args.currentPeriodEnd ?? subscription.currentPeriodEnd,
       trialEndsAt,
+      pastDueSince,
       cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? subscription.cancelAtPeriodEnd,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     return subscription._id;
@@ -571,9 +614,11 @@ export const getByUser = internalQuery({
  *
  * Run with: npx convex run subscriptions:devClearStripeData
  *
- * Safety: Refuses to run if any subscription has a live Stripe customer ID.
+ * Safety:
+ * - Internal mutation only (not callable from client)
+ * - Refuses to run if any subscription has a live Stripe customer ID
  */
-export const devClearStripeData = mutation({
+export const devClearStripeData = internalMutation({
   args: {},
   handler: async (ctx) => {
     const subscriptions = await ctx.db.query("subscriptions").collect();
