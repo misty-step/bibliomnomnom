@@ -1,8 +1,13 @@
 /**
  * Observability wrapper for API routes
  *
- * Wraps Next.js API route handlers with consistent logging and error handling.
- * Currently uses console logging as foundation for future Sentry integration.
+ * Wraps Next.js API route handlers with:
+ * - Structured JSON logging (captured by Vercel)
+ * - Error capture to Sentry
+ * - Request/response timing
+ *
+ * Note: Uses console.log with JSON for compatibility with Next.js edge bundling.
+ * Pino is available for server-only code but causes bundling issues in API routes.
  *
  * @example
  * ```typescript
@@ -12,10 +17,27 @@
  * }, "blob-upload");
  * ```
  */
+import * as Sentry from "@sentry/nextjs";
+
 type ObservabilityOptions = {
   metadata?: Record<string, unknown>;
   skipErrorCapture?: boolean;
 };
+
+/** Structured log output for Vercel to capture */
+function log(level: "info" | "error", data: Record<string, unknown>): void {
+  const entry = {
+    level,
+    timestamp: new Date().toISOString(),
+    ...data,
+  };
+  // JSON output captured by Vercel logs
+  if (level === "error") {
+    console.error(JSON.stringify(entry));
+  } else {
+    console.log(JSON.stringify(entry));
+  }
+}
 
 export function withObservability(
   handler: (req: Request) => Promise<Response>,
@@ -24,21 +46,30 @@ export function withObservability(
 ): (req: Request) => Promise<Response> {
   return async (req: Request): Promise<Response> => {
     const start = Date.now();
+    const requestId = crypto.randomUUID().slice(0, 8);
+
+    const context = {
+      operation: operationName,
+      requestId,
+      ...options.metadata,
+    };
 
     try {
-      console.log(`[${operationName}] START`, {
+      log("info", {
+        ...context,
+        msg: "request_start",
         method: req.method,
         url: req.url,
-        ...options.metadata,
       });
 
       const response = await handler(req);
       const duration = Date.now() - start;
 
-      console.log(`[${operationName}] SUCCESS`, {
+      log("info", {
+        ...context,
+        msg: "request_success",
         status: response.status,
-        duration,
-        ...options.metadata,
+        duration_ms: duration,
       });
 
       return response;
@@ -46,10 +77,24 @@ export function withObservability(
       const duration = Date.now() - start;
 
       if (!options.skipErrorCapture) {
-        console.error(`[${operationName}] ERROR`, {
+        log("error", {
+          ...context,
+          msg: "request_error",
           error: error instanceof Error ? error.message : String(error),
-          duration,
-          ...options.metadata,
+          stack: error instanceof Error ? error.stack : undefined,
+          duration_ms: duration,
+        });
+
+        // Send to Sentry with context
+        Sentry.captureException(error, {
+          tags: {
+            operation: operationName,
+          },
+          extra: {
+            requestId,
+            duration_ms: duration,
+            ...options.metadata,
+          },
         });
       }
 

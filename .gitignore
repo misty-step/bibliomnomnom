@@ -56,3 +56,4 @@ thinktank_*/
 thinktank.log
 .env.production
 thinktank_*
+.sentryclirc
