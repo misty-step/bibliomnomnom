@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export function Footer() {
   return (
     <footer className="border-t border-line-ghost/30 py-4">
@@ -10,12 +12,20 @@ export function Footer() {
         >
           a misty step project
         </a>
-        <a
-          href="mailto:hello@mistystep.io"
-          className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
-        >
-          feedback
-        </a>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/pricing"
+            className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
+          >
+            pricing
+          </Link>
+          <a
+            href="mailto:hello@mistystep.io"
+            className="font-mono text-xs text-text-inkSubtle transition-colors hover:text-text-inkMuted"
+          >
+            feedback
+          </a>
+        </div>
       </div>
     </footer>
   );
