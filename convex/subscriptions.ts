@@ -21,6 +21,34 @@ type SubscriptionStatus = "trialing" | "active" | "canceled" | "past_due" | "exp
 const PAST_DUE_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Compute trialEndsAt for subscription update.
+ * Clears trial when status becomes "active" to prevent zombie trial access.
+ */
+function computeTrialEndsAt(
+  newStatus: SubscriptionStatus,
+  incomingTrialEndsAt: number | undefined,
+  existingTrialEndsAt: number | undefined,
+): number | undefined {
+  if (newStatus === "active") return undefined;
+  return incomingTrialEndsAt ?? existingTrialEndsAt;
+}
+
+/**
+ * Compute pastDueSince for subscription update.
+ * Sets only on transition TO past_due, clears on any other status.
+ */
+function computePastDueSince(
+  newStatus: SubscriptionStatus,
+  existingStatus: SubscriptionStatus,
+  existingPastDueSince: number | undefined,
+  now: number,
+): number | undefined {
+  if (newStatus !== "past_due") return undefined;
+  if (existingStatus !== "past_due") return now; // Transition to past_due
+  return existingPastDueSince; // Already past_due, preserve original timestamp
+}
+
+/**
  * Check if a subscription grants access to the application.
  *
  * Access is granted for:
@@ -370,22 +398,13 @@ export const upsertFromWebhookInternal = internalMutation({
 
     if (existing) {
       // Update existing subscription (including internal trial → paid conversion)
-      // CRITICAL: Clear trialEndsAt when status becomes "active" to prevent zombie trial access.
-      // When a user converts from trial to paid, their trial period is over.
-      // If we don't clear this, a user who later cancels could still have access via stale trialEndsAt.
-      const trialEndsAt =
-        args.status === "active"
-          ? undefined // Clear trial when subscription is active
-          : (args.trialEndsAt ?? existing.trialEndsAt);
-
-      // Track pastDueSince: set only on transition TO past_due, clear on any other status
-      const isTransitioningToPastDue = args.status === "past_due" && existing.status !== "past_due";
-      const pastDueSince =
-        args.status === "past_due"
-          ? isTransitioningToPastDue
-            ? now
-            : existing.pastDueSince
-          : undefined; // Clear when leaving past_due
+      const trialEndsAt = computeTrialEndsAt(args.status, args.trialEndsAt, existing.trialEndsAt);
+      const pastDueSince = computePastDueSince(
+        args.status,
+        existing.status as SubscriptionStatus,
+        existing.pastDueSince,
+        now,
+      );
 
       await ctx.db.patch(existing._id, {
         stripeCustomerId: args.stripeCustomerId,
@@ -435,20 +454,14 @@ export const updateByStripeCustomerInternal = internalMutation({
       return null;
     }
 
-    // CRITICAL: Clear trialEndsAt when status becomes "active" to prevent zombie trial access.
-    const trialEndsAt =
-      args.status === "active" ? undefined : (args.trialEndsAt ?? subscription.trialEndsAt);
-
-    // Track pastDueSince: set only on transition TO past_due, clear on any other status
     const now = Date.now();
-    const isTransitioningToPastDue =
-      args.status === "past_due" && subscription.status !== "past_due";
-    const pastDueSince =
-      args.status === "past_due"
-        ? isTransitioningToPastDue
-          ? now
-          : subscription.pastDueSince
-        : undefined; // Clear when leaving past_due
+    const trialEndsAt = computeTrialEndsAt(args.status, args.trialEndsAt, subscription.trialEndsAt);
+    const pastDueSince = computePastDueSince(
+      args.status,
+      subscription.status as SubscriptionStatus,
+      subscription.pastDueSince,
+      now,
+    );
 
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
@@ -550,20 +563,14 @@ export const updateFromStripe = internalMutation({
       return null;
     }
 
-    // CRITICAL: Clear trialEndsAt when status becomes "active" to prevent zombie trial access.
-    const trialEndsAt =
-      args.status === "active" ? undefined : (args.trialEndsAt ?? subscription.trialEndsAt);
-
-    // Track pastDueSince: set only on transition TO past_due, clear on any other status
     const now = Date.now();
-    const isTransitioningToPastDue =
-      args.status === "past_due" && subscription.status !== "past_due";
-    const pastDueSince =
-      args.status === "past_due"
-        ? isTransitioningToPastDue
-          ? now
-          : subscription.pastDueSince
-        : undefined; // Clear when leaving past_due
+    const trialEndsAt = computeTrialEndsAt(args.status, args.trialEndsAt, subscription.trialEndsAt);
+    const pastDueSince = computePastDueSince(
+      args.status,
+      subscription.status as SubscriptionStatus,
+      subscription.pastDueSince,
+      now,
+    );
 
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,

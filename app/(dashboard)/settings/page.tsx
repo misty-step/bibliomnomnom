@@ -35,6 +35,18 @@ function getPlanName(priceId: string | undefined): string {
 }
 
 /**
+ * Get billing period label based on subscription state.
+ */
+function getBillingLabel(
+  status: string | undefined,
+  cancelAtPeriodEnd: boolean | undefined,
+): string {
+  if (status === "trialing") return "Trial Ends";
+  if (cancelAtPeriodEnd) return "Access Until";
+  return "Next Billing";
+}
+
+/**
  * Get status display info.
  */
 function getStatusDisplay(status: string | undefined, cancelAtPeriodEnd: boolean | undefined) {
@@ -174,16 +186,14 @@ function SubscriptionCard() {
             <Calendar className="mt-0.5 h-5 w-5 text-text-inkMuted" />
             <div>
               <p className="text-sm text-text-inkMuted">
-                {subscription.status === "trialing"
-                  ? "Trial Ends"
-                  : subscription.cancelAtPeriodEnd
-                    ? "Access Until"
-                    : "Next Billing"}
+                {getBillingLabel(subscription.status, subscription.cancelAtPeriodEnd)}
               </p>
               <p className="font-medium text-text-ink">
-                {subscription.status === "trialing"
-                  ? formatDate(subscription.trialEndsAt)
-                  : formatDate(subscription.currentPeriodEnd)}
+                {formatDate(
+                  subscription.status === "trialing"
+                    ? subscription.trialEndsAt
+                    : subscription.currentPeriodEnd,
+                )}
               </p>
               {subscription.daysRemaining !== null && subscription.daysRemaining <= 7 && (
                 <p className="mt-1 text-sm text-amber-700 dark:text-status-warning">
