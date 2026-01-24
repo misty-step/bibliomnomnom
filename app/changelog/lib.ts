@@ -25,8 +25,9 @@ export async function getReleases(): Promise<GitHubRelease[]> {
     headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   }
 
-  const res = await fetch("https://api.github.com/repos/phaedrus/bibliomnomnom/releases", {
+  const res = await fetch("https://api.github.com/repos/misty-step/bibliomnomnom/releases", {
     headers,
+    signal: AbortSignal.timeout(10000), // 10s timeout
     next: { revalidate: 3600 },
   });
 

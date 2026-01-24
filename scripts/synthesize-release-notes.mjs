@@ -10,8 +10,12 @@
  * - OPENROUTER_API_KEY: For LLM synthesis
  */
 
-const REPO_OWNER = "phaedrus";
-const REPO_NAME = "bibliomnomnom";
+// Use GITHUB_REPOSITORY env var (set by GitHub Actions) with fallback
+const repo = process.env.GITHUB_REPOSITORY || "misty-step/bibliomnomnom";
+const [REPO_OWNER, REPO_NAME] = repo.split("/");
+if (!REPO_OWNER || !REPO_NAME) {
+  throw new Error(`Invalid GITHUB_REPOSITORY: ${repo}`);
+}
 
 // DeepSeek V3.2: GPT-5 class performance at ~$0.24/$0.38 per 1M tokens
 const OPENROUTER_MODEL = "deepseek/deepseek-v3.2";
@@ -21,11 +25,19 @@ async function main() {
   const openrouterKey = process.env.OPENROUTER_API_KEY;
 
   if (!githubToken) {
+    if (process.env.CI) {
+      console.error("❌ GITHUB_TOKEN not set in CI environment");
+      process.exit(1);
+    }
     console.log("⏭️  GITHUB_TOKEN not set, skipping synthesis");
     process.exit(0);
   }
 
   if (!openrouterKey) {
+    if (process.env.CI) {
+      console.error("❌ OPENROUTER_API_KEY not set in CI environment");
+      process.exit(1);
+    }
     console.log("⏭️  OPENROUTER_API_KEY not set, skipping synthesis");
     process.exit(0);
   }
