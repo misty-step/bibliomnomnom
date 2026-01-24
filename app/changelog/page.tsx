@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { ChangelogList } from "./ChangelogList";
+import { getReleases } from "./lib";
 
 export const metadata: Metadata = {
   title: "Changelog | bibliomnomnom",
@@ -8,31 +9,6 @@ export const metadata: Metadata = {
 
 // Revalidate every hour
 export const revalidate = 3600;
-
-interface GitHubRelease {
-  id: number;
-  tag_name: string;
-  name: string;
-  body: string;
-  published_at: string;
-  html_url: string;
-}
-
-async function getReleases(): Promise<GitHubRelease[]> {
-  const res = await fetch("https://api.github.com/repos/phaedrus/bibliomnomnom/releases", {
-    headers: {
-      Accept: "application/vnd.github+json",
-    },
-    next: { revalidate: 3600 },
-  });
-
-  if (!res.ok) {
-    console.error("Failed to fetch releases:", res.status);
-    return [];
-  }
-
-  return res.json();
-}
 
 export default async function ChangelogPage() {
   const releases = await getReleases();

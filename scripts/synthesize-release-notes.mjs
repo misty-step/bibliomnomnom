@@ -33,6 +33,7 @@ async function main() {
   const releaseRes = await fetch(
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest`,
     {
+      signal: AbortSignal.timeout(10000), // 10s timeout
       headers: {
         Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github+json",
@@ -82,6 +83,7 @@ Write the user-friendly version (markdown format, no preamble):`;
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
     {
       method: "POST",
+      signal: AbortSignal.timeout(30000), // 30s timeout for LLM
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
@@ -126,6 +128,7 @@ ${technicalNotes}
     `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/${release.id}`,
     {
       method: "PATCH",
+      signal: AbortSignal.timeout(10000), // 10s timeout
       headers: {
         Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github+json",

@@ -1,28 +1,5 @@
 import { NextResponse } from "next/server";
-
-interface GitHubRelease {
-  id: number;
-  tag_name: string;
-  name: string;
-  body: string;
-  published_at: string;
-  html_url: string;
-}
-
-async function getReleases(): Promise<GitHubRelease[]> {
-  const res = await fetch("https://api.github.com/repos/phaedrus/bibliomnomnom/releases", {
-    headers: {
-      Accept: "application/vnd.github+json",
-    },
-    next: { revalidate: 3600 },
-  });
-
-  if (!res.ok) {
-    return [];
-  }
-
-  return res.json();
-}
+import { getReleases, extractUserNotes, escapeCdata } from "../lib";
 
 function escapeXml(text: string): string {
   return text
@@ -33,14 +10,6 @@ function escapeXml(text: string): string {
     .replace(/'/g, "&apos;");
 }
 
-function extractUserNotes(body: string): string {
-  const detailsIndex = body.indexOf("<details>");
-  if (detailsIndex !== -1) {
-    return body.substring(0, detailsIndex).trim();
-  }
-  return body;
-}
-
 export async function GET() {
   const releases = await getReleases();
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://bibliomnomnom.com";
@@ -49,13 +18,14 @@ export async function GET() {
     .slice(0, 20) // Latest 20 releases
     .map((release) => {
       const userNotes = extractUserNotes(release.body);
+      const safeNotes = escapeCdata(userNotes);
       return `
     <item>
       <title>${escapeXml(release.name || release.tag_name)}</title>
       <link>${escapeXml(release.html_url)}</link>
       <guid isPermaLink="true">${escapeXml(release.html_url)}</guid>
       <pubDate>${new Date(release.published_at).toUTCString()}</pubDate>
-      <description><![CDATA[${userNotes}]]></description>
+      <description><![CDATA[${safeNotes}]]></description>
     </item>`;
     })
     .join("");

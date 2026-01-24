@@ -1,16 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
-
-interface GitHubRelease {
-  id: number;
-  tag_name: string;
-  name: string;
-  body: string;
-  published_at: string;
-  html_url: string;
-}
+import DOMPurify from "dompurify";
+import { marked } from "marked";
+import type { GitHubRelease } from "./lib";
+import { extractUserNotes } from "./lib";
 
 interface GroupedReleases {
   [minorVersion: string]: GitHubRelease[];
@@ -53,17 +48,14 @@ function formatDate(dateString: string): string {
   });
 }
 
-function extractUserNotes(body: string): string {
-  // If synthesized, extract only the user-friendly part (before the <details> tag)
-  const detailsIndex = body.indexOf("<details>");
-  if (detailsIndex !== -1) {
-    return body.substring(0, detailsIndex).trim();
-  }
-  return body;
-}
-
 function ReleaseCard({ release }: { release: GitHubRelease }) {
   const userNotes = extractUserNotes(release.body);
+
+  // Sanitize markdown → HTML to prevent XSS
+  const sanitizedHtml = useMemo(() => {
+    const rawHtml = marked.parse(userNotes, { async: false }) as string;
+    return DOMPurify.sanitize(rawHtml);
+  }, [userNotes]);
 
   return (
     <article className="border-l-2 border-leather/30 pl-6 pb-8 relative">
@@ -82,7 +74,7 @@ function ReleaseCard({ release }: { release: GitHubRelease }) {
 
       <div
         className="prose prose-sm prose-ink max-w-none"
-        dangerouslySetInnerHTML={{ __html: markdownToHtml(userNotes) }}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
 
       <a
@@ -108,13 +100,13 @@ function MinorVersionGroup({
   defaultOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  const latestRelease = releases[0];
 
   return (
     <section className="mb-8">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 w-full text-left mb-4 group"
+        aria-expanded={isOpen}
       >
         {isOpen ? (
           <ChevronDown className="h-5 w-5 text-ink/40" />
@@ -137,33 +129,6 @@ function MinorVersionGroup({
         </div>
       )}
     </section>
-  );
-}
-
-// Simple markdown to HTML conversion (for release notes)
-function markdownToHtml(markdown: string): string {
-  return (
-    markdown
-      // Headers
-      .replace(/^### (.*$)/gim, '<h4 class="font-semibold mt-4 mb-2">$1</h4>')
-      .replace(/^## (.*$)/gim, '<h3 class="font-semibold mt-4 mb-2">$1</h3>')
-      // Bold
-      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-      // Italic
-      .replace(/\*(.*?)\*/g, "<em>$1</em>")
-      // Code
-      .replace(/`([^`]+)`/g, '<code class="bg-ink/5 px-1 rounded">$1</code>')
-      // Links
-      .replace(
-        /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" class="text-leather hover:underline" target="_blank" rel="noopener noreferrer">$1</a>',
-      )
-      // Lists
-      .replace(/^\s*[-*] (.*$)/gim, '<li class="ml-4">$1</li>')
-      // Paragraphs
-      .replace(/\n\n/g, "</p><p>")
-      // Line breaks
-      .replace(/\n/g, "<br />")
   );
 }
 

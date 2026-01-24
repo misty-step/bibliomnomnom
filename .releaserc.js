@@ -3,7 +3,7 @@
  * Auto-generates CHANGELOG.md and GitHub Releases from conventional commits
  * Docs: https://semantic-release.gitbook.io/
  */
-export default {
+const releaseConfig = {
   branches: ["master"],
   plugins: [
     // Analyze commits to determine version bump
@@ -68,3 +68,5 @@ export default {
     "@semantic-release/github",
   ],
 };
+
+export default releaseConfig;
