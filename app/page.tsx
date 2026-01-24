@@ -33,13 +33,7 @@ export default async function HomePage() {
       />
 
       {/* Navigation - Top Right */}
-      <nav className="absolute right-6 top-6 z-10 flex items-center gap-6" aria-label="Main">
-        <Link
-          href="/pricing"
-          className="font-mono text-sm text-text-inkMuted transition-colors hover:text-text-ink"
-        >
-          Pricing
-        </Link>
+      <nav className="absolute right-6 top-6 z-10 flex items-center gap-4" aria-label="Main">
         <ThemeToggle />
       </nav>
 

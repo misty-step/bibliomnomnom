@@ -4,8 +4,11 @@
 #
 # Usage:
 #   ./scripts/validate-env.sh              # Check local env only
+#   ./scripts/validate-env.sh --dev        # Also check Convex DEV for live key contamination
 #   ./scripts/validate-env.sh --prod       # Also check production Convex env
-#   ./scripts/validate-env.sh --prod-only  # Only check production Convex env
+#   ./scripts/validate-env.sh --all        # Check local, dev, and prod
+#   ./scripts/validate-env.sh --dev-only   # Only check Convex DEV
+#   ./scripts/validate-env.sh --prod-only  # Only check Convex PROD
 
 set -e
 
@@ -18,7 +21,9 @@ NC='\033[0m' # No Color
 
 # Parse arguments
 CHECK_PROD=false
+CHECK_DEV=false
 PROD_ONLY=false
+DEV_ONLY=false
 for arg in "$@"; do
   case $arg in
     --prod)
@@ -27,6 +32,17 @@ for arg in "$@"; do
     --prod-only)
       PROD_ONLY=true
       CHECK_PROD=true
+      ;;
+    --dev)
+      CHECK_DEV=true
+      ;;
+    --dev-only)
+      DEV_ONLY=true
+      CHECK_DEV=true
+      ;;
+    --all)
+      CHECK_PROD=true
+      CHECK_DEV=true
       ;;
   esac
 done
@@ -246,6 +262,91 @@ check_local_env() {
   return 0
 }
 
+check_convex_dev_env() {
+  echo ""
+  echo -e "${CYAN}Checking Convex DEV environment variables...${NC}"
+  echo ""
+
+  # Get current dev env vars (default, no --prod flag)
+  local dev_env=""
+  dev_env=$(npx convex env list 2>/dev/null || echo "")
+
+  if [[ -z "$dev_env" ]]; then
+    echo -e "${RED}  Failed to fetch dev environment variables.${NC}"
+    echo -e "${YELLOW}  Check your Convex authentication.${NC}"
+    return 1
+  fi
+
+  echo -e "  ${GREEN}Connected to dev deployment${NC}"
+  echo ""
+
+  local dev_errors=()
+
+  # Check Stripe keys are TEST mode (not LIVE)
+  local stripe_secret
+  stripe_secret=$(echo "$dev_env" | grep "^STRIPE_SECRET_KEY=" | cut -d= -f2-)
+  # Strip surrounding quotes (convex env list may quote values)
+  stripe_secret="${stripe_secret%\"}"
+  stripe_secret="${stripe_secret#\"}"
+  stripe_secret="${stripe_secret%\'}"
+  stripe_secret="${stripe_secret#\'}"
+  if [[ -n "$stripe_secret" ]]; then
+    if [[ "$stripe_secret" =~ ^sk_live_ ]]; then
+      dev_errors+=("STRIPE_SECRET_KEY is LIVE key (sk_live_) - dev should use TEST key (sk_test_)")
+    elif [[ "$stripe_secret" =~ ^sk_test_ ]]; then
+      echo -e "  ${GREEN}✓ STRIPE_SECRET_KEY is TEST mode${NC}"
+    fi
+  fi
+
+  local stripe_pub
+  stripe_pub=$(echo "$dev_env" | grep "^STRIPE_PUBLISHABLE_KEY=" | cut -d= -f2-)
+  # Strip surrounding quotes (convex env list may quote values)
+  stripe_pub="${stripe_pub%\"}"
+  stripe_pub="${stripe_pub#\"}"
+  stripe_pub="${stripe_pub%\'}"
+  stripe_pub="${stripe_pub#\'}"
+  if [[ -n "$stripe_pub" ]]; then
+    if [[ "$stripe_pub" =~ ^pk_live_ ]]; then
+      dev_errors+=("STRIPE_PUBLISHABLE_KEY is LIVE key (pk_live_) - dev should use TEST key (pk_test_)")
+    elif [[ "$stripe_pub" =~ ^pk_test_ ]]; then
+      echo -e "  ${GREEN}✓ STRIPE_PUBLISHABLE_KEY is TEST mode${NC}"
+    fi
+  fi
+
+  # Check Clerk issuer domain is dev (not production custom domain)
+  local clerk_issuer
+  clerk_issuer=$(echo "$dev_env" | grep "^CLERK_JWT_ISSUER_DOMAIN=" | cut -d= -f2-)
+  # Strip surrounding quotes (convex env list may quote values)
+  clerk_issuer="${clerk_issuer%\"}"
+  clerk_issuer="${clerk_issuer#\"}"
+  clerk_issuer="${clerk_issuer%\'}"
+  clerk_issuer="${clerk_issuer#\'}"
+  if [[ -n "$clerk_issuer" ]]; then
+    if [[ "$clerk_issuer" =~ \.clerk\.accounts\.dev ]]; then
+      echo -e "  ${GREEN}✓ CLERK_JWT_ISSUER_DOMAIN is dev mode (.clerk.accounts.dev)${NC}"
+    elif [[ "$clerk_issuer" =~ clerk\. ]]; then
+      # Custom domain like clerk.bibliomnomnom.com - likely production
+      dev_errors+=("CLERK_JWT_ISSUER_DOMAIN appears to be production ($clerk_issuer) - dev should use .clerk.accounts.dev domain")
+    fi
+  fi
+
+  if [[ ${#dev_errors[@]} -gt 0 ]]; then
+    echo ""
+    echo -e "${RED}  ❌ DEV environment has PRODUCTION credentials:${NC}"
+    for err in "${dev_errors[@]}"; do
+      echo -e "    ${RED}- $err${NC}"
+    done
+    echo ""
+    echo -e "${YELLOW}  This is dangerous! Dev operations will affect production services.${NC}"
+    echo -e "${YELLOW}  Fix with: npx convex env set <VAR_NAME> \"<test_value>\"${NC}"
+    return 1
+  fi
+
+  echo ""
+  echo -e "${GREEN}  ✓ DEV environment uses test/dev credentials${NC}"
+  return 0
+}
+
 check_convex_prod_env() {
   echo ""
   echo -e "${CYAN}Checking Convex production environment variables...${NC}"
@@ -364,8 +465,12 @@ check_convex_prod_env() {
 # Main execution
 exit_code=0
 
-if [[ "$PROD_ONLY" == "false" ]]; then
+if [[ "$PROD_ONLY" == "false" ]] && [[ "$DEV_ONLY" == "false" ]]; then
   check_local_env || exit_code=1
+fi
+
+if [[ "$CHECK_DEV" == "true" ]]; then
+  check_convex_dev_env || exit_code=1
 fi
 
 if [[ "$CHECK_PROD" == "true" ]]; then

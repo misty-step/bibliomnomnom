@@ -21,6 +21,34 @@ type SubscriptionStatus = "trialing" | "active" | "canceled" | "past_due" | "exp
 const PAST_DUE_GRACE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Compute trialEndsAt for subscription update.
+ * Clears trial when status becomes "active" to prevent zombie trial access.
+ */
+function computeTrialEndsAt(
+  newStatus: SubscriptionStatus,
+  incomingTrialEndsAt: number | undefined,
+  existingTrialEndsAt: number | undefined,
+): number | undefined {
+  if (newStatus === "active") return undefined;
+  return incomingTrialEndsAt ?? existingTrialEndsAt;
+}
+
+/**
+ * Compute pastDueSince for subscription update.
+ * Sets only on transition TO past_due, clears on any other status.
+ */
+function computePastDueSince(
+  newStatus: SubscriptionStatus,
+  existingStatus: SubscriptionStatus,
+  existingPastDueSince: number | undefined,
+  now: number,
+): number | undefined {
+  if (newStatus !== "past_due") return undefined;
+  if (existingStatus !== "past_due") return now; // Transition to past_due
+  return existingPastDueSince; // Already past_due, preserve original timestamp
+}
+
+/**
  * Check if a subscription grants access to the application.
  *
  * Access is granted for:
@@ -45,8 +73,10 @@ export function hasAccess(subscription: Doc<"subscriptions"> | null): boolean {
     case "past_due": {
       // Limited grace period for payment retry (7 days max)
       // Don't grant indefinite access until period end (could be a year for annual plans)
+      // Uses pastDueSince (set on transition TO past_due) to prevent reset on every webhook update
       if (!subscription.currentPeriodEnd) return false;
-      const gracePeriodEnd = subscription.updatedAt + PAST_DUE_GRACE_PERIOD_MS;
+      const pastDueStart = subscription.pastDueSince ?? subscription.updatedAt;
+      const gracePeriodEnd = pastDueStart + PAST_DUE_GRACE_PERIOD_MS;
       return now < gracePeriodEnd && subscription.currentPeriodEnd >= now;
     }
     case "expired":
@@ -184,9 +214,16 @@ export const ensureTrialExists = mutation({
       if (allMatches.length > 1) {
         // Keep earliest by _creationTime, delete others
         const sorted = allMatches.sort((a, b) => a._creationTime - b._creationTime);
+        const keeper = sorted[0]!;
         for (const dupe of sorted.slice(1)) {
           await ctx.db.delete(dupe._id);
         }
+        // Return the keeper (not `existing`, which might have been deleted if it wasn't earliest)
+        return {
+          ...keeper,
+          hasAccess: hasAccess(keeper),
+          daysRemaining: getDaysRemaining(keeper),
+        };
       }
 
       return {
@@ -361,13 +398,22 @@ export const upsertFromWebhookInternal = internalMutation({
 
     if (existing) {
       // Update existing subscription (including internal trial → paid conversion)
+      const trialEndsAt = computeTrialEndsAt(args.status, args.trialEndsAt, existing.trialEndsAt);
+      const pastDueSince = computePastDueSince(
+        args.status,
+        existing.status as SubscriptionStatus,
+        existing.pastDueSince,
+        now,
+      );
+
       await ctx.db.patch(existing._id, {
         stripeCustomerId: args.stripeCustomerId,
         stripeSubscriptionId: args.stripeSubscriptionId ?? existing.stripeSubscriptionId,
         status: args.status,
         priceId: args.priceId ?? existing.priceId,
         currentPeriodEnd: args.currentPeriodEnd ?? existing.currentPeriodEnd,
-        trialEndsAt: args.trialEndsAt ?? existing.trialEndsAt,
+        trialEndsAt,
+        pastDueSince,
         cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? existing.cancelAtPeriodEnd,
         updatedAt: now,
       });
@@ -408,14 +454,24 @@ export const updateByStripeCustomerInternal = internalMutation({
       return null;
     }
 
+    const now = Date.now();
+    const trialEndsAt = computeTrialEndsAt(args.status, args.trialEndsAt, subscription.trialEndsAt);
+    const pastDueSince = computePastDueSince(
+      args.status,
+      subscription.status as SubscriptionStatus,
+      subscription.pastDueSince,
+      now,
+    );
+
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
       status: args.status,
       priceId: args.priceId ?? subscription.priceId,
       currentPeriodEnd: args.currentPeriodEnd ?? subscription.currentPeriodEnd,
-      trialEndsAt: args.trialEndsAt ?? subscription.trialEndsAt,
+      trialEndsAt,
+      pastDueSince,
       cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? subscription.cancelAtPeriodEnd,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     return subscription._id;
@@ -507,14 +563,24 @@ export const updateFromStripe = internalMutation({
       return null;
     }
 
+    const now = Date.now();
+    const trialEndsAt = computeTrialEndsAt(args.status, args.trialEndsAt, subscription.trialEndsAt);
+    const pastDueSince = computePastDueSince(
+      args.status,
+      subscription.status as SubscriptionStatus,
+      subscription.pastDueSince,
+      now,
+    );
+
     await ctx.db.patch(subscription._id, {
       stripeSubscriptionId: args.stripeSubscriptionId ?? subscription.stripeSubscriptionId,
       status: args.status,
       priceId: args.priceId ?? subscription.priceId,
       currentPeriodEnd: args.currentPeriodEnd ?? subscription.currentPeriodEnd,
-      trialEndsAt: args.trialEndsAt ?? subscription.trialEndsAt,
+      trialEndsAt,
+      pastDueSince,
       cancelAtPeriodEnd: args.cancelAtPeriodEnd ?? subscription.cancelAtPeriodEnd,
-      updatedAt: Date.now(),
+      updatedAt: now,
     });
 
     return subscription._id;
@@ -546,5 +612,59 @@ export const getByUser = internalQuery({
       .query("subscriptions")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .first();
+  },
+});
+
+/**
+ * DEV ONLY: Clear stale Stripe customer data from all subscriptions.
+ * Use when database has stripeCustomerIds from a different Stripe account.
+ *
+ * Run with: npx convex run subscriptions:devClearStripeData
+ *
+ * Safety:
+ * - Internal mutation only (not callable from client)
+ * - Refuses to run if production Stripe key detected (checked BEFORE any mutations)
+ */
+export const devClearStripeData = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    // CRITICAL: Check for production key BEFORE any mutations to avoid partial updates
+    const stripeKey = process.env.STRIPE_SECRET_KEY || "";
+    if (stripeKey.startsWith("sk_live_")) {
+      throw new Error("Refusing to clear data: production Stripe key detected");
+    }
+
+    const subscriptions = await ctx.db.query("subscriptions").collect();
+
+    let cleared = 0;
+    const details: string[] = [];
+    const now = Date.now();
+    const trialEnd = now + TRIAL_DURATION_MS;
+
+    for (const sub of subscriptions) {
+      if (sub.stripeCustomerId || sub.stripeSubscriptionId) {
+        details.push(`Subscription ${sub._id}: cleared ${sub.stripeCustomerId || "no customer"}`);
+        await ctx.db.patch(sub._id, {
+          stripeCustomerId: undefined,
+          stripeSubscriptionId: undefined,
+          status: "trialing",
+          priceId: undefined,
+          cancelAtPeriodEnd: false,
+          // Restore valid trial window to prevent immediate access revocation
+          trialEndsAt: trialEnd,
+          currentPeriodEnd: trialEnd,
+          pastDueSince: undefined,
+          updatedAt: now,
+        });
+        cleared++;
+      }
+    }
+
+    return {
+      success: true,
+      message: `Cleared Stripe data from ${cleared} subscription(s). All reset to trial state with ${TRIAL_DAYS}-day trial.`,
+      cleared,
+      details,
+    };
   },
 });

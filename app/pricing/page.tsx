@@ -188,7 +188,7 @@ function PricingCTA({ isAnnual, state }: { isAnnual: boolean; state: Subscriptio
       <>
         <button onClick={handleCheckout} disabled={isLoading} className={buttonStyles}>
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {state.isUrgent ? "Keep Your Library" : "Become a Member"}
+          {state.isUrgent ? "Keep Your Library" : "Subscribe"}
         </button>
         <p className="text-sm text-text-inkSubtle">
           {state.isUrgent
@@ -290,7 +290,7 @@ function BottomCTA({ state }: { state: SubscriptionState }) {
         </p>
         <button onClick={handleCheckout} disabled={isLoading} className={buttonStyles}>
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          {state.isUrgent ? "Keep Your Library" : "Become a Member"}
+          {state.isUrgent ? "Keep Your Library" : "Subscribe"}
         </button>
       </div>
     );
@@ -421,7 +421,11 @@ export default function PricingPage() {
                 }`}
               >
                 Annual
-                <span className="ml-2 rounded-full bg-status-positive/10 px-2 py-0.5 text-xs text-status-positive">
+                <span
+                  className={`ml-2 rounded-full px-2 py-0.5 text-xs transition-all duration-200 ${
+                    isAnnual ? "bg-text-ink text-canvas-bone" : "bg-text-ink/10 text-text-inkMuted"
+                  }`}
+                >
                   2 months free
                 </span>
               </button>

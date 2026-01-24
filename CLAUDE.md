@@ -11,8 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Development
 
 ```bash
-# Start Next.js dev server (Turbopack is default in Next.js 16)
+# Start full dev environment (Next.js + Convex + Stripe webhook listener)
 pnpm dev
+
+# Start without Stripe listener (if running on different port)
+pnpm dev:no-stripe
 
 # Start Convex dev server (for live backend logs/updates)
 pnpm convex:dev
@@ -270,6 +273,7 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 - `NEXT_PUBLIC_CONVEX_URL`
 - `CONVEX_DEPLOYMENT`
 - `BLOB_READ_WRITE_TOKEN`
+- `NEXT_PUBLIC_SENTRY_DSN` (for error tracking)
 
 ## Common Issues & Solutions
 
@@ -298,6 +302,27 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 **Cause**: External image domain not whitelisted in `next.config.ts`
 **Fix**: Add hostname to `images.remotePatterns` in `next.config.ts`
 
+### Stripe webhooks not received in local dev
+
+**Cause**: Stripe cannot reach `localhost` to deliver webhooks
+**Fix**: Use Stripe CLI to forward webhooks locally:
+
+```bash
+# 1. Install Stripe CLI (if not already)
+brew install stripe/stripe-cli/stripe
+
+# 2. Login to Stripe
+stripe login
+
+# 3. Forward webhooks to local dev server
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+
+# 4. Copy the webhook signing secret from CLI output to .env.local
+# It will look like: whsec_...
+```
+
+**Note**: `pnpm dev` now runs the Stripe listener automatically. If running on a different port, run `stripe listen` manually with the correct port. Use `pnpm dev:no-stripe` to run without the listener.
+
 ## Testing Strategy
 
 ### Current State (MVP)
@@ -312,6 +337,109 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 - **E2E tests**: Playwright for critical user flows
 - **Visual regression**: Chromatic for component library
 - Detailed testing architecture in DESIGN.md lines 1572-1809
+
+## Observability
+
+### Overview
+
+Production monitoring uses Sentry for error tracking, pino for structured logging (captured by Vercel), and Vercel Analytics for web vitals. All queryable from CLI.
+
+### CLI Access (`./scripts/obs`)
+
+```bash
+# Full status overview (health + issues + alerts)
+./scripts/obs status
+
+# List unresolved Sentry issues
+./scripts/obs issues [--limit N] [--env production|preview]
+
+# Get issue details
+./scripts/obs issue BIBLIOMNOMNOM-123
+
+# Check health endpoint
+./scripts/obs health [--deep] [--prod]
+
+# List alert rules
+./scripts/obs alerts
+
+# Resolve an issue
+./scripts/obs resolve BIBLIOMNOMNOM-123
+
+# Tail Vercel logs
+./scripts/obs logs [--follow]
+```
+
+**Requires:** `SENTRY_AUTH_TOKEN` environment variable set in shell.
+
+### Sentry Configuration
+
+- **Project:** `bibliomnomnom` in `misty-step` org
+- **DSN:** Set in `.env.local` and Vercel production
+- **Config:** `.sentryclirc` (gitignored, uses env token)
+- **Tunnel:** `/monitoring` route bypasses ad blockers
+
+**Alert Rules (5 active):**
+
+| Rule | Trigger |
+|------|---------|
+| New Error Alert | First occurrence of any new issue |
+| Regression Alert | Resolved issue resurfaces |
+| High-Frequency Error | Same error 10+ times in 1 hour |
+| Critical: Auth/Payment | Errors in stripe/clerk/webhook routes |
+| High-Priority Issues | Default Sentry rule |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `sentry.client.config.ts` | Client-side Sentry init + session replay |
+| `sentry.server.config.ts` | Server-side Sentry init |
+| `lib/sentry-config.ts` | Shared config + PII scrubbing |
+| `lib/sentry.ts` | `captureError`/`captureMessage` utilities |
+| `lib/logger.ts` | pino logger (JSON in prod, pretty in dev) |
+| `lib/api/withObservability.ts` | API route wrapper with logging + error capture |
+| `app/api/health/route.ts` | Health endpoint with service probes |
+
+### Health Endpoint
+
+```bash
+# Shallow check (fast, no external calls)
+curl https://bibliomnomnom.com/api/health
+
+# Deep check (probes Convex, Clerk, Blob, Stripe)
+curl https://bibliomnomnom.com/api/health?mode=deep
+```
+
+### Error Capture in Code
+
+```typescript
+// In client components (safe for browser)
+import { captureError } from "@/lib/sentry";
+
+try {
+  // risky operation
+} catch (error) {
+  captureError(error, { tags: { feature: "book-import" } });
+}
+
+// In API routes (automatic via withObservability)
+export const POST = withObservability(async (req) => {
+  // errors auto-captured with context
+}, "operation-name");
+```
+
+### Logging
+
+**Server-only code** (not API routes):
+```typescript
+import { logger } from "@/lib/logger";
+
+// Pino structured JSON output
+logger.info({ msg: "book_created", bookId, userId });
+logger.error({ msg: "import_failed", error: err.message });
+```
+
+**API routes**: Use `withObservability` wrapper which outputs JSON via console (pino has Next.js bundling issues in API routes).
 
 ## Performance Targets
 
@@ -391,6 +519,6 @@ From previous grooming sessions:
 
 ---
 
-**Last Updated**: 2026-01-01
+**Last Updated**: 2026-01-23
 **Architecture Version**: 1.0 (Complete)
 **Status**: MVP in active development

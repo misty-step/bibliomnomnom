@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+#
+# obs - Observability CLI for bibliomnomnom
+#
+# Usage:
+#   ./scripts/obs issues [--limit N] [--env ENV]  - List Sentry issues
+#   ./scripts/obs issue <ID>                      - Get issue details
+#   ./scripts/obs health [--deep]                 - Check health endpoint
+#   ./scripts/obs logs [--follow]                 - Tail Vercel logs
+#   ./scripts/obs alerts                          - List alert rules
+#   ./scripts/obs status                          - Full status overview
+#
+set -euo pipefail
+
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Config
+SENTRY_ORG="${SENTRY_ORG:-misty-step}"
+SENTRY_PROJECT="${SENTRY_PROJECT:-bibliomnomnom}"
+APP_URL="${NEXT_PUBLIC_APP_URL:-http://localhost:3000}"
+PROD_URL="https://bibliomnomnom.com"
+
+usage() {
+    cat <<EOF
+${BLUE}obs${NC} - Observability CLI for bibliomnomnom
+
+${YELLOW}Usage:${NC}
+  obs issues [--limit N] [--env ENV]  List Sentry issues
+  obs issue <ID>                      Get issue details
+  obs health [--deep] [--prod]        Check health endpoint
+  obs logs [--follow]                 Tail Vercel logs
+  obs alerts                          List alert rules
+  obs status                          Full status overview
+  obs resolve <ID>                    Resolve a Sentry issue
+
+${YELLOW}Examples:${NC}
+  obs issues --limit 5                Show 5 most recent issues
+  obs health --deep --prod            Deep health check on production
+  obs status                          Show everything
+
+${YELLOW}Environment:${NC}
+  SENTRY_AUTH_TOKEN    Required for Sentry commands
+  NEXT_PUBLIC_APP_URL  Local app URL (default: localhost:3000)
+EOF
+}
+
+# Check for required token
+check_sentry_token() {
+    if [[ -z "${SENTRY_AUTH_TOKEN:-}" ]]; then
+        echo -e "${RED}Error:${NC} SENTRY_AUTH_TOKEN not set"
+        echo "Set it with: export SENTRY_AUTH_TOKEN=sntryu_..."
+        exit 1
+    fi
+}
+
+# List Sentry issues
+cmd_issues() {
+    check_sentry_token
+    local limit=10
+    local env="production"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --limit) limit="$2"; shift 2 ;;
+            --env) env="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    echo -e "${BLUE}→${NC} Fetching issues (env: $env, limit: $limit)"
+
+    local response
+    response=$(curl -sS "https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=is:unresolved+environment:${env}&limit=${limit}" \
+        -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}")
+
+    if [[ $(echo "$response" | jq 'length') -eq 0 ]]; then
+        echo -e "${GREEN}✓${NC} No unresolved issues"
+        return
+    fi
+
+    echo "$response" | jq -r '.[] | "\(.shortId)\t\(.count)\t\(.title | .[0:60])"' | \
+        awk -F'\t' 'BEGIN {printf "%-12s %-6s %s\n", "ID", "COUNT", "TITLE"; print "---"} {printf "%-12s %-6s %s\n", $1, $2, $3}'
+}
+
+# Get issue details
+cmd_issue() {
+    check_sentry_token
+    local issue_id="${1:-}"
+
+    if [[ -z "$issue_id" ]]; then
+        echo -e "${RED}Error:${NC} Issue ID required"
+        echo "Usage: obs issue BIBLIOMNOMNOM-123"
+        exit 1
+    fi
+
+    echo -e "${BLUE}→${NC} Fetching issue ${issue_id}"
+
+    curl -sS "https://sentry.io/api/0/issues/${issue_id}/" \
+        -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}" | \
+        jq '{
+            id: .shortId,
+            title: .title,
+            culprit: .culprit,
+            count: .count,
+            userCount: .userCount,
+            firstSeen: .firstSeen,
+            lastSeen: .lastSeen,
+            status: .status,
+            level: .level,
+            platform: .platform
+        }'
+
+    echo -e "\n${YELLOW}Latest event:${NC}"
+    curl -sS "https://sentry.io/api/0/issues/${issue_id}/events/latest/" \
+        -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}" | \
+        jq '{
+            message: .message,
+            timestamp: .dateCreated,
+            tags: .tags,
+            context: .contexts.browser
+        }'
+}
+
+# Check health endpoint
+cmd_health() {
+    local deep=false
+    local url="$APP_URL"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --deep) deep=true; shift ;;
+            --prod) url="$PROD_URL"; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    local endpoint="${url}/api/health"
+    [[ "$deep" == "true" ]] && endpoint="${endpoint}?mode=deep"
+
+    echo -e "${BLUE}→${NC} Checking health at ${endpoint}"
+
+    local response
+    local http_code
+
+    response=$(curl -sSL -w "\n%{http_code}" "$endpoint" 2>&1) || {
+        echo -e "${RED}✗${NC} Failed to connect to ${endpoint}"
+        return 1
+    }
+
+    http_code=$(echo "$response" | tail -1)
+    response=$(echo "$response" | sed '$d')
+
+    if [[ "$http_code" == "200" ]]; then
+        echo -e "${GREEN}✓${NC} Healthy (HTTP $http_code)"
+        echo "$response" | jq '.'
+    else
+        echo -e "${RED}✗${NC} Unhealthy (HTTP $http_code)"
+        echo "$response" | jq '.' 2>/dev/null || echo "$response"
+        return 1
+    fi
+}
+
+# Tail Vercel logs
+cmd_logs() {
+    local follow=false
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --follow|-f) follow=true; shift ;;
+            *) shift ;;
+        esac
+    done
+
+    if ! command -v vercel &>/dev/null; then
+        echo -e "${RED}Error:${NC} vercel CLI not installed"
+        echo "Install with: pnpm add -g vercel"
+        exit 1
+    fi
+
+    echo -e "${BLUE}→${NC} Fetching Vercel logs"
+
+    if [[ "$follow" == "true" ]]; then
+        vercel logs --follow
+    else
+        vercel logs --limit 50
+    fi
+}
+
+# List alert rules
+cmd_alerts() {
+    check_sentry_token
+
+    echo -e "${BLUE}→${NC} Fetching alert rules"
+
+    curl -sS "https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/rules/" \
+        -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}" | \
+        jq -r '.[] | "\(.id)\t\(.name)\t\(.status)"' | \
+        awk -F'\t' 'BEGIN {printf "%-10s %-30s %s\n", "ID", "NAME", "STATUS"; print "---"} {printf "%-10s %-30s %s\n", $1, $2, $3}'
+}
+
+# Resolve issue (accepts BIBLIOMNOMNOM-123 or numeric ID)
+cmd_resolve() {
+    check_sentry_token
+    local issue_id="${1:-}"
+
+    if [[ -z "$issue_id" ]]; then
+        echo -e "${RED}Error:${NC} Issue ID required"
+        echo "Usage: obs resolve BIBLIOMNOMNOM-123"
+        exit 1
+    fi
+
+    # If short ID provided, look up numeric ID
+    local numeric_id="$issue_id"
+    if [[ "$issue_id" == BIBLIOMNOMNOM-* ]]; then
+        echo -e "${BLUE}→${NC} Looking up issue ${issue_id}"
+        numeric_id=$(curl -sS "https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=is:unresolved" \
+            -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}" | \
+            jq -r ".[] | select(.shortId == \"${issue_id}\") | .id")
+
+        if [[ -z "$numeric_id" ]]; then
+            echo -e "${RED}Error:${NC} Issue ${issue_id} not found or already resolved"
+            exit 1
+        fi
+    fi
+
+    echo -e "${BLUE}→${NC} Resolving issue ${issue_id} (ID: ${numeric_id})"
+
+    curl -sS -X PUT "https://sentry.io/api/0/issues/${numeric_id}/" \
+        -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+        -H"Content-Type: application/json" \
+        -d '{"status": "resolved"}' | jq '{id: .shortId, status: .status}'
+
+    echo -e "${GREEN}✓${NC} Issue resolved"
+}
+
+# Full status overview
+cmd_status() {
+    echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}     bibliomnomnom Observability        ${BLUE}║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
+    echo
+
+    # Health check (prod first, fallback to local)
+    echo -e "${YELLOW}Health:${NC}"
+    if ! cmd_health --prod 2>/dev/null; then
+        echo -e "  ${YELLOW}(prod unavailable, checking local)${NC}"
+        cmd_health 2>/dev/null || true
+    fi
+    echo
+
+    # Recent issues
+    echo -e "${YELLOW}Recent Issues:${NC}"
+    cmd_issues --limit 5 2>/dev/null || echo -e "  ${RED}Could not fetch issues${NC}"
+    echo
+
+    # Alert rules
+    echo -e "${YELLOW}Alert Rules:${NC}"
+    cmd_alerts 2>/dev/null || echo -e "  ${RED}Could not fetch alerts${NC}"
+}
+
+# Main
+case "${1:-}" in
+    issues) shift; cmd_issues "$@" ;;
+    issue) shift; cmd_issue "$@" ;;
+    health) shift; cmd_health "$@" ;;
+    logs) shift; cmd_logs "$@" ;;
+    alerts) shift; cmd_alerts "$@" ;;
+    resolve) shift; cmd_resolve "$@" ;;
+    status) cmd_status ;;
+    -h|--help|help) usage ;;
+    "") usage ;;
+    *) echo -e "${RED}Unknown command:${NC} $1"; usage; exit 1 ;;
+esac

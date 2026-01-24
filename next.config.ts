@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Avoid 308 redirects for POST requests
+  skipTrailingSlashRedirect: true,
+
   images: {
     remotePatterns: [
       {
@@ -61,6 +64,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
 };
 
 // Sentry configuration for Next.js
