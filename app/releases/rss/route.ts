@@ -33,12 +33,12 @@ export async function GET() {
   const feed = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>bibliomnomnom Changelog</title>
-    <link>${siteUrl}/changelog</link>
+    <title>bibliomnomnom Releases</title>
+    <link>${siteUrl}/releases</link>
     <description>Updates and improvements to bibliomnomnom, the book tracker for voracious readers</description>
     <language>en-us</language>
     <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
-    <atom:link href="${siteUrl}/changelog/rss" rel="self" type="application/rss+xml"/>
+    <atom:link href="${siteUrl}/releases/rss" rel="self" type="application/rss+xml"/>
     ${items}
   </channel>
 </rss>`;

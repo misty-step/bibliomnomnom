@@ -132,7 +132,7 @@ function MinorVersionGroup({
   );
 }
 
-export function ChangelogList({ releases }: { releases: GitHubRelease[] }) {
+export function ReleasesList({ releases }: { releases: GitHubRelease[] }) {
   const grouped = groupByMinorVersion(releases);
   const sortedVersions = Object.keys(grouped).sort((a, b) => {
     const [aMajor = 0, aMinor = 0] = a.split(".").map(Number);
