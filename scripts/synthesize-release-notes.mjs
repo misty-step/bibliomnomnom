@@ -2,29 +2,31 @@
 /**
  * Synthesize Release Notes
  *
- * Fetches the latest GitHub release and uses Gemini to transform
+ * Fetches the latest GitHub release and uses an LLM via OpenRouter to transform
  * technical changelog into user-friendly release notes.
  *
  * Requirements:
  * - GITHUB_TOKEN: For fetching/updating releases
- * - GEMINI_API_KEY: For LLM synthesis
+ * - OPENROUTER_API_KEY: For LLM synthesis
  */
 
 const REPO_OWNER = "phaedrus";
 const REPO_NAME = "bibliomnomnom";
-const GEMINI_MODEL = "gemini-2.5-flash-preview-05-20";
+
+// DeepSeek V3.2: GPT-5 class performance at ~$0.24/$0.38 per 1M tokens
+const OPENROUTER_MODEL = "deepseek/deepseek-v3.2";
 
 async function main() {
   const githubToken = process.env.GITHUB_TOKEN;
-  const geminiKey = process.env.GEMINI_API_KEY;
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
 
   if (!githubToken) {
     console.log("⏭️  GITHUB_TOKEN not set, skipping synthesis");
     process.exit(0);
   }
 
-  if (!geminiKey) {
-    console.log("⏭️  GEMINI_API_KEY not set, skipping synthesis");
+  if (!openrouterKey) {
+    console.log("⏭️  OPENROUTER_API_KEY not set, skipping synthesis");
     process.exit(0);
   }
 
@@ -60,8 +62,8 @@ async function main() {
 
   const technicalNotes = release.body || "";
 
-  // Call Gemini API
-  console.log("🤖 Synthesizing with Gemini...");
+  // Call OpenRouter API (OpenAI-compatible format)
+  console.log(`🤖 Synthesizing with ${OPENROUTER_MODEL}...`);
   const prompt = `You are a product manager writing release notes for bibliomnomnom, a book tracking app for voracious readers.
 
 Transform these technical release notes into user-friendly notes that readers will appreciate.
@@ -79,33 +81,33 @@ ${technicalNotes}
 
 Write the user-friendly version (markdown format, no preamble):`;
 
-  const geminiRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
-    {
-      method: "POST",
-      signal: AbortSignal.timeout(30000), // 30s timeout for LLM
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1024,
-        },
-      }),
-    }
-  );
+  const llmRes = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    signal: AbortSignal.timeout(30000), // 30s timeout for LLM
+    headers: {
+      Authorization: `Bearer ${openrouterKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": "https://bibliomnomnom.com",
+      "X-Title": "bibliomnomnom Release Notes",
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 1024,
+    }),
+  });
 
-  if (!geminiRes.ok) {
-    const error = await geminiRes.text();
-    throw new Error(`Gemini API error: ${geminiRes.status} ${error}`);
+  if (!llmRes.ok) {
+    const error = await llmRes.text();
+    throw new Error(`OpenRouter API error: ${llmRes.status} ${error}`);
   }
 
-  const geminiData = await geminiRes.json();
-  const synthesized =
-    geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const llmData = await llmRes.json();
+  const synthesized = llmData.choices?.[0]?.message?.content || "";
 
   if (!synthesized) {
-    console.log("⚠️  Empty response from Gemini, keeping original notes");
+    console.log("⚠️  Empty response from LLM, keeping original notes");
     process.exit(0);
   }
 
