@@ -58,22 +58,22 @@ function ReleaseCard({ release }: { release: GitHubRelease }) {
   }, [userNotes]);
 
   return (
-    <article className="border-l-2 border-leather/30 pl-6 pb-8 relative">
-      <div className="absolute -left-2 top-0 h-4 w-4 rounded-full bg-leather border-4 border-paper" />
+    <article className="border-l-2 border-line-ghost pl-6 pb-8 relative">
+      <div className="absolute -left-2 top-0 h-4 w-4 rounded-full bg-text-ink border-4 border-canvas-bone" />
 
       <div className="flex items-baseline gap-3 mb-2">
-        <span className="font-mono text-sm font-semibold text-leather">{release.tag_name}</span>
-        <time className="text-sm text-ink/50" dateTime={release.published_at}>
+        <span className="font-mono text-sm font-semibold text-text-ink">{release.tag_name}</span>
+        <time className="text-sm text-text-inkSubtle" dateTime={release.published_at}>
           {formatDate(release.published_at)}
         </time>
       </div>
 
       {release.name && release.name !== release.tag_name && (
-        <h3 className="font-serif text-xl font-semibold text-ink mb-3">{release.name}</h3>
+        <h3 className="font-display text-xl font-semibold text-text-ink mb-3">{release.name}</h3>
       )}
 
       <div
-        className="prose prose-sm prose-ink max-w-none"
+        className="prose prose-sm max-w-none text-text-inkMuted prose-headings:text-text-ink prose-strong:text-text-ink prose-a:text-text-ink"
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
 
@@ -81,7 +81,7 @@ function ReleaseCard({ release }: { release: GitHubRelease }) {
         href={release.html_url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 mt-4 text-sm text-leather hover:text-leather/80 transition-colors"
+        className="inline-flex items-center gap-1 mt-4 text-sm text-text-inkSubtle hover:text-text-ink transition-colors"
       >
         View on GitHub
         <ExternalLink className="h-3 w-3" />
@@ -109,14 +109,14 @@ function MinorVersionGroup({
         aria-expanded={isOpen}
       >
         {isOpen ? (
-          <ChevronDown className="h-5 w-5 text-ink/40" />
+          <ChevronDown className="h-5 w-5 text-text-inkSubtle" />
         ) : (
-          <ChevronRight className="h-5 w-5 text-ink/40" />
+          <ChevronRight className="h-5 w-5 text-text-inkSubtle" />
         )}
-        <h2 className="font-serif text-2xl font-bold text-ink group-hover:text-leather transition-colors">
+        <h2 className="font-display text-2xl font-bold text-text-ink group-hover:text-text-inkMuted transition-colors">
           v{version}
         </h2>
-        <span className="text-sm text-ink/50">
+        <span className="text-sm text-text-inkSubtle">
           ({releases.length} {releases.length === 1 ? "release" : "releases"})
         </span>
       </button>
