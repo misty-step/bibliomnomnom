@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReleases, extractUserNotes, escapeCdata } from "../lib";
+import { getReleases, escapeCdata } from "../lib";
 
 function escapeXml(text: string): string {
   return text
@@ -17,14 +17,16 @@ export async function GET() {
   const items = releases
     .slice(0, 20) // Latest 20 releases
     .map((release) => {
-      const userNotes = extractUserNotes(release.body);
-      const safeNotes = escapeCdata(userNotes);
+      const safeNotes = escapeCdata(release.productNotes);
+      const title = `v${release.version}`;
+      const link = release.compareUrl || `${siteUrl}/releases`;
+
       return `
     <item>
-      <title>${escapeXml(release.name || release.tag_name)}</title>
-      <link>${escapeXml(release.html_url)}</link>
-      <guid isPermaLink="true">${escapeXml(release.html_url)}</guid>
-      <pubDate>${new Date(release.published_at).toUTCString()}</pubDate>
+      <title>${escapeXml(title)}</title>
+      <link>${escapeXml(link)}</link>
+      <guid isPermaLink="false">bibliomnomnom-v${release.version}</guid>
+      <pubDate>${new Date(release.date).toUTCString()}</pubDate>
       <description><![CDATA[${safeNotes}]]></description>
     </item>`;
     })

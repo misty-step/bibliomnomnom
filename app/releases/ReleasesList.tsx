@@ -1,18 +1,17 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, Github } from "lucide-react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
-import type { GitHubRelease } from "./lib";
-import { extractUserNotes } from "./lib";
+import type { ReleaseWithNotes } from "@/lib/releases/types";
 
 interface GroupedReleases {
-  [minorVersion: string]: GitHubRelease[];
+  [minorVersion: string]: ReleaseWithNotes[];
 }
 
-function parseVersion(tag: string): { major: number; minor: number; patch: number } {
-  const match = tag.replace(/^v/, "").match(/^(\d+)\.(\d+)\.(\d+)/);
+function parseVersion(version: string): { major: number; minor: number; patch: number } {
+  const match = version.replace(/^v/, "").match(/^(\d+)\.(\d+)\.(\d+)/);
   if (!match) return { major: 0, minor: 0, patch: 0 };
   return {
     major: parseInt(match[1] ?? "0", 10),
@@ -21,16 +20,16 @@ function parseVersion(tag: string): { major: number; minor: number; patch: numbe
   };
 }
 
-function getMinorVersion(tag: string): string {
-  const { major, minor } = parseVersion(tag);
+function getMinorVersion(version: string): string {
+  const { major, minor } = parseVersion(version);
   return `${major}.${minor}`;
 }
 
-function groupByMinorVersion(releases: GitHubRelease[]): GroupedReleases {
+function groupByMinorVersion(releases: ReleaseWithNotes[]): GroupedReleases {
   const groups: GroupedReleases = {};
 
   for (const release of releases) {
-    const minor = getMinorVersion(release.tag_name);
+    const minor = getMinorVersion(release.version);
     if (!groups[minor]) {
       groups[minor] = [];
     }
@@ -48,44 +47,41 @@ function formatDate(dateString: string): string {
   });
 }
 
-function ReleaseCard({ release }: { release: GitHubRelease }) {
-  const userNotes = extractUserNotes(release.body);
-
+function ReleaseCard({ release }: { release: ReleaseWithNotes }) {
   // Sanitize markdown → HTML to prevent XSS
   const sanitizedHtml = useMemo(() => {
-    const rawHtml = marked.parse(userNotes, { async: false }) as string;
+    const rawHtml = marked.parse(release.productNotes, { async: false }) as string;
     return DOMPurify.sanitize(rawHtml);
-  }, [userNotes]);
+  }, [release.productNotes]);
 
   return (
     <article className="border-l-2 border-line-ghost pl-6 pb-8 relative">
       <div className="absolute -left-2 top-0 h-4 w-4 rounded-full bg-text-ink border-4 border-canvas-bone" />
 
       <div className="flex items-baseline gap-3 mb-2">
-        <span className="font-mono text-sm font-semibold text-text-ink">{release.tag_name}</span>
-        <time className="text-sm text-text-inkSubtle" dateTime={release.published_at}>
-          {formatDate(release.published_at)}
+        <span className="font-mono text-sm font-semibold text-text-ink">v{release.version}</span>
+        <time className="text-sm text-text-inkSubtle" dateTime={release.date}>
+          {formatDate(release.date)}
         </time>
       </div>
-
-      {release.name && release.name !== release.tag_name && (
-        <h3 className="font-display text-xl font-semibold text-text-ink mb-3">{release.name}</h3>
-      )}
 
       <div
         className="prose prose-sm max-w-none text-text-inkMuted prose-headings:text-text-ink prose-strong:text-text-ink prose-a:text-text-ink"
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
 
-      <a
-        href={release.html_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 mt-4 text-sm text-text-inkSubtle hover:text-text-ink transition-colors"
-      >
-        View on GitHub
-        <ExternalLink className="h-3 w-3" />
-      </a>
+      {release.compareUrl && (
+        <a
+          href={release.compareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 mt-4 text-sm text-text-inkSubtle hover:text-text-ink transition-colors"
+        >
+          <Github className="h-3 w-3" />
+          View changes
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
     </article>
   );
 }
@@ -96,7 +92,7 @@ function MinorVersionGroup({
   defaultOpen = false,
 }: {
   version: string;
-  releases: GitHubRelease[];
+  releases: ReleaseWithNotes[];
   defaultOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -124,7 +120,7 @@ function MinorVersionGroup({
       {isOpen && (
         <div className="ml-2">
           {releases.map((release) => (
-            <ReleaseCard key={release.id} release={release} />
+            <ReleaseCard key={release.version} release={release} />
           ))}
         </div>
       )}
@@ -132,7 +128,7 @@ function MinorVersionGroup({
   );
 }
 
-export function ReleasesList({ releases }: { releases: GitHubRelease[] }) {
+export function ReleasesList({ releases }: { releases: ReleaseWithNotes[] }) {
   const grouped = groupByMinorVersion(releases);
   const sortedVersions = Object.keys(grouped).sort((a, b) => {
     const [aMajor = 0, aMinor = 0] = a.split(".").map(Number);
