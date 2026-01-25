@@ -1,7 +1,12 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import packageJson from "./package.json" with { type: "json" };
 
 const nextConfig: NextConfig = {
+  // Expose version to client via env
+  env: {
+    NEXT_PUBLIC_APP_VERSION: packageJson.version,
+  },
   // Avoid 308 redirects for POST requests
   skipTrailingSlashRedirect: true,
 
