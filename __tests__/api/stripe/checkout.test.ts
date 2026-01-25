@@ -175,7 +175,9 @@ describe("Stripe Checkout Route", () => {
     });
 
     it("honors remaining trial time on mid-trial upgrade", async () => {
-      const trialEndsAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      const now = new Date("2024-01-01T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const trialEndsAt = now.getTime() + 7 * 24 * 60 * 60 * 1000;
 
       mockQuery.mockResolvedValue({ trialEndsAt });
       mockCreate.mockResolvedValue({
@@ -193,7 +195,9 @@ describe("Stripe Checkout Route", () => {
     });
 
     it("does not grant trial for user with expired trial", async () => {
-      const trialEndsAt = Date.now() - 24 * 60 * 60 * 1000;
+      const now = new Date("2024-01-10T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const trialEndsAt = now.getTime() - 24 * 60 * 60 * 1000;
 
       mockQuery.mockResolvedValue({ trialEndsAt });
       mockCreate.mockResolvedValue({

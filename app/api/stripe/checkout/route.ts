@@ -85,7 +85,6 @@ export const POST = withObservability(async (request: Request) => {
     const now = Date.now();
     const trialEndsAt = existingSubscription?.trialEndsAt;
     const hasRemainingTrial = trialEndsAt && trialEndsAt > now;
-    const hasHadTrial = Boolean(trialEndsAt);
 
     // Build subscription_data conditionally
     const subscriptionData: {
@@ -99,7 +98,7 @@ export const POST = withObservability(async (request: Request) => {
     if (hasRemainingTrial) {
       // Honor remaining trial time (Stripe expects Unix timestamp in seconds)
       subscriptionData.trial_end = Math.floor(trialEndsAt / 1000);
-    } else if (!hasHadTrial) {
+    } else if (!trialEndsAt) {
       // New user: grant full trial period
       subscriptionData.trial_period_days = TRIAL_DAYS;
     }
