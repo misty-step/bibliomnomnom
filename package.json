@@ -15,7 +15,7 @@
     "dev": "concurrently \"pnpm:convex:dev\" \"pnpm:next:dev\" \"pnpm:stripe:listen\"",
     "dev:no-stripe": "concurrently \"pnpm:convex:dev\" \"pnpm:next:dev\"",
     "next:dev": "next dev",
-    "stripe:listen": "stripe listen --forward-to localhost:3000/api/stripe/webhook",
+    "stripe:listen": "./scripts/dev-stripe.sh",
     "build": "npx convex deploy --cmd 'next build'",
     "build:local": "next build",
     "start": "next start",

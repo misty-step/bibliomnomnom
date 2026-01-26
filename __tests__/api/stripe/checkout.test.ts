@@ -173,6 +173,67 @@ describe("Stripe Checkout Route", () => {
         }),
       );
     });
+
+    it("honors remaining trial time on mid-trial upgrade", async () => {
+      const now = new Date("2024-01-01T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const trialEndsAt = now.getTime() + 7 * 24 * 60 * 60 * 1000;
+
+      mockQuery.mockResolvedValue({ trialEndsAt });
+      mockCreate.mockResolvedValue({
+        url: "https://checkout.stripe.com/session_123",
+      });
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(200);
+
+      const createArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+      const subscriptionData = createArgs?.subscription_data as Record<string, unknown>;
+      expect(subscriptionData?.trial_end).toBe(Math.floor(trialEndsAt / 1000));
+      expect(subscriptionData?.trial_period_days).toBeUndefined();
+    });
+
+    it("does not set trial_end when remaining trial is under 2 days", async () => {
+      const now = new Date("2024-01-08T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const trialEndsAt = now.getTime() + 24 * 60 * 60 * 1000;
+
+      mockQuery.mockResolvedValue({ trialEndsAt });
+      mockCreate.mockResolvedValue({
+        url: "https://checkout.stripe.com/session_123",
+      });
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(200);
+
+      const createArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+      const subscriptionData = createArgs?.subscription_data as Record<string, unknown>;
+      expect(subscriptionData?.trial_end).toBeUndefined();
+      expect(subscriptionData?.trial_period_days).toBeUndefined();
+      expect(subscriptionData?.metadata).toEqual({ clerkId: "clerk_user_123" });
+    });
+
+    it("does not grant trial for user with expired trial", async () => {
+      const now = new Date("2024-01-10T00:00:00.000Z");
+      vi.setSystemTime(now);
+      const trialEndsAt = now.getTime() - 24 * 60 * 60 * 1000;
+
+      mockQuery.mockResolvedValue({ trialEndsAt });
+      mockCreate.mockResolvedValue({
+        url: "https://checkout.stripe.com/session_123",
+      });
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(200);
+
+      const createArgs = mockCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(createArgs?.subscription_data).toEqual({
+        metadata: { clerkId: "clerk_user_123" },
+      });
+    });
   });
 
   describe("authentication errors", () => {

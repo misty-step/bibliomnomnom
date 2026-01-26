@@ -5,6 +5,8 @@ import { api } from "@/convex/_generated/api";
 import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
 
+const MIN_TRIAL_MS = 2 * 24 * 60 * 60 * 1000; // Stripe requires trial_end >= 2 days out.
+
 /**
  * POST /api/stripe/checkout
  *
@@ -78,21 +80,31 @@ export const POST = withObservability(async (request: Request) => {
     const existingSubscription = await convex.query(api.subscriptions.get);
     const customerId = existingSubscription?.stripeCustomerId;
 
-    // Prevent double-dipping: only grant trial if user hasn't had one
-    // trialEndsAt is set for both internal trials and Stripe trials
-    const hasHadTrial = Boolean(existingSubscription?.trialEndsAt);
+    // Calculate trial handling:
+    // - New user (no trial yet): grant TRIAL_DAYS via trial_period_days
+    // - User with remaining trial: honor remaining time via trial_end timestamp
+    // - User with expired trial: no trial (charge immediately)
+    const now = Date.now();
+    const trialEndsAt = existingSubscription?.trialEndsAt;
+    const hasRemainingTrial = trialEndsAt && trialEndsAt - now >= MIN_TRIAL_MS;
 
     // Build subscription_data conditionally
     const subscriptionData: {
       metadata: { clerkId: string };
       trial_period_days?: number;
+      trial_end?: number;
     } = {
       metadata: { clerkId },
     };
 
-    if (!hasHadTrial) {
+    if (hasRemainingTrial) {
+      // Honor remaining trial time (Stripe expects Unix timestamp in seconds)
+      subscriptionData.trial_end = Math.floor(trialEndsAt / 1000);
+    } else if (!trialEndsAt) {
+      // New user: grant full trial period
       subscriptionData.trial_period_days = TRIAL_DAYS;
     }
+    // Else: user had trial but it expired - no trial granted (charge immediately)
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create({
