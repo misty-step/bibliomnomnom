@@ -5,6 +5,8 @@ import { api } from "@/convex/_generated/api";
 import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
 
+const MIN_TRIAL_MS = 2 * 24 * 60 * 60 * 1000; // Stripe requires trial_end >= 2 days out.
+
 /**
  * POST /api/stripe/checkout
  *
@@ -84,7 +86,7 @@ export const POST = withObservability(async (request: Request) => {
     // - User with expired trial: no trial (charge immediately)
     const now = Date.now();
     const trialEndsAt = existingSubscription?.trialEndsAt;
-    const hasRemainingTrial = trialEndsAt && trialEndsAt > now;
+    const hasRemainingTrial = trialEndsAt && trialEndsAt - now >= MIN_TRIAL_MS;
 
     // Build subscription_data conditionally
     const subscriptionData: {
