@@ -323,6 +323,24 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 **Note**: `pnpm dev` now runs the Stripe listener automatically. If running on a different port, run `stripe listen` manually with the correct port. Use `pnpm dev:no-stripe` to run without the listener.
 
+### Stripe webhook signature verification fails (400 errors)
+
+**Cause**: Stripe CLI generates a **new ephemeral webhook secret** every time it starts. If `.env.local` has a stale secret from a previous CLI session, signature verification fails.
+
+**Symptoms**:
+- All webhook events return 400
+- Logs show: "No signatures found matching the expected signature for payload"
+- Checkout succeeds but subscription status doesn't update
+
+**Auto-fix**: The `scripts/dev-stripe.sh` script now auto-syncs the ephemeral secret to `.env.local` before starting the listener. However, if Next.js was already running, you need to restart it to pick up the new secret.
+
+**Manual fix** (if auto-sync fails):
+1. Find the current secret in the `stripe listen` output: `Your webhook signing secret is whsec_...`
+2. Update `.env.local`: `STRIPE_WEBHOOK_SECRET=whsec_<new-secret>`
+3. Restart Next.js dev server to pick up the new env var
+
+**Prevention**: Run `pnpm dev` fresh (not `dev:no-stripe` + manual listener) to ensure secret stays in sync.
+
 ## Testing Strategy
 
 ### Current State (MVP)
