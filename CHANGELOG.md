@@ -3,6 +3,10 @@
 All notable changes to bibliomnomnom are documented here.
 
 
+## <small>1.0.1 (2026-01-26)</small>
+
+* fix(stripe): honor remaining trial time on mid-trial upgrade (#117) ([32024b7](https://github.com/misty-step/bibliomnomnom/commit/32024b7)), closes [#117](https://github.com/misty-step/bibliomnomnom/issues/117)
+
 ## 1.0.0 (2026-01-25)
 
 * feat: add blob upload route ([465851e](https://github.com/misty-step/bibliomnomnom/commit/465851e))
