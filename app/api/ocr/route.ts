@@ -191,7 +191,8 @@ export const POST = withObservability(async (request: Request) => {
 
     log("error", "ocr_unexpected_error", {
       requestId,
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
     });
     return NextResponse.json(
       { error: "Could not read text. Please try again.", code: "OCR_FAILED" },

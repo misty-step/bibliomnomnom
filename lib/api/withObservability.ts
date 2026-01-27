@@ -81,11 +81,8 @@ export function log(
     ...payload,
   };
   // JSON output captured by Vercel logs
-  if (level === "error") {
-    console.error(JSON.stringify(entry));
-    return;
-  }
-  console.log(JSON.stringify(entry));
+  const method = level === "error" ? "error" : level === "warn" ? "warn" : "log";
+  console[method](JSON.stringify(entry));
 }
 
 export function withObservability(

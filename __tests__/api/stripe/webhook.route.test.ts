@@ -44,6 +44,18 @@ vi.mock("@/lib/stripe-utils", () => ({
 
 import { POST } from "../../../app/api/stripe/webhook/route";
 
+/** Find a structured log entry by message name */
+function findLogByMsg(calls: unknown[][], msg: string): unknown[] | undefined {
+  return calls.find((call) => {
+    try {
+      const parsed = JSON.parse(call[0] as string);
+      return parsed.msg === msg;
+    } catch {
+      return false;
+    }
+  });
+}
+
 describe("Stripe Webhook Route", () => {
   const originalEnv = process.env;
 
@@ -162,15 +174,7 @@ describe("Stripe Webhook Route", () => {
 
       expect(response.status).toBe(200); // Still returns 200 to avoid Stripe retries
       // Verify structured error log
-      const calls = consoleSpy.mock.calls;
-      const errorLog = calls.find((call) => {
-        try {
-          const parsed = JSON.parse(call[0] as string);
-          return parsed.msg === "stripe_webhook_missing_clerk_id";
-        } catch {
-          return false;
-        }
-      });
+      const errorLog = findLogByMsg(consoleSpy.mock.calls, "stripe_webhook_missing_clerk_id");
       expect(errorLog).toBeDefined();
       expect(mockAction).not.toHaveBeenCalled();
 
@@ -304,15 +308,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      const calls = consoleSpy.mock.calls;
-      const successLog = calls.find((call) => {
-        try {
-          const parsed = JSON.parse(call[0] as string);
-          return parsed.msg === "stripe_webhook_invoice_succeeded";
-        } catch {
-          return false;
-        }
-      });
+      const successLog = findLogByMsg(consoleSpy.mock.calls, "stripe_webhook_invoice_succeeded");
       expect(successLog).toBeDefined();
       expect(mockAction).not.toHaveBeenCalled();
 
@@ -334,15 +330,7 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      const calls = consoleSpy.mock.calls;
-      const failLog = calls.find((call) => {
-        try {
-          const parsed = JSON.parse(call[0] as string);
-          return parsed.msg === "stripe_webhook_invoice_failed";
-        } catch {
-          return false;
-        }
-      });
+      const failLog = findLogByMsg(consoleSpy.mock.calls, "stripe_webhook_invoice_failed");
       expect(failLog).toBeDefined();
 
       consoleSpy.mockRestore();
@@ -424,15 +412,7 @@ describe("Stripe Webhook Route", () => {
 
       expect(response.status).toBe(200);
       // Verify structured log output for unhandled event
-      const calls = consoleSpy.mock.calls;
-      const unhandledLog = calls.find((call) => {
-        try {
-          const parsed = JSON.parse(call[0] as string);
-          return parsed.msg === "stripe_webhook_unhandled";
-        } catch {
-          return false;
-        }
-      });
+      const unhandledLog = findLogByMsg(consoleSpy.mock.calls, "stripe_webhook_unhandled");
       expect(unhandledLog).toBeDefined();
       const logData = JSON.parse(unhandledLog![0] as string);
       expect(logData.type).toBe("customer.created");
