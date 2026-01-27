@@ -161,9 +161,17 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200); // Still returns 200 to avoid Stripe retries
-      expect(consoleSpy).toHaveBeenCalledWith(
-        "Webhook error: missing clerkId in checkout session metadata",
-      );
+      // Verify structured error log
+      const calls = consoleSpy.mock.calls;
+      const errorLog = calls.find((call) => {
+        try {
+          const parsed = JSON.parse(call[0] as string);
+          return parsed.msg === "stripe_webhook_missing_clerk_id";
+        } catch {
+          return false;
+        }
+      });
+      expect(errorLog).toBeDefined();
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -296,7 +304,16 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith("Webhook processed: invoice payment succeeded");
+      const calls = consoleSpy.mock.calls;
+      const successLog = calls.find((call) => {
+        try {
+          const parsed = JSON.parse(call[0] as string);
+          return parsed.msg === "stripe_webhook_invoice_succeeded";
+        } catch {
+          return false;
+        }
+      });
+      expect(successLog).toBeDefined();
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
@@ -317,7 +334,16 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith("Webhook processed: invoice payment failed");
+      const calls = consoleSpy.mock.calls;
+      const failLog = calls.find((call) => {
+        try {
+          const parsed = JSON.parse(call[0] as string);
+          return parsed.msg === "stripe_webhook_invoice_failed";
+        } catch {
+          return false;
+        }
+      });
+      expect(failLog).toBeDefined();
 
       consoleSpy.mockRestore();
     });
@@ -397,9 +423,19 @@ describe("Stripe Webhook Route", () => {
       const response = await POST(makeRequest());
 
       expect(response.status).toBe(200);
-      expect(consoleSpy).toHaveBeenCalledWith("Webhook skipped: unhandled event type", {
-        type: "customer.created",
+      // Verify structured log output for unhandled event
+      const calls = consoleSpy.mock.calls;
+      const unhandledLog = calls.find((call) => {
+        try {
+          const parsed = JSON.parse(call[0] as string);
+          return parsed.msg === "stripe_webhook_unhandled";
+        } catch {
+          return false;
+        }
       });
+      expect(unhandledLog).toBeDefined();
+      const logData = JSON.parse(unhandledLog![0] as string);
+      expect(logData.type).toBe("customer.created");
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();

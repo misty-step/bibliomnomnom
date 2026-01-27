@@ -3,6 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api, internal } from "@/convex/_generated/api";
 import { stripe, stripeTimestampToMs } from "@/lib/stripe";
 import { mapStripeStatus } from "@/lib/stripe-utils";
+import { log } from "@/lib/api/log";
 import type Stripe from "stripe";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -19,7 +20,7 @@ function getWebhookToken(): string {
   const token = process.env.CONVEX_WEBHOOK_TOKEN;
   if (!token) {
     // Log internally, don't expose configuration state
-    console.error("Webhook configuration error: CONVEX_WEBHOOK_TOKEN not set");
+    log("error", "stripe_webhook_missing_convex_token");
     throw new Error("Webhook processing unavailable");
   }
   return token;
@@ -40,7 +41,9 @@ function sanitizeId(id: string | null | undefined): string {
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const clerkId = session.metadata?.clerkId;
   if (!clerkId) {
-    console.error("Webhook error: missing clerkId in checkout session metadata");
+    log("error", "stripe_webhook_missing_clerk_id", {
+      event: "checkout.session.completed",
+    });
     return;
   }
 
@@ -49,7 +52,10 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
 
   if (!customerId || !subscriptionId) {
-    console.error("Webhook error: missing customer or subscription ID in checkout session");
+    log("error", "stripe_webhook_missing_customer_or_subscription", {
+      event: "checkout.session.completed",
+      clerkIdPrefix: sanitizeId(clerkId),
+    });
     return;
   }
 
@@ -72,7 +78,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
   });
 
-  console.log("Webhook processed: subscription created", {
+  log("info", "stripe_webhook_subscription_created", {
     event: "checkout.session.completed",
     clerkIdPrefix: sanitizeId(clerkId),
   });
@@ -85,7 +91,9 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   // Type-safe extraction (customer can be string or object)
   const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
   if (!customerId) {
-    console.error("Webhook error: missing customer ID in subscription update");
+    log("error", "stripe_webhook_missing_customer", {
+      event: "customer.subscription.updated",
+    });
     return;
   }
 
@@ -104,7 +112,7 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
   });
 
-  console.log("Webhook processed: subscription updated", {
+  log("info", "stripe_webhook_subscription_updated", {
     event: "subscription.updated",
     status: subscription.status,
   });
@@ -117,7 +125,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   // Type-safe extraction
   const customerId = typeof subscription.customer === "string" ? subscription.customer : null;
   if (!customerId) {
-    console.error("Webhook error: missing customer ID in subscription deletion");
+    log("error", "stripe_webhook_missing_customer", {
+      event: "customer.subscription.deleted",
+    });
     return;
   }
 
@@ -129,7 +139,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     cancelAtPeriodEnd: false,
   });
 
-  console.log("Webhook processed: subscription deleted", {
+  log("info", "stripe_webhook_subscription_deleted", {
     event: "subscription.deleted",
   });
 }
@@ -150,7 +160,7 @@ export async function POST(request: Request) {
   // Validate required environment variables upfront
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
-    console.error("Webhook configuration error: STRIPE_WEBHOOK_SECRET not set");
+    log("error", "stripe_webhook_missing_secret");
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
 
@@ -159,7 +169,7 @@ export async function POST(request: Request) {
 
   // Use generic error for all signature issues to prevent probing
   if (!signature) {
-    console.error("Webhook error: missing Stripe signature");
+    log("error", "stripe_webhook_missing_signature");
     return NextResponse.json({ error: INVALID_REQUEST }, { status: 400 });
   }
 
@@ -168,7 +178,7 @@ export async function POST(request: Request) {
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
-    console.error("Webhook error: signature verification failed", {
+    log("error", "stripe_webhook_signature_failed", {
       error: err instanceof Error ? err.message : "unknown",
     });
     // Generic error - don't reveal if signature was wrong vs malformed
@@ -182,15 +192,20 @@ export async function POST(request: Request) {
     });
 
     if (isProcessed) {
-      console.log("Webhook skipped: event already processed", { eventId: sanitizeId(event.id) });
+      log("info", "stripe_webhook_skipped_processed", {
+        eventId: sanitizeId(event.id),
+      });
       return NextResponse.json({ received: true, skipped: true });
     }
   } catch (err) {
     // If idempotency check fails, continue processing to avoid dropping events
-    console.warn("Webhook warning: idempotency check failed, processing anyway");
+    log("warn", "stripe_webhook_idempotency_failed");
   }
 
-  console.log("Webhook received", { type: event.type, eventId: sanitizeId(event.id) });
+  log("info", "stripe_webhook_received", {
+    type: event.type,
+    eventId: sanitizeId(event.id),
+  });
 
   try {
     switch (event.type) {
@@ -217,18 +232,18 @@ export async function POST(request: Request) {
 
       case "invoice.payment_succeeded": {
         // Subscription renewed successfully - already handled by subscription.updated
-        console.log("Webhook processed: invoice payment succeeded");
+        log("info", "stripe_webhook_invoice_succeeded");
         break;
       }
 
       case "invoice.payment_failed": {
         // Payment failed - subscription will be marked past_due by subscription.updated
-        console.log("Webhook processed: invoice payment failed");
+        log("info", "stripe_webhook_invoice_failed");
         break;
       }
 
       default:
-        console.log("Webhook skipped: unhandled event type", { type: event.type });
+        log("info", "stripe_webhook_unhandled", { type: event.type });
     }
 
     // Mark event as processed for idempotency
@@ -239,13 +254,13 @@ export async function POST(request: Request) {
       });
     } catch (err) {
       // Log but don't fail - event was processed successfully
-      console.warn("Webhook warning: failed to mark event as processed");
+      log("warn", "stripe_webhook_mark_processed_failed", { eventId: sanitizeId(event.id) });
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
     // CRITICAL: Return 500 to trigger Stripe retry on processing failures
-    console.error("Webhook error: processing failed", {
+    log("error", "stripe_webhook_processing_failed", {
       type: event.type,
       eventId: sanitizeId(event.id),
       error: error instanceof Error ? error.message : "unknown",
