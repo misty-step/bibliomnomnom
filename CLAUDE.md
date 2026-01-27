@@ -360,7 +360,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 
 ### Overview
 
-Production monitoring uses Sentry for error tracking, pino for structured logging (captured by Vercel), and Vercel Analytics for web vitals. All queryable from CLI.
+Production monitoring uses Sentry for error tracking, pino for structured logging (captured by Vercel), and PostHog for product analytics. All queryable from CLI.
 
 ### CLI Access (`./scripts/obs`)
 
@@ -424,7 +424,7 @@ Production monitoring uses Sentry for error tracking, pino for structured loggin
 # Shallow check (fast, no external calls)
 curl https://bibliomnomnom.com/api/health
 
-# Deep check (probes Convex, Clerk, Blob, Stripe)
+# Deep check (probes Convex, Clerk, Stripe)
 curl https://bibliomnomnom.com/api/health?mode=deep
 ```
 
@@ -457,7 +457,18 @@ logger.info({ msg: "book_created", bookId, userId });
 logger.error({ msg: "import_failed", error: err.message });
 ```
 
-**API routes**: Use `withObservability` wrapper which outputs JSON via console (pino has Next.js bundling issues in API routes).
+**API routes**: Use `withObservability` wrapper which provides structured JSON logging via `log()` export:
+```typescript
+import { log, withObservability } from "@/lib/api/withObservability";
+
+// Standalone logging
+log("info", "webhook_processed", { eventId: "evt_123" });
+
+// Or automatic via wrapper
+export const POST = withObservability(async (req) => {
+  // errors auto-captured with context
+}, "operation-name");
+```
 
 ## Performance Targets
 
