@@ -3,6 +3,7 @@ import { Webhook } from "svix";
 import { headers } from "next/headers";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
+import { log } from "@/lib/api/withObservability";
 import type { WebhookEvent } from "@clerk/nextjs/server";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
 
   if (!WEBHOOK_SECRET) {
-    console.error("Missing CLERK_WEBHOOK_SECRET environment variable");
+    log("error", "clerk_webhook_missing_secret");
     return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
   }
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const svixSignature = headerPayload.get("svix-signature");
 
   if (!svixId || !svixTimestamp || !svixSignature) {
-    console.error("Missing Svix headers");
+    log("error", "clerk_webhook_missing_headers");
     return NextResponse.json({ error: "Missing webhook headers" }, { status: 400 });
   }
 
@@ -51,11 +52,11 @@ export async function POST(request: Request) {
     }) as WebhookEvent;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature";
-    console.error("Clerk webhook signature verification failed:", message);
+    log("error", "clerk_webhook_signature_failed", { error: message });
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
-  console.log(`Received Clerk event: ${event.type}`);
+  log("info", "clerk_webhook_received", { type: event.type });
 
   try {
     switch (event.type) {
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
             ?.email_address ?? email_addresses?.[0]?.email_address;
 
         if (!primaryEmail) {
-          console.error(`No email found for Clerk user: ${id}`);
+          log("error", "clerk_webhook_missing_email", { clerkId: id });
           return NextResponse.json({ error: "User has no email" }, { status: 400 });
         }
 
@@ -83,7 +84,10 @@ export async function POST(request: Request) {
           imageUrl: image_url,
         });
 
-        console.log(`User ${event.type === "user.created" ? "created" : "updated"}: ${id}`);
+        log("info", "clerk_user_upserted", {
+          clerkId: id,
+          action: event.type === "user.created" ? "created" : "updated",
+        });
         break;
       }
 
@@ -91,18 +95,20 @@ export async function POST(request: Request) {
         const { id } = event.data;
         if (id) {
           await convex.mutation(api.users.deleteUser, { clerkId: id });
-          console.log(`User deleted: ${id}`);
+          log("info", "clerk_user_deleted", { clerkId: id });
         }
         break;
       }
 
       default:
-        console.log(`Unhandled Clerk event type: ${event.type}`);
+        log("info", "clerk_webhook_unhandled", { type: event.type });
     }
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Clerk webhook handler error:", error);
+    log("error", "clerk_webhook_handler_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
     const message = error instanceof Error ? error.message : "Webhook handler failed";
     return NextResponse.json({ error: message }, { status: 500 });
   }

@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { withObservability } from "@/lib/api/withObservability";
+import { log, withObservability } from "@/lib/api/withObservability";
 import { DEFAULT_OCR_MODEL } from "@/lib/ai/models";
 import { OpenRouterApiError, openRouterChatCompletion } from "@/lib/ai/openrouter";
 import { MAX_BASE64_PAYLOAD_CHARS, MAX_DATA_URL_CHARS } from "@/lib/ocr/limits";
@@ -51,11 +51,11 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
-  console.log("[ocr] REQUEST", { requestId, user: redactUserId(userId) });
+  log("info", "ocr_request", { requestId, user: redactUserId(userId) });
 
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    console.error("[ocr] OPENROUTER_API_KEY not configured");
+    log("error", "ocr_missing_api_key", { requestId });
     return NextResponse.json(
       { error: "OCR service not configured", code: "OCR_FAILED" },
       { status: 500, headers: responseHeaders },
@@ -111,7 +111,7 @@ export const POST = withObservability(async (request: Request) => {
 
   const model =
     process.env.OPENROUTER_OCR_MODEL || process.env.OPENROUTER_MODEL || DEFAULT_OCR_MODEL;
-  console.log("[ocr] MODEL", { requestId, model });
+  log("info", "ocr_model_selected", { requestId, model });
 
   try {
     const { content } = await openRouterChatCompletion({
@@ -153,7 +153,7 @@ export const POST = withObservability(async (request: Request) => {
       );
     }
 
-    console.log("[ocr] SUCCESS", {
+    log("info", "ocr_success", {
       requestId,
       rawChars: rawText.length,
       formattedChars: text.length,
@@ -189,7 +189,10 @@ export const POST = withObservability(async (request: Request) => {
       );
     }
 
-    console.error("[ocr] Unexpected error:", error);
+    log("error", "ocr_unexpected_error", {
+      requestId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: "Could not read text. Please try again.", code: "OCR_FAILED" },
       { status: 500, headers: responseHeaders },

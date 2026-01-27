@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { withObservability } from "@/lib/api/withObservability";
+import { log, withObservability } from "@/lib/api/withObservability";
 import { captureError } from "@/lib/sentry";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -34,7 +34,7 @@ export const POST = withObservability(async (request: Request) => {
         };
       },
       onUploadCompleted: async ({ blob }) => {
-        console.log("Upload completed:", blob.url);
+        log("info", "blob_upload_completed", { url: blob.url });
       },
     });
 
