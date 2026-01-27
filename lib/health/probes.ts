@@ -68,14 +68,6 @@ export async function probeClerk(
   return probeUrl(url, { method: "GET" }, timeoutMs);
 }
 
-export async function probeBlob(
-  url?: string,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-): Promise<ServiceCheckResult> {
-  if (!url) return { status: "unknown" };
-  return probeUrl(url, { method: "HEAD" }, timeoutMs);
-}
-
 /**
  * Probe Stripe API connectivity.
  * Uses balance.retrieve() which is the recommended health check endpoint.
@@ -127,14 +119,10 @@ export async function probeStripe(
   }
 }
 
-export function makeUnknownServices(): Record<
-  "convex" | "clerk" | "blob" | "stripe",
-  ServiceCheckResult
-> {
+export function makeUnknownServices(): Record<"convex" | "clerk" | "stripe", ServiceCheckResult> {
   return {
     convex: { status: "unknown" },
     clerk: { status: "unknown" },
-    blob: { status: "unknown" },
     stripe: { status: "unknown" },
   };
 }

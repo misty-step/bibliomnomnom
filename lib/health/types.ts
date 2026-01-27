@@ -2,7 +2,7 @@ export type HealthStatus = "healthy" | "degraded" | "unhealthy";
 
 export type ServiceStatus = "up" | "down" | "unknown";
 
-export type ServiceName = "convex" | "clerk" | "blob" | "stripe";
+export type ServiceName = "convex" | "clerk" | "stripe";
 
 export interface ServiceCheckResult {
   status: ServiceStatus;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { probeBlob, probeClerk, probeConvex } from "../probes";
+import { probeClerk, probeConvex } from "../probes";
 
 const originalFetch = global.fetch;
 
@@ -17,7 +17,6 @@ describe("probe helpers", () => {
   it("returns unknown when url missing", async () => {
     await expect(probeConvex(undefined)).resolves.toEqual({ status: "unknown" });
     await expect(probeClerk(undefined)).resolves.toEqual({ status: "unknown" });
-    await expect(probeBlob(undefined)).resolves.toEqual({ status: "unknown" });
   });
 
   it("marks service up on 200", async () => {
@@ -31,7 +30,7 @@ describe("probe helpers", () => {
   it("marks service down on non-200", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503 }) as unknown as typeof fetch;
 
-    const result = await probeBlob("https://blob.example.com");
+    const result = await probeConvex("https://convex.example.com");
     expect(result).toEqual({
       status: "down",
       latencyMs: expect.any(Number),
