@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { log } from "@/lib/api/log";
-import { withObservability } from "@/lib/api/withObservability";
+import { log, withObservability } from "@/lib/api/withObservability";
 import { DEFAULT_OCR_MODEL } from "@/lib/ai/models";
 import { OpenRouterApiError, openRouterChatCompletion } from "@/lib/ai/openrouter";
 import { MAX_BASE64_PAYLOAD_CHARS, MAX_DATA_URL_CHARS } from "@/lib/ocr/limits";

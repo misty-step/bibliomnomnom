@@ -2,7 +2,7 @@
 import { ImageResponse } from "next/og";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { log } from "@/lib/api/log";
+import { log } from "@/lib/api/withObservability";
 
 export const runtime = "edge";
 

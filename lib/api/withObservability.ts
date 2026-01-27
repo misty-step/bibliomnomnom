@@ -64,19 +64,28 @@ type ObservabilityOptions = {
   skipErrorCapture?: boolean;
 };
 
+type LogLevel = "info" | "warn" | "error";
+
 /** Structured log output for Vercel to capture */
-function log(level: "info" | "error", data: Record<string, unknown>): void {
+export function log(level: LogLevel, data: Record<string, unknown>): void;
+export function log(level: LogLevel, msg: string, data?: Record<string, unknown>): void;
+export function log(
+  level: LogLevel,
+  msgOrData: string | Record<string, unknown>,
+  data?: Record<string, unknown>,
+): void {
+  const payload = typeof msgOrData === "string" ? { msg: msgOrData, ...(data ?? {}) } : msgOrData;
   const entry = {
     level,
     timestamp: new Date().toISOString(),
-    ...data,
+    ...payload,
   };
   // JSON output captured by Vercel logs
   if (level === "error") {
     console.error(JSON.stringify(entry));
-  } else {
-    console.log(JSON.stringify(entry));
+    return;
   }
+  console.log(JSON.stringify(entry));
 }
 
 export function withObservability(

@@ -3,7 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api, internal } from "@/convex/_generated/api";
 import { stripe, stripeTimestampToMs } from "@/lib/stripe";
 import { mapStripeStatus } from "@/lib/stripe-utils";
-import { log } from "@/lib/api/log";
+import { log } from "@/lib/api/withObservability";
 import type Stripe from "stripe";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
