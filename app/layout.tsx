@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Playfair_Display, Geist, JetBrains_Mono } from "next/font/google";
-import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { PostHogPageview } from "@/components/providers/PostHogPageview";
+import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { Footer } from "@/components/layout/Footer";
@@ -71,12 +72,14 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <ConvexClientProvider>
-              <div className="flex-1">{children}</div>
-              <Footer />
-              <Toaster />
-            </ConvexClientProvider>
-            <Analytics />
+            <PostHogProvider>
+              <ConvexClientProvider>
+                <div className="flex-1">{children}</div>
+                <Footer />
+                <Toaster />
+              </ConvexClientProvider>
+              <PostHogPageview />
+            </PostHogProvider>
             <SpeedInsights />
           </ThemeProvider>
         </body>
