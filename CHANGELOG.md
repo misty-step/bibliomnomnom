@@ -3,6 +3,11 @@
 All notable changes to bibliomnomnom are documented here.
 
 
+## 1.1.0 (2026-01-27)
+
+* feat(observability): structured logging, PostHog analytics, fix health probe (#120) ([61fb865](https://github.com/misty-step/bibliomnomnom/commit/61fb865)), closes [#120](https://github.com/misty-step/bibliomnomnom/issues/120) [#120](https://github.com/misty-step/bibliomnomnom/issues/120) [#121](https://github.com/misty-step/bibliomnomnom/issues/121)
+* docs: update env vars and observability documentation (#121) ([568eda6](https://github.com/misty-step/bibliomnomnom/commit/568eda6)), closes [#121](https://github.com/misty-step/bibliomnomnom/issues/121)
+
 ## <small>1.0.1 (2026-01-26)</small>
 
 * fix(stripe): honor remaining trial time on mid-trial upgrade (#117) ([32024b7](https://github.com/misty-step/bibliomnomnom/commit/32024b7)), closes [#117](https://github.com/misty-step/bibliomnomnom/issues/117)
