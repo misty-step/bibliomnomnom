@@ -172,7 +172,8 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     log("error", "og_profile_generation_failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
       username,
     });
     return errorImage();

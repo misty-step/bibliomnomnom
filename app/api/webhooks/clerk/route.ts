@@ -52,7 +52,9 @@ export async function POST(request: Request) {
     }) as WebhookEvent;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Invalid signature";
-    log("error", "clerk_webhook_signature_failed", { error: message });
+    log("error", "clerk_webhook_signature_failed", {
+      error: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
+    });
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
@@ -107,7 +109,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   } catch (error) {
     log("error", "clerk_webhook_handler_failed", {
-      error: error instanceof Error ? error.message : String(error),
+      error:
+        error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
     });
     const message = error instanceof Error ? error.message : "Webhook handler failed";
     return NextResponse.json({ error: message }, { status: 500 });

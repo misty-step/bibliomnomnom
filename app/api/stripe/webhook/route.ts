@@ -179,7 +179,7 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
     log("error", "stripe_webhook_signature_failed", {
-      error: err instanceof Error ? err.message : "unknown",
+      error: err instanceof Error ? { message: err.message, stack: err.stack } : String(err),
     });
     // Generic error - don't reveal if signature was wrong vs malformed
     return NextResponse.json({ error: INVALID_REQUEST }, { status: 400 });
@@ -263,7 +263,8 @@ export async function POST(request: Request) {
     log("error", "stripe_webhook_processing_failed", {
       type: event.type,
       eventId: sanitizeId(event.id),
-      error: error instanceof Error ? error.message : "unknown",
+      error:
+        error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
     });
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
