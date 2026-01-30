@@ -2,6 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Brain, Download, Globe, Quote } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { ArchetypeCarousel } from "@/components/landing/ArchetypeCarousel";
 import { CTAButton } from "@/components/landing/CTAButton";
 
 export default async function HomePage() {
@@ -141,58 +142,7 @@ export default async function HomePage() {
               <div>
                 <h2 className="font-display text-3xl text-text-ink">What Your Profile Reveals</h2>
               </div>
-              <div className="rounded-lg border border-line-ghost bg-surface-dawn p-lg">
-                <div className="grid gap-lg md:grid-cols-[1.2fr_1fr]">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
-                        archetype
-                      </p>
-                      <p className="font-display text-3xl text-text-ink">The Polymath</p>
-                      <p className="mt-2 text-text-inkMuted">
-                        Eclectic explorer of psychological depths and quiet resilience
-                      </p>
-                    </div>
-                    <p className="text-sm text-text-inkMuted">127 books · 41k pages</p>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
-                        themes
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {["Identity & belonging", "Systems thinking", "Unreliable narrators"].map(
-                          (theme) => (
-                            <span
-                              key={theme}
-                              className="rounded-md border border-line-ghost bg-canvas-bone px-3 py-1 text-xs text-text-inkMuted"
-                            >
-                              {theme}
-                            </span>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
-                        genres
-                      </p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {["Literary fiction", "Psychological thriller", "Narrative nonfiction"].map(
-                          (genre) => (
-                            <span
-                              key={genre}
-                              className="rounded-md border border-line-ghost bg-canvas-bone px-3 py-1 text-xs text-text-inkMuted"
-                            >
-                              {genre}
-                            </span>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ArchetypeCarousel />
             </div>
           </div>
         </section>
