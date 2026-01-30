@@ -1,7 +1,8 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { Brain, Download, Globe, Quote } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { CTAButton } from "@/components/landing/CTAButton";
 
 export default async function HomePage() {
   const user = await currentUser();
@@ -38,36 +39,177 @@ export default async function HomePage() {
       </nav>
 
       {/* Main content - asymmetric left alignment */}
-      <div className="relative flex min-h-screen items-center">
-        <div className="w-full px-8 md:px-16 lg:px-24">
-          {/* Title - massive, left-aligned, 40% width on desktop */}
-          <div className="mx-auto max-w-7xl">
-            <div className="lg:w-2/5">
-              {/* Title */}
-              <h1
-                className="font-display text-8xl tracking-tight text-text-ink sm:text-9xl lg:text-[10rem]"
-                aria-label="bibliomnomnom"
-              >
-                <span className="block">bibliom</span>
-                <span className="block -mt-6 sm:-mt-8 lg:-mt-12">nomnom</span>
-              </h1>
+      <main className="relative">
+        <section className="relative flex min-h-screen items-center">
+          <div className="w-full px-md md:px-lg lg:px-24">
+            {/* Title - massive, left-aligned, 40% width on desktop */}
+            <div className="mx-auto max-w-7xl">
+              <div className="lg:w-2/5">
+                {/* Title */}
+                <h1
+                  className="font-display text-8xl tracking-tight text-text-ink sm:text-9xl lg:text-[10rem]"
+                  aria-label="bibliomnomnom"
+                >
+                  <span className="block">bibliom</span>
+                  <span className="block -mt-6 sm:-mt-8 lg:-mt-12">nomnom</span>
+                </h1>
 
-              {/* Tagline as subheading */}
-              <p className="mb-16 mt-8 font-mono text-sm uppercase tracking-widest text-text-inkMuted md:mb-20 md:mt-10">
-                for voracious readers
-              </p>
+                <div className="mt-8 space-y-3 md:mt-10">
+                  {/* Tagline as subheading */}
+                  <p className="font-mono text-sm uppercase tracking-widest text-text-inkMuted">
+                    for voracious readers
+                  </p>
+                  <p className="font-sans text-lg text-text-inkMuted">
+                    AI-powered insights for voracious readers
+                  </p>
+                </div>
 
-              {/* CTA */}
-              <Link
-                href="/sign-in"
-                className="inline-flex rounded-md bg-text-ink px-8 py-3 font-sans text-base text-canvas-bone transition-all hover:bg-text-inkMuted"
-              >
-                Get Started
-              </Link>
+                {/* CTA */}
+                <div className="mt-12 md:mt-14">
+                  <CTAButton href="/sign-in" location="hero">
+                    Get Started
+                  </CTAButton>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
+
+        <section className="relative">
+          <div className="mx-auto max-w-6xl px-md py-2xl">
+            <div className="grid gap-lg md:grid-cols-2">
+              <div className="rounded-lg border border-line-ghost bg-surface-dawn p-lg">
+                <div className="flex items-start gap-md">
+                  <div className="rounded-md border border-line-ghost bg-canvas-bone p-2">
+                    <Brain className="h-5 w-5 text-text-ink" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display text-xl text-text-ink">Reader Profile</h3>
+                    <p className="text-sm text-text-inkMuted">
+                      AI-generated insights reveal your reading identity
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-line-ghost bg-surface-dawn p-lg">
+                <div className="flex items-start gap-md">
+                  <div className="rounded-md border border-line-ghost bg-canvas-bone p-2">
+                    <Download className="h-5 w-5 text-text-ink" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display text-xl text-text-ink">Import Library</h3>
+                    <p className="text-sm text-text-inkMuted">
+                      Bring your Goodreads history in seconds
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-line-ghost bg-surface-dawn p-lg">
+                <div className="flex items-start gap-md">
+                  <div className="rounded-md border border-line-ghost bg-canvas-bone p-2">
+                    <Quote className="h-5 w-5 text-text-ink" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display text-xl text-text-ink">Notes & Quotes</h3>
+                    <p className="text-sm text-text-inkMuted">Capture thoughts while you read</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-line-ghost bg-surface-dawn p-lg">
+                <div className="flex items-start gap-md">
+                  <div className="rounded-md border border-line-ghost bg-canvas-bone p-2">
+                    <Globe className="h-5 w-5 text-text-ink" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="font-display text-xl text-text-ink">Public Shelf</h3>
+                    <p className="text-sm text-text-inkMuted">
+                      Share your collection with the world
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative">
+          <div className="mx-auto max-w-6xl px-md py-2xl">
+            <div className="space-y-lg">
+              <div>
+                <h2 className="font-display text-3xl text-text-ink">What Your Profile Reveals</h2>
+              </div>
+              <div className="rounded-lg border border-line-ghost bg-surface-dawn p-lg">
+                <div className="grid gap-lg md:grid-cols-[1.2fr_1fr]">
+                  <div className="space-y-4">
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
+                        archetype
+                      </p>
+                      <p className="font-display text-3xl text-text-ink">The Polymath</p>
+                      <p className="mt-2 text-text-inkMuted">
+                        Eclectic explorer of psychological depths and quiet resilience
+                      </p>
+                    </div>
+                    <p className="text-sm text-text-inkMuted">127 books · 41k pages</p>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
+                        themes
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {["Identity & belonging", "Systems thinking", "Unreliable narrators"].map(
+                          (theme) => (
+                            <span
+                              key={theme}
+                              className="rounded-md border border-line-ghost bg-canvas-bone px-3 py-1 text-xs text-text-inkMuted"
+                            >
+                              {theme}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
+                        genres
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {["Literary fiction", "Psychological thriller", "Narrative nonfiction"].map(
+                          (genre) => (
+                            <span
+                              key={genre}
+                              className="rounded-md border border-line-ghost bg-canvas-bone px-3 py-1 text-xs text-text-inkMuted"
+                            >
+                              {genre}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative">
+          <div className="mx-auto max-w-6xl px-md py-2xl">
+            <div className="flex flex-col items-start gap-md rounded-lg border border-line-ghost bg-canvas-bone p-lg">
+              <h2 className="font-display text-3xl text-text-ink">
+                Ready to discover your reader identity?
+              </h2>
+              <CTAButton href="/sign-in" location="closing">
+                Build Your Reader Profile
+              </CTAButton>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
