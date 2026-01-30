@@ -126,6 +126,14 @@
     animation: draw-line-v 1.2s ease-out forwards;
     transform-origin: center;
   }
+
+  .animate-archetype-ticker {
+    animation: archetype-ticker 60s linear infinite;
+  }
+
+  .pause-animation {
+    animation-play-state: paused;
+  }
 }
 
 @keyframes fade-in {
@@ -163,6 +171,15 @@
   }
   to {
     transform: scaleY(1);
+  }
+}
+
+@keyframes archetype-ticker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
   }
 }
 

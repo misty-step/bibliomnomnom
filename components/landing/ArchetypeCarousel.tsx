@@ -1,185 +1,194 @@
+/* eslint-disable design-tokens/no-raw-design-values -- Ticker animation requires fixed card widths */
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion, useInView, useReducedMotion } from "framer-motion";
+import { useState } from "react";
+import { useReducedMotion } from "framer-motion";
 
 import { cn } from "@/lib/utils";
-
-const ROTATION_INTERVAL = 5000;
 
 const archetypes = [
   {
     archetype: "The Polymath",
     tagline: "Eclectic explorer of psychological depths and quiet resilience",
-    themes: ["Identity & belonging", "Systems thinking", "Unreliable narrators"],
-    genres: ["Literary fiction", "Psychological thriller", "Narrative nonfiction"],
-    stats: "127 books · 41k pages",
   },
   {
     archetype: "The Night Owl",
     tagline: "Drawn to shadows, mysteries, and things that go bump in the night",
-    themes: ["Gothic atmosphere", "Moral ambiguity", "Hidden secrets"],
-    genres: ["Horror", "Dark fantasy", "Crime fiction"],
-    stats: "89 books · 28k pages",
   },
   {
     archetype: "The Time Traveler",
     tagline: "Living a thousand lives across centuries and civilizations",
-    themes: ["Rise and fall of empires", "Lives shaped by history", "What-ifs"],
-    genres: ["Historical fiction", "Epic fantasy", "Alternate history"],
-    stats: "156 books · 52k pages",
   },
   {
     archetype: "The Stargazer",
     tagline: "Reaching for the cosmos and pondering what lies beyond",
-    themes: ["First contact", "Human expansion", "Tech ethics"],
-    genres: ["Hard sci-fi", "Space opera", "Speculative fiction"],
-    stats: "112 books · 38k pages",
   },
   {
     archetype: "The Empath",
     tagline: "Finding beauty in the quiet moments between people",
-    themes: ["Family dynamics", "Healing & growth", "Love in all forms"],
-    genres: ["Contemporary fiction", "Romance", "Memoir"],
-    stats: "203 books · 61k pages",
   },
   {
     archetype: "The Seeker",
     tagline: "Questioning everything, from the self to the infinite",
-    themes: ["Meaning of existence", "Eastern & Western philosophy", "Consciousness"],
-    genres: ["Philosophy", "Spirituality", "Literary fiction"],
-    stats: "78 books · 24k pages",
+  },
+  {
+    archetype: "The Strategist",
+    tagline: "Obsessed with systems, power, and the games people play",
+  },
+  {
+    archetype: "The Romantic",
+    tagline: "Believing in love against all odds and reason",
+  },
+  {
+    archetype: "The Detective",
+    tagline: "Unraveling puzzles and hunting for hidden truths",
+  },
+  {
+    archetype: "The Wanderer",
+    tagline: "At home in foreign lands and unfamiliar tongues",
+  },
+  {
+    archetype: "The Philosopher",
+    tagline: "Wrestling with questions that have no easy answers",
+  },
+  {
+    archetype: "The Rebel",
+    tagline: "Drawn to those who fight against the status quo",
+  },
+  {
+    archetype: "The Dreamer",
+    tagline: "Lost in worlds that exist only in imagination",
+  },
+  {
+    archetype: "The Historian",
+    tagline: "Finding wisdom in the patterns of the past",
+  },
+  {
+    archetype: "The Optimist",
+    tagline: "Seeking stories of hope, growth, and redemption",
+  },
+  {
+    archetype: "The Cynic",
+    tagline: "Appreciating dark humor and unflinching honesty",
+  },
+  {
+    archetype: "The Artist",
+    tagline: "Drawn to beauty, creativity, and unconventional lives",
+  },
+  {
+    archetype: "The Scientist",
+    tagline: "Fascinated by how things work at every scale",
+  },
+  {
+    archetype: "The Survivor",
+    tagline: "Inspired by resilience in the face of impossible odds",
+  },
+  {
+    archetype: "The Mentor",
+    tagline: "Learning from those who've walked the path before",
+  },
+  {
+    archetype: "The Adventurer",
+    tagline: "Craving action, danger, and the thrill of the unknown",
+  },
+  {
+    archetype: "The Introvert",
+    tagline: "Finding depth in solitude and inner worlds",
+  },
+  {
+    archetype: "The Collector",
+    tagline: "Cataloging knowledge across every domain",
+  },
+  {
+    archetype: "The Minimalist",
+    tagline: "Seeking profound meaning in simple stories",
+  },
+  {
+    archetype: "The Maximalist",
+    tagline: "Reveling in sprawling epics and intricate worlds",
+  },
+  {
+    archetype: "The Contrarian",
+    tagline: "Deliberately reading against the grain",
+  },
+  {
+    archetype: "The Nostalgic",
+    tagline: "Returning to comfort reads and childhood favorites",
+  },
+  {
+    archetype: "The Futurist",
+    tagline: "Imagining what tomorrow might bring",
+  },
+  {
+    archetype: "The Humanist",
+    tagline: "Celebrating the full spectrum of human experience",
+  },
+  {
+    archetype: "The Mystic",
+    tagline: "Exploring the boundaries between known and unknown",
   },
 ] as const;
 
-const variants = {
-  enter: { opacity: 0 },
-  center: { opacity: 1 },
-  exit: { opacity: 0 },
-};
-
-export function ArchetypeCarousel() {
+export function ArchetypeTicker() {
   const shouldReduceMotion = useReducedMotion();
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [isHovered, setIsHovered] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const isInView = useInView(containerRef, { amount: 0.35 });
+  const [isPaused, setIsPaused] = useState(false);
 
-  const activeArchetype = archetypes[activeIndex] ?? archetypes[0]!;
-  const canAutoRotate = useMemo(
-    () => isInView && !isHovered && !shouldReduceMotion,
-    [isInView, isHovered, shouldReduceMotion],
-  );
+  // Shuffle once on mount (useState initializer runs once)
+  const [shuffled] = useState(() => [...archetypes].sort(() => Math.random() - 0.5));
+  // Duplicate for seamless infinite loop
+  const items = [...shuffled, ...shuffled];
 
-  const goTo = useCallback((index: number) => {
-    setActiveIndex((current) => (index + archetypes.length) % archetypes.length);
-  }, []);
-
-  const goNext = useCallback(() => {
-    setActiveIndex((current) => (current + 1) % archetypes.length);
-  }, []);
-
-  useEffect(() => {
-    if (!canAutoRotate) return undefined;
-    const timer = window.setInterval(goNext, ROTATION_INTERVAL);
-    return () => window.clearInterval(timer);
-  }, [canAutoRotate, goNext]);
+  if (shouldReduceMotion) {
+    return (
+      <div className="grid gap-md sm:grid-cols-2 lg:grid-cols-3">
+        {shuffled.map((item) => (
+          <ArchetypeCard key={item.archetype} {...item} />
+        ))}
+      </div>
+    );
+  }
 
   return (
-    <div ref={containerRef} className="space-y-md">
+    <div
+      className="overflow-hidden"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onFocusCapture={() => setIsPaused(true)}
+      onBlurCapture={() => setIsPaused(false)}
+    >
       <div
-        className="rounded-lg border border-line-ghost bg-surface-dawn p-lg"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onFocusCapture={() => setIsHovered(true)}
-        onBlurCapture={() => setIsHovered(false)}
+        className={cn(
+          "flex w-max gap-md pr-md",
+          "animate-archetype-ticker",
+          isPaused && "pause-animation",
+        )}
       >
-        <div className="grid gap-lg md:grid-cols-[1.2fr_1fr]">
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={activeArchetype.archetype}
-              variants={variants}
-              initial={shouldReduceMotion ? undefined : "enter"}
-              animate="center"
-              exit={shouldReduceMotion ? undefined : "exit"}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.3 }}
-              className="space-y-4"
-            >
-              <div>
-                <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
-                  archetype
-                </p>
-                <p className="font-display text-3xl text-text-ink">{activeArchetype.archetype}</p>
-                <p className="mt-2 text-text-inkMuted">{activeArchetype.tagline}</p>
-              </div>
-              <p className="text-sm text-text-inkMuted">{activeArchetype.stats}</p>
-            </motion.div>
-          </AnimatePresence>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.div
-              key={`${activeArchetype.archetype}-details`}
-              variants={variants}
-              initial={shouldReduceMotion ? undefined : "enter"}
-              animate="center"
-              exit={shouldReduceMotion ? undefined : "exit"}
-              transition={{ duration: shouldReduceMotion ? 0 : 0.3 }}
-              className="space-y-4"
-            >
-              <div>
-                <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
-                  themes
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {activeArchetype.themes.map((theme) => (
-                    <span
-                      key={theme}
-                      className="rounded-md border border-line-ghost bg-canvas-bone px-3 py-1 text-xs text-text-inkMuted"
-                    >
-                      {theme}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="font-mono text-xs uppercase tracking-widest text-text-inkSubtle">
-                  genres
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {activeArchetype.genres.map((genre) => (
-                    <span
-                      key={genre}
-                      className="rounded-md border border-line-ghost bg-canvas-bone px-3 py-1 text-xs text-text-inkMuted"
-                    >
-                      {genre}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
+        {items.map((item, index) => (
+          <ArchetypeCard
+            key={`${item.archetype}-${index}`}
+            {...item}
+            aria-hidden={index >= shuffled.length}
+          />
+        ))}
       </div>
+    </div>
+  );
+}
 
-      <div className="flex items-center justify-center gap-2">
-        {archetypes.map((archetype, index) => {
-          const isActive = index === activeIndex;
-          return (
-            <button
-              key={archetype.archetype}
-              type="button"
-              aria-label={`Show ${archetype.archetype}`}
-              aria-pressed={isActive}
-              onClick={() => goTo(index)}
-              className={cn(
-                "h-2 w-2 rounded-full transition-colors duration-150",
-                isActive
-                  ? "bg-text-ink"
-                  : "bg-line-ghost hover:bg-text-inkMuted focus-visible:bg-text-inkMuted",
-              )}
-            />
-          );
-        })}
-      </div>
+type ArchetypeCardProps = {
+  archetype: string;
+  tagline: string;
+  "aria-hidden"?: boolean;
+};
+
+function ArchetypeCard({ archetype, tagline, ...rest }: ArchetypeCardProps) {
+  return (
+    <div
+      className="flex w-[260px] flex-shrink-0 flex-col rounded-lg border border-line-ghost bg-surface-dawn p-md md:w-[320px]"
+      {...rest}
+    >
+      <p className="font-display text-xl text-text-ink">{archetype}</p>
+      <p className="mt-1 text-sm text-text-inkMuted line-clamp-2">{tagline}</p>
     </div>
   );
 }

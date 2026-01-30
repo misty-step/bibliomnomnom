@@ -2,7 +2,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { Brain, Download, Globe, Quote } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
-import { ArchetypeCarousel } from "@/components/landing/ArchetypeCarousel";
+import { ArchetypeTicker } from "@/components/landing/ArchetypeCarousel";
 import { CTAButton } from "@/components/landing/CTAButton";
 
 export default async function HomePage() {
@@ -140,9 +140,9 @@ export default async function HomePage() {
           <div className="mx-auto max-w-6xl px-md py-2xl">
             <div className="space-y-lg">
               <div>
-                <h2 className="font-display text-3xl text-text-ink">What Your Profile Reveals</h2>
+                <h2 className="font-display text-3xl text-text-ink">Every reader has a story</h2>
               </div>
-              <ArchetypeCarousel />
+              <ArchetypeTicker />
             </div>
           </div>
         </section>
