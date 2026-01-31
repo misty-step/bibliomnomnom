@@ -128,7 +128,7 @@
   }
 
   .animate-archetype-ticker {
-    animation: archetype-ticker 180s linear infinite;
+    animation: archetype-ticker 360s linear infinite;
   }
 
   .pause-animation {
