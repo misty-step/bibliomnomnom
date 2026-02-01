@@ -10,6 +10,24 @@ const nextConfig: NextConfig = {
   // Avoid 308 redirects for POST requests
   skipTrailingSlashRedirect: true,
 
+  // PostHog reverse proxy to bypass ad blockers
+  async rewrites() {
+    return [
+      {
+        source: "/ingest/static/:path*",
+        destination: "https://us-assets.i.posthog.com/static/:path*",
+      },
+      {
+        source: "/ingest/:path*",
+        destination: "https://us.i.posthog.com/:path*",
+      },
+      {
+        source: "/ingest/decide",
+        destination: "https://us.i.posthog.com/decide",
+      },
+    ];
+  },
+
   images: {
     remotePatterns: [
       {
@@ -52,7 +70,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'", // Next.js requires unsafe-inline for styles
               "img-src 'self' data: blob: https:", // Allow external images from configured sources
               "font-src 'self' data:",
-              "connect-src 'self' https://*.convex.cloud https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://clerk-telemetry.com https://challenges.cloudflare.com https://vercel.com https://*.vercel.com wss://*.convex.cloud https://*.sentry.io https://*.ingest.sentry.io", // Convex, Clerk, Vercel Blob, Sentry
+              "connect-src 'self' https://*.convex.cloud https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://clerk-telemetry.com https://challenges.cloudflare.com https://vercel.com https://*.vercel.com wss://*.convex.cloud https://*.sentry.io https://*.ingest.sentry.io https://us.i.posthog.com https://us-assets.i.posthog.com", // Convex, Clerk, Vercel Blob, Sentry, PostHog
               "frame-src 'self' https://*.clerk.accounts.dev https://clerk.bibliomnomnom.com https://challenges.cloudflare.com https://vercel.live https://*.vercel.live", // Clerk auth frames + Vercel overlay
               "object-src 'none'",
               "base-uri 'self'",
