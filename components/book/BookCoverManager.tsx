@@ -265,15 +265,15 @@ export function BookCoverManager({
                       </Button>
                       <label
                         className={cn(
-                          buttonVariants({ variant: "secondary", size: "sm" }),
-                          "w-full cursor-pointer",
+                          buttonVariants({ variant: "secondary", size: "sm", fullWidth: true }),
+                          "cursor-pointer",
                         )}
                       >
                         <input
                           type="file"
                           accept={ALLOWED_TYPES.join(",")}
                           onChange={handleFileUpload}
-                          className="hidden"
+                          className="sr-only"
                           disabled={isUploading}
                         />
                         <Upload className="w-3.5 h-3.5 mr-2" />
@@ -332,15 +332,15 @@ export function BookCoverManager({
                   </Button>
                   <label
                     className={cn(
-                      buttonVariants({ variant: "secondary" }),
-                      "w-full cursor-pointer justify-start border border-dashed border-line-ember bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink",
+                      buttonVariants({ variant: "ghost", fullWidth: true }),
+                      "cursor-pointer justify-start border border-dashed border-line-ember text-text-inkMuted hover:text-text-ink",
                     )}
                   >
                     <input
                       type="file"
                       accept={ALLOWED_TYPES.join(",")}
                       onChange={handleFileUpload}
-                      className="hidden"
+                      className="sr-only"
                       disabled={isUploading}
                     />
                     <Upload className="w-3.5 h-3.5 mr-2" />
