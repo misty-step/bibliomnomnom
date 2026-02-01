@@ -45,7 +45,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
     } else if (!isSignedIn) {
       posthog.reset();
     }
-  }, [isSignedIn, userId, user?.createdAt]);
+  }, [isSignedIn, userId, user]);
 
   return <PHProvider client={posthog}>{children}</PHProvider>;
 }
