@@ -11,6 +11,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/stripe/webhook", // Stripe webhook (uses own signature verification)
   "/api/webhooks/clerk", // Clerk webhook (uses Svix signature verification)
   "/monitoring(.*)", // Sentry tunnel (bypasses ad blockers)
+  "/ingest(.*)", // PostHog reverse proxy (must be public for anonymous analytics)
   "/",
 ]);
 
