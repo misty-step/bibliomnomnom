@@ -6,7 +6,7 @@ import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
 
 export function PostHogProvider({ children }: { children: ReactNode }) {
-  const { isSignedIn, userId } = useAuth();
+  const { isSignedIn, isLoaded, userId } = useAuth();
   const { user } = useUser();
 
   // Initialize PostHog on mount
@@ -37,6 +37,11 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
 
   // Identify user when auth state changes
   useEffect(() => {
+    // Guard: don't call identify/reset if PostHog isn't configured or Clerk is still loading
+    if (!process.env.NEXT_PUBLIC_POSTHOG_KEY || !isLoaded) {
+      return;
+    }
+
     if (isSignedIn && userId) {
       posthog.identify(userId, {
         // Only include non-PII properties
@@ -45,7 +50,7 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
     } else if (!isSignedIn) {
       posthog.reset();
     }
-  }, [isSignedIn, userId, user]);
+  }, [isSignedIn, isLoaded, userId, user]);
 
   return <PHProvider client={posthog}>{children}</PHProvider>;
 }
