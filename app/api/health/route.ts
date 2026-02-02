@@ -61,8 +61,11 @@ export const GET = withObservability(
   },
 );
 
+/** Number of service probes - update when adding/removing probes below */
+const PROBE_COUNT = 3;
+
 async function runProbesWithinBudget() {
-  const perProbe = OVERALL_TIMEOUT_MS / 3;
+  const perProbe = OVERALL_TIMEOUT_MS / PROBE_COUNT;
 
   const [convex, clerk, stripe] = await Promise.all([
     probeConvex(process.env.NEXT_PUBLIC_CONVEX_URL, perProbe),
