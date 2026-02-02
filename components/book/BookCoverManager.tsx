@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, type ChangeEvent } from "react";
+import { useState, type ChangeEvent } from "react";
 import { useMutation, useAction } from "convex/react";
 import { upload } from "@vercel/blob/client";
 import { Loader2, Upload, Search, Trash2, ImageIcon, Globe } from "lucide-react";
@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import { api } from "@/convex/_generated/api";
 import type { Id } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -56,7 +56,6 @@ export function BookCoverManager({
   const [isHovered, setIsHovered] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const updateBook = useMutation(api.books.update);
@@ -68,7 +67,8 @@ export function BookCoverManager({
 
   // 1. Handle File Upload (Manual)
   const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
 
     if (!ALLOWED_TYPES.includes(file.type)) {
@@ -110,7 +110,7 @@ export function BookCoverManager({
       });
     } finally {
       setIsUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      input.value = "";
     }
   };
 
@@ -217,16 +217,6 @@ export function BookCoverManager({
 
   return (
     <div className={cn("w-full", className)}>
-      {/* Hidden Input */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={ALLOWED_TYPES.join(",")}
-        onChange={handleFileUpload}
-        className="hidden"
-        disabled={isUploading}
-      />
-
       <div
         className="group relative aspect-[2/3] w-full overflow-hidden rounded-sm shadow-lg bg-canvas-bone focus-within:ring-2 focus-within:ring-accent-ember"
         tabIndex={0}
@@ -273,15 +263,22 @@ export function BookCoverManager({
                         <Search className="w-3.5 h-3.5 mr-2" />
                         Search Web
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="w-full"
-                        onClick={() => fileInputRef.current?.click()}
+                      <label
+                        className={cn(
+                          buttonVariants({ variant: "secondary", size: "sm", fullWidth: true }),
+                          "cursor-pointer",
+                        )}
                       >
+                        <input
+                          type="file"
+                          accept={ALLOWED_TYPES.join(",")}
+                          onChange={handleFileUpload}
+                          className="sr-only"
+                          disabled={isUploading}
+                        />
                         <Upload className="w-3.5 h-3.5 mr-2" />
                         Upload File
-                      </Button>
+                      </label>
                       <Button
                         size="sm"
                         variant="destructive"
@@ -333,14 +330,22 @@ export function BookCoverManager({
                     <Globe className="w-3.5 h-3.5 mr-2" />
                     Search Web
                   </Button>
-                  <Button
-                    variant="secondary"
-                    className="w-full justify-start border border-dashed border-line-ember bg-transparent text-text-inkMuted hover:bg-canvas-boneMuted hover:text-text-ink"
-                    onClick={() => fileInputRef.current?.click()}
+                  <label
+                    className={cn(
+                      buttonVariants({ variant: "ghost", fullWidth: true }),
+                      "cursor-pointer justify-start border border-dashed border-line-ember text-text-inkMuted hover:text-text-ink",
+                    )}
                   >
+                    <input
+                      type="file"
+                      accept={ALLOWED_TYPES.join(",")}
+                      onChange={handleFileUpload}
+                      className="sr-only"
+                      disabled={isUploading}
+                    />
                     <Upload className="w-3.5 h-3.5 mr-2" />
                     Upload File
-                  </Button>
+                  </label>
                 </>
               )}
             </div>
