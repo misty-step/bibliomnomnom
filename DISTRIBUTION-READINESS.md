@@ -79,7 +79,7 @@ STRIPE_PRICE_MONTHLY=price_monthly_test_xxx
 STRIPE_PRICE_ANNUAL=price_annual_test_xxx
 
 # Convex webhook token (already generated)
-CONVEX_WEBHOOK_TOKEN=49cf9d6f4cca9a421af6d9c75cfd3e61a9d3b41e614611dd9d54835ccd0544ca
+CONVEX_WEBHOOK_TOKEN=xxx
 
 # PostHog
 NEXT_PUBLIC_POSTHOG_KEY=phc_xxx
@@ -142,7 +142,7 @@ pnpm dev
 #### Pre-deployment checks
 ```bash
 # Run automated checks
-./scripts/verify-deploy-ready.sh
+./scripts/check-readiness.sh
 
 # Validate environment
 ./scripts/validate-env.sh --prod-only
@@ -247,7 +247,7 @@ Post-launch features to increase retention:
 
 ## 🎁 What I've Done Tonight
 
-1. **Generated Convex webhook token**: `49cf9d6f4cca9a421af6d9c75cfd3e61a9d3b41e614611dd9d54835ccd0544ca`
+1. **Convex webhook token generation** documented in setup script (run `./scripts/setup-distribution.sh`)
 2. **Created .env.local template** with all required variables
 3. **Created this comprehensive guide** with step-by-step instructions
 4. **Verified codebase is production-ready** (architecture, tests, deployment scripts)

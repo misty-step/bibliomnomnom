@@ -28,98 +28,112 @@ print_status() {
   fi
 }
 
-# Check 1: Environment file
-if [[ -f "$ENV_FILE" ]]; then
-  print_status "OK" "Environment file (.env.local) exists"
-else
-  print_status "FAIL" "Missing .env.local (copy from .env.example)"
-fi
+# Capture all check output for summary
+run_checks() {
+  # Check 1: Environment file
+  if [[ -f "$ENV_FILE" ]]; then
+    print_status "OK" "Environment file (.env.local) exists"
+  else
+    print_status "FAIL" "Missing .env.local (copy from .env.example)"
+  fi
 
-# Check 2: Convex webhook token
-if [[ -f "$ENV_FILE" ]] && grep -q "^CONVEX_WEBHOOK_TOKEN=[a-f0-9]\{64\}" "$ENV_FILE"; then
-  print_status "OK" "CONVEX_WEBHOOK_TOKEN is set (64 hex chars)"
-else
-  print_status "WARN" "CONVEX_WEBHOOK_TOKEN missing or invalid"
-fi
+  # Check 2: Convex webhook token
+  if [[ -f "$ENV_FILE" ]] && grep -q "^CONVEX_WEBHOOK_TOKEN=[a-f0-9]\{64\}" "$ENV_FILE"; then
+    print_status "OK" "CONVEX_WEBHOOK_TOKEN is set (64 hex chars)"
+  else
+    print_status "WARN" "CONVEX_WEBHOOK_TOKEN missing or invalid"
+  fi
 
-# Check 3: Required services configuration
-echo ""
-echo "Required Services Status:"
+  # Check 3: Required services configuration
+  echo ""
+  echo "Required Services Status:"
 
-check_env_var() {
-  local var_name="$1"
-  local description="$2"
-  
-  if [[ -f "$ENV_FILE" ]] && grep -q "^${var_name}=" "$ENV_FILE"; then
-    local value=$(grep "^${var_name}=" "$ENV_FILE" | cut -d'=' -f2)
-    if [[ "$value" =~ ^(pk_test_|sk_test_|whsec_|price_|phc_|https://) ]] || [[ "$value" != "your_"* ]]; then
-      print_status "OK" "$description: Configured"
+  check_env_var() {
+    local var_name="$1"
+    local description="$2"
+
+    if [[ -f "$ENV_FILE" ]] && grep -q "^${var_name}=" "$ENV_FILE"; then
+      local value=$(grep "^${var_name}=" "$ENV_FILE" | cut -d'=' -f2)
+      if [[ "$value" =~ ^(pk_test_|sk_test_|whsec_|price_|phc_|https://) ]] || [[ "$value" != "your_"* ]]; then
+        print_status "OK" "$description: Configured"
+      else
+        print_status "WARN" "$description: Placeholder value"
+      fi
     else
-      print_status "WARN" "$description: Placeholder value"
+      print_status "FAIL" "$description: Not set"
+    fi
+  }
+
+  check_env_var "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" "Clerk Publishable Key"
+  check_env_var "CLERK_SECRET_KEY" "Clerk Secret Key"
+  check_env_var "NEXT_PUBLIC_CONVEX_URL" "Convex URL"
+  check_env_var "STRIPE_SECRET_KEY" "Stripe Secret Key"
+  check_env_var "STRIPE_PRICE_MONTHLY" "Stripe Monthly Price"
+  check_env_var "STRIPE_PRICE_ANNUAL" "Stripe Annual Price"
+  check_env_var "NEXT_PUBLIC_POSTHOG_KEY" "PostHog API Key"
+
+  # Check 4: Dependencies
+  echo ""
+  echo "Dependencies:"
+
+  if command -v node &> /dev/null; then
+    print_status "OK" "Node.js $(node --version)"
+  else
+    print_status "FAIL" "Node.js not installed"
+  fi
+
+  if command -v pnpm &> /dev/null; then
+    print_status "OK" "pnpm $(pnpm --version)"
+  else
+    print_status "WARN" "pnpm not installed (run: npm install -g pnpm)"
+  fi
+
+  # Check 5: Build status
+  echo ""
+  echo "Build Status:"
+
+  cd "$PROJECT_ROOT"
+
+  if [[ -f "package.json" ]]; then
+    print_status "OK" "package.json exists"
+
+    # Check if dependencies are installed
+    if [[ -d "node_modules" ]] || [[ -f "pnpm-lock.yaml" ]]; then
+      print_status "OK" "Dependencies appear installed"
+    else
+      print_status "WARN" "Dependencies not installed (run: pnpm install)"
     fi
   else
-    print_status "FAIL" "$description: Not set"
+    print_status "FAIL" "Missing package.json"
   fi
 }
 
-check_env_var "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" "Clerk Publishable Key"
-check_env_var "CLERK_SECRET_KEY" "Clerk Secret Key"
-check_env_var "NEXT_PUBLIC_CONVEX_URL" "Convex URL"
-check_env_var "STRIPE_SECRET_KEY" "Stripe Secret Key"
-check_env_var "STRIPE_PRICE_MONTHLY" "Stripe Monthly Price"
-check_env_var "STRIPE_PRICE_ANNUAL" "Stripe Annual Price"
-check_env_var "NEXT_PUBLIC_POSTHOG_KEY" "PostHog API Key"
-
-# Check 4: Dependencies
-echo ""
-echo "Dependencies:"
-
-if command -v node &> /dev/null; then
-  print_status "OK" "Node.js $(node --version)"
-else
-  print_status "FAIL" "Node.js not installed"
-fi
-
-if command -v pnpm &> /dev/null; then
-  print_status "OK" "pnpm $(pnpm --version)"
-else
-  print_status "WARN" "pnpm not installed (run: npm install -g pnpm)"
-fi
-
-# Check 5: Build status
-echo ""
-echo "Build Status:"
-
-cd "$PROJECT_ROOT"
-
-if [[ -f "package.json" ]]; then
-  print_status "OK" "package.json exists"
-  
-  # Check if dependencies are installed
-  if [[ -d "node_modules" ]] || [[ -f "pnpm-lock.yaml" ]]; then
-    print_status "OK" "Dependencies appear installed"
-  else
-    print_status "WARN" "Dependencies not installed (run: pnpm install)"
-  fi
-else
-  print_status "FAIL" "Missing package.json"
-fi
+# Run checks and capture output
+output=$(run_checks)
+echo -e "$output"
 
 # Summary
 echo ""
 echo "📈 Readiness Summary"
 echo "==================="
 
-TOTAL_CHECKS=13
-OK_CHECKS=$(grep -c "✓" <<< "$(echo -e "$output")")
-WARN_CHECKS=$(grep -c "⚠" <<< "$(echo -e "$output")")
-FAIL_CHECKS=$(grep -c "✗" <<< "$(echo -e "$output")")
+OK_CHECKS=$(grep -c "✓" <<< "$output" 2>/dev/null || true)
+OK_CHECKS=${OK_CHECKS:-0}
+WARN_CHECKS=$(grep -c "⚠" <<< "$output" 2>/dev/null || true)
+WARN_CHECKS=${WARN_CHECKS:-0}
+FAIL_CHECKS=$(grep -c "✗" <<< "$output" 2>/dev/null || true)
+FAIL_CHECKS=${FAIL_CHECKS:-0}
+TOTAL_CHECKS=$((OK_CHECKS + WARN_CHECKS + FAIL_CHECKS))
 
 echo "Passing: $OK_CHECKS/$TOTAL_CHECKS"
 echo "Warnings: $WARN_CHECKS"
 echo "Failures: $FAIL_CHECKS"
 
-READINESS_PERCENT=$(( (OK_CHECKS * 100) / TOTAL_CHECKS ))
+if [[ $TOTAL_CHECKS -eq 0 ]]; then
+  READINESS_PERCENT=0
+else
+  READINESS_PERCENT=$(( (OK_CHECKS * 100) / TOTAL_CHECKS ))
+fi
 
 echo ""
 echo "Overall Readiness: $READINESS_PERCENT%"

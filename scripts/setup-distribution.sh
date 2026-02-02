@@ -3,6 +3,8 @@ set -eo pipefail
 
 # bibliomnomnom Distribution Setup Assistant
 # Guides you through making bibliomnomnom production-ready
+# Note: This script uses macOS-specific commands (brew, open, sed -i '').
+# For Linux, install dependencies manually and use xdg-open instead of open.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
