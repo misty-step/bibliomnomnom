@@ -4,7 +4,7 @@ import { Playfair_Display, Geist, JetBrains_Mono } from "next/font/google";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { PostHogPageview } from "@/components/providers/PostHogPageview";
-import { PostHogProvider } from "@/components/providers/PostHogProvider";
+import { PostHogProvider, PostHogIdentify } from "@/components/providers/PostHogProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/toaster";
 import { Footer } from "@/components/layout/Footer";
@@ -73,6 +73,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <PostHogProvider>
+              <PostHogIdentify />
               <ConvexClientProvider>
                 <div className="flex-1">{children}</div>
                 <Footer />
