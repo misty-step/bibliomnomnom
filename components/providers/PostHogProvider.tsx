@@ -3,6 +3,7 @@
 import { useEffect, type ReactNode } from "react";
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
+import { useUser } from "@clerk/nextjs";
 
 export function PostHogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -16,4 +17,23 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return <PHProvider client={posthog}>{children}</PHProvider>;
+}
+
+// Separate component for user identification - must be inside ClerkProvider
+export function PostHogIdentify() {
+  const { user, isLoaded } = useUser();
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      posthog.identify(user.id, {
+        created_at: user.createdAt
+          ? new Date(user.createdAt).toISOString()
+          : undefined,
+      });
+    } else if (isLoaded && !user && posthog._isIdentified?.()) {
+      posthog.reset();
+    }
+  }, [user, isLoaded]);
+
+  return null;
 }
