@@ -3,7 +3,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api, internal } from "@/convex/_generated/api";
 import { stripe, stripeTimestampToMs } from "@/lib/stripe";
 import { mapStripeStatus } from "@/lib/stripe-utils";
-import { log } from "@/lib/api/withObservability";
+import { log, withObservability } from "@/lib/api/withObservability";
 import type Stripe from "stripe";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
@@ -156,7 +156,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
  * - Idempotency via event ID tracking
  * - Returns 500 on processing failures to trigger Stripe retries
  */
-export async function POST(request: Request) {
+export const POST = withObservability(async (request: Request) => {
   // Validate required environment variables upfront
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!webhookSecret) {
@@ -268,4 +268,4 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ error: INTERNAL_ERROR }, { status: 500 });
   }
-}
+}, "stripe-webhook");
