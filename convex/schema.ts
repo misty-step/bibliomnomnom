@@ -271,6 +271,7 @@ export default defineSchema({
       v.literal("expired"),
     ),
     priceId: v.optional(v.string()),
+    planName: v.optional(v.string()),
     currentPeriodEnd: v.optional(v.number()),
     trialEndsAt: v.optional(v.number()),
     cancelAtPeriodEnd: v.boolean(),

@@ -20,14 +20,14 @@ function formatDate(timestamp: number | undefined): string {
 }
 
 /**
- * Get plan name from price ID.
+ * Get plan name from subscription.
+ * Prefers server-stored planName, falls back to client-side price ID detection.
  */
-function getPlanName(priceId: string | undefined): string {
+function getPlanName(priceId: string | undefined, planName: string | undefined): string {
+  // Use server-stored planName if available
+  if (planName) return planName;
+  // Fallback: detect from price ID
   if (!priceId) return "Standard";
-  // Check against env vars at runtime, fall back to detection
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY) return "Monthly";
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL) return "Annual";
-  // Fallback: detect from ID naming convention
   if (priceId.toLowerCase().includes("month")) return "Monthly";
   if (priceId.toLowerCase().includes("annual") || priceId.toLowerCase().includes("year"))
     return "Annual";
@@ -160,7 +160,7 @@ function SubscriptionCard() {
   }
 
   const statusInfo = getStatusDisplay(subscription.status, subscription.cancelAtPeriodEnd);
-  const planName = getPlanName(subscription.priceId);
+  const planName = getPlanName(subscription.priceId, subscription.planName);
   const hasStripeCustomer = Boolean(subscription.stripeCustomerId);
 
   return (

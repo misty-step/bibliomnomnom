@@ -94,3 +94,18 @@ export function getBaseUrl(): string {
   }
   return "http://localhost:3000";
 }
+
+/**
+ * Compute plan name from price ID using environment variable mappings.
+ * Falls back to string detection for legacy/custom prices.
+ */
+export function computePlanName(priceId: string | undefined): string {
+  if (!priceId) return "Standard";
+  if (priceId === process.env.STRIPE_PRICE_MONTHLY) return "Monthly";
+  if (priceId === process.env.STRIPE_PRICE_ANNUAL) return "Annual";
+  // Fallback for legacy/custom prices
+  if (priceId.toLowerCase().includes("month")) return "Monthly";
+  if (priceId.toLowerCase().includes("annual") || priceId.toLowerCase().includes("year"))
+    return "Annual";
+  return "Standard";
+}

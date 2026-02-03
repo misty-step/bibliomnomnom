@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api, internal } from "@/convex/_generated/api";
-import { stripe, stripeTimestampToMs } from "@/lib/stripe";
+import { stripe, stripeTimestampToMs, computePlanName } from "@/lib/stripe";
 import { mapStripeStatus } from "@/lib/stripe-utils";
 import { log, withObservability } from "@/lib/api/withObservability";
 import type Stripe from "stripe";
@@ -65,6 +65,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   // In newer Stripe API versions, billing period is on the item
   const subscriptionItem = subscription.items.data[0];
   const currentPeriodEnd = subscriptionItem?.current_period_end;
+  const priceId = subscriptionItem?.price?.id;
 
   await convex.action(api.subscriptions.upsertFromWebhook, {
     webhookToken: getWebhookToken(),
@@ -72,7 +73,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscriptionId,
     status: mapStripeStatus(subscription.status),
-    priceId: subscriptionItem?.price?.id,
+    priceId,
+    planName: computePlanName(priceId),
     currentPeriodEnd: currentPeriodEnd ? stripeTimestampToMs(currentPeriodEnd) : undefined,
     trialEndsAt: subscription.trial_end ? stripeTimestampToMs(subscription.trial_end) : undefined,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
@@ -100,13 +102,15 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   // In newer Stripe API versions, billing period is on the item
   const subscriptionItem = subscription.items.data[0];
   const currentPeriodEnd = subscriptionItem?.current_period_end;
+  const priceId = subscriptionItem?.price?.id;
 
   await convex.action(api.subscriptions.updateByStripeCustomer, {
     webhookToken: getWebhookToken(),
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
     status: mapStripeStatus(subscription.status),
-    priceId: subscriptionItem?.price?.id,
+    priceId,
+    planName: computePlanName(priceId),
     currentPeriodEnd: currentPeriodEnd ? stripeTimestampToMs(currentPeriodEnd) : undefined,
     trialEndsAt: subscription.trial_end ? stripeTimestampToMs(subscription.trial_end) : undefined,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
