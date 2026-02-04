@@ -28,6 +28,13 @@ vi.mock("@/lib/stripe", () => ({
     },
   },
   stripeTimestampToMs: (ts: number) => ts * 1000,
+  computePlanName: (priceId: string | undefined) => {
+    if (!priceId) return "Standard";
+    if (priceId.toLowerCase().includes("month")) return "Monthly";
+    if (priceId.toLowerCase().includes("annual") || priceId.toLowerCase().includes("year"))
+      return "Annual";
+    return "Standard";
+  },
 }));
 
 vi.mock("@/lib/stripe-utils", () => ({
@@ -127,6 +134,7 @@ describe("Stripe Webhook Route", () => {
           stripeSubscriptionId: "sub_456",
           status: "trialing",
           priceId: "price_monthly",
+          planName: "Monthly",
           currentPeriodEnd: 1704844800000,
           trialEndsAt: 1704240000000,
           cancelAtPeriodEnd: false,
@@ -218,6 +226,7 @@ describe("Stripe Webhook Route", () => {
           stripeSubscriptionId: "sub_456",
           status: "active",
           priceId: "price_monthly",
+          planName: "Monthly",
           currentPeriodEnd: 1707523200000,
           trialEndsAt: undefined,
           cancelAtPeriodEnd: false,
@@ -257,6 +266,7 @@ describe("Stripe Webhook Route", () => {
           webhookToken: "test_webhook_token",
           cancelAtPeriodEnd: true,
           status: "active", // Still active until period ends
+          planName: "Annual",
         }),
       );
     });
