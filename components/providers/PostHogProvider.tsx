@@ -4,7 +4,6 @@ import { useEffect, type ReactNode } from "react";
 import { useAuth, useUser } from "@clerk/nextjs";
 import posthog from "posthog-js";
 import { PostHogProvider as PHProvider } from "posthog-js/react";
-import { useUser } from "@clerk/nextjs";
 
 export function PostHogProvider({ children }: { children: ReactNode }) {
   const { isSignedIn, isLoaded, userId } = useAuth();
@@ -63,9 +62,7 @@ export function PostHogIdentify() {
   useEffect(() => {
     if (isLoaded && user) {
       posthog.identify(user.id, {
-        created_at: user.createdAt
-          ? new Date(user.createdAt).toISOString()
-          : undefined,
+        created_at: user.createdAt ? new Date(user.createdAt).toISOString() : undefined,
       });
     } else if (isLoaded && !user && posthog._isIdentified?.()) {
       posthog.reset();
