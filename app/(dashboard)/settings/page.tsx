@@ -22,16 +22,14 @@ function formatDate(timestamp: number | undefined): string {
 /**
  * Get plan name from price ID.
  */
+const PRICE_ID_TO_PLAN_NAME: Record<string, string> = {
+  [process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? ""]: "Monthly",
+  [process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ?? ""]: "Annual",
+};
+
 function getPlanName(priceId: string | undefined): string {
   if (!priceId) return "Standard";
-  // Check against env vars at runtime, fall back to detection
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY) return "Monthly";
-  if (priceId === process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL) return "Annual";
-  // Fallback: detect from ID naming convention
-  if (priceId.toLowerCase().includes("month")) return "Monthly";
-  if (priceId.toLowerCase().includes("annual") || priceId.toLowerCase().includes("year"))
-    return "Annual";
-  return "Standard";
+  return PRICE_ID_TO_PLAN_NAME[priceId] ?? "Standard";
 }
 
 /**
