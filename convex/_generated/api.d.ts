@@ -14,6 +14,7 @@ import type * as actions_profileInsights from "../actions/profileInsights.js";
 import type * as auth from "../auth.js";
 import type * as books from "../books.js";
 import type * as imports from "../imports.js";
+import type * as listeningSessions from "../listeningSessions.js";
 import type * as notes from "../notes.js";
 import type * as profiles from "../profiles.js";
 import type * as rateLimit from "../rateLimit.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   books: typeof books;
   imports: typeof imports;
+  listeningSessions: typeof listeningSessions;
   notes: typeof notes;
   profiles: typeof profiles;
   rateLimit: typeof rateLimit;

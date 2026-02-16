@@ -1,0 +1,395 @@
+import { mutation, query } from "./_generated/server";
+import { requireAuth } from "./auth";
+import { v } from "convex/values";
+import type { Doc, Id } from "./_generated/dataModel";
+
+const sessionStatus = v.union(
+  v.literal("recording"),
+  v.literal("transcribing"),
+  v.literal("synthesizing"),
+  v.literal("review"),
+  v.literal("complete"),
+  v.literal("failed"),
+);
+
+const synthesisArtifacts = v.object({
+  insights: v.array(
+    v.object({
+      title: v.string(),
+      content: v.string(),
+    }),
+  ),
+  openQuestions: v.array(v.string()),
+  quotes: v.array(
+    v.object({
+      text: v.string(),
+      source: v.optional(v.string()),
+    }),
+  ),
+  followUpQuestions: v.array(v.string()),
+  contextExpansions: v.array(
+    v.object({
+      title: v.string(),
+      content: v.string(),
+    }),
+  ),
+});
+
+const DEFAULT_CAP_DURATION_MS = 30 * 60 * 1000;
+const MIN_CAP_DURATION_MS = 60 * 1000;
+const MAX_CAP_DURATION_MS = 4 * 60 * 60 * 1000;
+const DEFAULT_WARNING_DURATION_MS = 60 * 1000;
+const MIN_WARNING_DURATION_MS = 15 * 1000;
+const MAX_SYNTH_NOTES = 12;
+
+type SessionStatus = Doc<"listeningSessions">["status"];
+type SynthesisArtifacts = Doc<"listeningSessions">["synthesis"];
+
+const ALLOWED_TRANSITIONS: Record<SessionStatus, SessionStatus[]> = {
+  recording: ["transcribing", "failed"],
+  transcribing: ["synthesizing", "complete", "failed"],
+  synthesizing: ["review", "complete", "failed"],
+  review: ["complete", "failed"],
+  complete: ["complete"],
+  failed: ["failed"],
+};
+
+function normalizeCapDuration(value: number | undefined): number {
+  if (!value || Number.isNaN(value)) return DEFAULT_CAP_DURATION_MS;
+  return Math.min(MAX_CAP_DURATION_MS, Math.max(MIN_CAP_DURATION_MS, value));
+}
+
+function normalizeWarningDuration(value: number | undefined, capDurationMs: number): number {
+  if (!value || Number.isNaN(value)) {
+    return Math.min(DEFAULT_WARNING_DURATION_MS, capDurationMs - 5_000);
+  }
+  const bounded = Math.max(MIN_WARNING_DURATION_MS, value);
+  return Math.min(bounded, Math.max(MIN_WARNING_DURATION_MS, capDurationMs - 5_000));
+}
+
+function assertTransition(current: SessionStatus, next: SessionStatus) {
+  if (current === next) return;
+  const allowed = ALLOWED_TRANSITIONS[current];
+  if (!allowed.includes(next)) {
+    throw new Error(`Invalid session transition from ${current} to ${next}`);
+  }
+}
+
+function formatDuration(durationMs: number | undefined): string {
+  if (!durationMs || durationMs <= 0) return "Unknown";
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function truncate(input: string, maxChars: number): string {
+  const normalized = input.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxChars) return normalized;
+  return `${normalized.slice(0, maxChars - 1)}…`;
+}
+
+async function getOwnedBook(
+  ctx: Parameters<typeof requireAuth>[0],
+  userId: Id<"users">,
+  bookId: Id<"books">,
+) {
+  const book = await ctx.db.get(bookId);
+  if (!book || book.userId !== userId) {
+    throw new Error("Book not found or access denied");
+  }
+  return book;
+}
+
+async function getOwnedSession(
+  ctx: Parameters<typeof requireAuth>[0],
+  userId: Id<"users">,
+  sessionId: Id<"listeningSessions">,
+) {
+  const session = await ctx.db.get(sessionId);
+  if (!session || session.userId !== userId) {
+    throw new Error("Listening session not found or access denied");
+  }
+  return session;
+}
+
+export const listByBook = query({
+  args: { bookId: v.id("books") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await getOwnedBook(ctx, userId, args.bookId);
+
+    return await ctx.db
+      .query("listeningSessions")
+      .withIndex("by_book", (q) => q.eq("bookId", args.bookId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const get = query({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    return await getOwnedSession(ctx, userId, args.sessionId);
+  },
+});
+
+export const create = mutation({
+  args: {
+    bookId: v.id("books"),
+    capDurationMs: v.optional(v.number()),
+    warningDurationMs: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await getOwnedBook(ctx, userId, args.bookId);
+
+    const now = Date.now();
+    const capDurationMs = normalizeCapDuration(args.capDurationMs);
+    const warningDurationMs = normalizeWarningDuration(args.warningDurationMs, capDurationMs);
+
+    return await ctx.db.insert("listeningSessions", {
+      userId,
+      bookId: args.bookId,
+      status: "recording",
+      capReached: false,
+      capDurationMs,
+      warningDurationMs,
+      startedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const markTranscribing = mutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    audioUrl: v.string(),
+    durationMs: v.number(),
+    capReached: v.boolean(),
+    transcriptLive: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+
+    assertTransition(session.status, "transcribing");
+
+    const now = Date.now();
+    await ctx.db.patch(session._id, {
+      status: "transcribing",
+      audioUrl: args.audioUrl,
+      durationMs: Math.max(0, Math.floor(args.durationMs)),
+      capReached: args.capReached,
+      transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
+      endedAt: now,
+      updatedAt: now,
+      lastError: undefined,
+    });
+  },
+});
+
+export const markSynthesizing = mutation({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    assertTransition(session.status, "synthesizing");
+
+    await ctx.db.patch(session._id, {
+      status: "synthesizing",
+      updatedAt: Date.now(),
+      lastError: undefined,
+    });
+  },
+});
+
+export const complete = mutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    transcript: v.string(),
+    transcriptProvider: v.optional(v.string()),
+    synthesis: v.optional(synthesisArtifacts),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    await getOwnedBook(ctx, userId, session.bookId);
+
+    if (!["transcribing", "synthesizing", "review", "complete"].includes(session.status)) {
+      throw new Error(`Cannot complete session from state: ${session.status}`);
+    }
+
+    const now = Date.now();
+    const cleanedTranscript = args.transcript.trim();
+    if (!cleanedTranscript) {
+      throw new Error("Transcript cannot be empty");
+    }
+
+    const startedLabel = new Date(session.startedAt).toLocaleString();
+    const endedLabel = session.endedAt ? new Date(session.endedAt).toLocaleString() : "Unknown";
+    const provider = args.transcriptProvider?.trim() || session.transcriptProvider || "unknown";
+
+    const rawNoteContent = [
+      "## Voice Transcript",
+      "",
+      `Recorded: ${startedLabel}`,
+      `Ended: ${endedLabel}`,
+      `Duration: ${formatDuration(session.durationMs)}`,
+      `Provider: ${provider}`,
+      "",
+      cleanedTranscript,
+    ].join("\n");
+
+    let rawNoteId = session.rawNoteId;
+    if (rawNoteId) {
+      await ctx.db.patch(rawNoteId, {
+        content: rawNoteContent,
+        updatedAt: now,
+      });
+    } else {
+      rawNoteId = await ctx.db.insert("notes", {
+        bookId: session.bookId,
+        userId,
+        type: "note",
+        content: rawNoteContent,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const synthesizedNoteIds: Id<"notes">[] = session.synthesizedNoteIds
+      ? [...session.synthesizedNoteIds]
+      : [];
+
+    const createSynthesizedNote = async (type: Doc<"notes">["type"], content: string) => {
+      if (synthesizedNoteIds.length >= MAX_SYNTH_NOTES) return;
+      const cleaned = content.trim();
+      if (!cleaned) return;
+      const noteId = await ctx.db.insert("notes", {
+        bookId: session.bookId,
+        userId,
+        type,
+        content: cleaned,
+        createdAt: now,
+        updatedAt: now,
+      });
+      synthesizedNoteIds.push(noteId);
+    };
+
+    const synth = args.synthesis;
+    if (synth && synthesizedNoteIds.length === 0) {
+      for (const insight of synth.insights.slice(0, 4)) {
+        await createSynthesizedNote("note", `### Insight: ${insight.title}\n\n${insight.content}`);
+      }
+      for (const quote of synth.quotes.slice(0, 4)) {
+        await createSynthesizedNote("quote", quote.text);
+      }
+      for (const question of synth.openQuestions.slice(0, 2)) {
+        await createSynthesizedNote("reflection", `### Open Question\n\n${question}`);
+      }
+      for (const question of synth.followUpQuestions.slice(0, 2)) {
+        await createSynthesizedNote("reflection", `### Follow-up\n\n${question}`);
+      }
+      for (const expansion of synth.contextExpansions.slice(0, 2)) {
+        await createSynthesizedNote(
+          "reflection",
+          `### Context Expansion: ${expansion.title}\n\n${expansion.content}`,
+        );
+      }
+    }
+
+    await ctx.db.patch(session._id, {
+      status: "complete",
+      transcript: cleanedTranscript,
+      transcriptChars: cleanedTranscript.length,
+      transcriptProvider: provider,
+      rawNoteId,
+      synthesizedNoteIds: synthesizedNoteIds.length > 0 ? synthesizedNoteIds : undefined,
+      synthesis: synth,
+      updatedAt: now,
+      lastError: undefined,
+    });
+
+    return { rawNoteId, synthesizedNoteIds };
+  },
+});
+
+export const fail = mutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+
+    await ctx.db.patch(session._id, {
+      status: "failed",
+      lastError: truncate(args.message, 1_000),
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const getSynthesisContext = query({
+  args: { bookId: v.id("books") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const currentBook = await getOwnedBook(ctx, userId, args.bookId);
+
+    const books = await ctx.db
+      .query("books")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    const bookTitles = new Map(books.map((book) => [book._id, book.title]));
+    const recentNotes = notes
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 20)
+      .map((note) => ({
+        bookTitle: bookTitles.get(note.bookId) ?? "Unknown book",
+        type: note.type,
+        content: truncate(note.content, 280),
+      }));
+
+    const mapBookItem = (book: Doc<"books">) => ({
+      title: book.title,
+      author: book.author,
+    });
+
+    const currentlyReading = books
+      .filter((book) => book.status === "currently-reading" && book._id !== currentBook._id)
+      .slice(0, 20)
+      .map(mapBookItem);
+
+    const wantToRead = books
+      .filter((book) => book.status === "want-to-read" && book._id !== currentBook._id)
+      .slice(0, 20)
+      .map(mapBookItem);
+
+    const read = books
+      .filter((book) => book.status === "read" && book._id !== currentBook._id)
+      .slice(0, 30)
+      .map(mapBookItem);
+
+    return {
+      book: {
+        title: currentBook.title,
+        author: currentBook.author,
+        description: currentBook.description,
+      },
+      currentlyReading,
+      wantToRead,
+      read,
+      recentNotes,
+    };
+  },
+});
