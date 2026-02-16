@@ -776,7 +776,7 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 
 1. **Environment validation** - Checks required env vars exist (via `scripts/validate-env.sh`)
 2. **Test suite** - Runs all 54 tests with Vitest
-3. **Build verification** - Ensures production build succeeds (`pnpm build:local`)
+3. **Build verification** - Ensures production build succeeds (`bun run build:local`)
 
 **Commit-Msg** (runs on commit message creation):
 
@@ -787,7 +787,7 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 **On Pull Request**:
 
 - Checkout code
-- Install dependencies (pnpm)
+- Install dependencies (bun)
 - Run linting (ESLint)
 - Run type checking (TypeScript)
 - Run test suite with coverage
@@ -858,17 +858,17 @@ git commit --no-verify -m "fix: urgent"
 
 ```bash
 # Quick validation (no coverage, no build) - 30s
-pnpm validate:fast
+bun run validate:fast
 
 # Full validation (includes coverage + build) - 2-3min
-pnpm validate
+bun run validate
 
 # Individual checks
-pnpm lint              # ESLint
-pnpm typecheck         # TypeScript
-pnpm test              # Vitest
-pnpm test:coverage     # Vitest with coverage report
-pnpm build:local       # Next.js production build
+bun run lint              # ESLint
+bun run typecheck         # TypeScript
+bun run test              # Vitest
+bun run test:coverage     # Vitest with coverage report
+bun run build:local       # Next.js production build
 ```
 
 ## Testing Strategy
@@ -945,7 +945,7 @@ pnpm build:local       # Next.js production build
 **Current Process** (dev):
 
 1. Edit `convex/schema.ts`
-2. Run `pnpm convex:push` to sync schema
+2. Run `bun run convex:push` to sync schema
 3. Convex auto-migrates (adds fields, creates indexes)
 
 **Future Process** (production):

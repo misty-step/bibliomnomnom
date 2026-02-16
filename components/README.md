@@ -354,12 +354,12 @@ See [BACKLOG.md](../BACKLOG.md) for component testing roadmap.
 ### Styles not applying
 
 **Cause**: Tailwind class name not recognized or CSS not rebuilt.
-**Fix**: Restart `pnpm dev` to rebuild Tailwind.
+**Fix**: Restart `bun run dev` to rebuild Tailwind.
 
 ### Type errors on Convex data
 
 **Cause**: Generated types out of sync with schema.
-**Fix**: Run `pnpm convex:push` to regenerate types.
+**Fix**: Run `bun run convex:push` to regenerate types.
 
 ## Best Practices
 

@@ -21,7 +21,7 @@ A comprehensive checklist before deploying bibliomnomnom to production.
 
 **Rules:**
 
-- `.env.local` is loaded by default during `pnpm dev`
+- `.env.local` is loaded by default during `bun run dev`
 - `.env.production` must be explicitly sourced: `source .env.production`
 - Both are gitignored - never commit secrets
 - Never use `.env.production.local` - Vercel pulls can corrupt values with `\n`
@@ -125,13 +125,13 @@ stripe webhook_endpoints list --limit 5
 
 ### 6. Quality Checks
 
-- [ ] TypeScript compiles: `pnpm tsc --noEmit`
-- [ ] Tests pass: `pnpm test`
-- [ ] Lint clean: `pnpm lint`
+- [ ] TypeScript compiles: `bun run tsc --noEmit`
+- [ ] Tests pass: `bun run test`
+- [ ] Lint clean: `bun run lint`
 
 ### 7. Build
 
-- [ ] Local build succeeds: `pnpm build:local`
+- [ ] Local build succeeds: `bun run build:local`
 
 ## CLI Gotchas
 

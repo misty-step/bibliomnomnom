@@ -164,8 +164,8 @@ The project includes `vercel.json` with correct build command:
 
 ```json
 {
-  "buildCommand": "npx convex deploy --cmd 'pnpm build'",
-  "installCommand": "pnpm install --frozen-lockfile"
+  "buildCommand": "npx convex deploy --cmd 'bun run build'",
+  "installCommand": "bun install --frozen-lockfile"
 }
 ```
 
@@ -197,7 +197,7 @@ git push origin main
 1. Watch deployment logs in Vercel Dashboard
 2. Check for errors in:
    - `npx convex deploy` step (should complete successfully)
-   - `pnpm install` step (dependencies)
+   - `bun install` step (dependencies)
    - `next build` step (compilation)
 3. If deployment fails, check Vercel logs for specific error
 
@@ -476,16 +476,16 @@ git checkout main
 
 ### Monthly Tasks
 
-- [ ] Review and update dependencies (`pnpm update`)
-- [ ] Check security advisories (`pnpm audit`)
+- [ ] Review and update dependencies (`bun update`)
+- [ ] Check security advisories (`bun audit`)
 - [ ] Review Vercel analytics for performance trends
 - [ ] Cleanup old preview deployments (Convex auto-deletes after 14 days)
 
 ### Before Major Releases
 
 - [ ] Test on preview deployment first
-- [ ] Run full test suite (`pnpm test`)
-- [ ] Verify build succeeds locally (`pnpm build`)
+- [ ] Run full test suite (`bun run test`)
+- [ ] Verify build succeeds locally (`bun run build`)
 - [ ] Review recent error patterns in Sentry
 - [ ] Communicate maintenance window to users (if needed)
 

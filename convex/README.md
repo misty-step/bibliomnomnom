@@ -211,7 +211,7 @@ export const getPublic = query({
 
 - `by_user_run` - Find a run by userId + importRunId (idempotency + rate limit guard)
 
-**After schema edits**: run `pnpm convex:push` to apply changes and regenerate `_generated/*` types.
+**After schema edits**: run `bun run convex:push` to apply changes and regenerate `_generated/*` types.
 
 ## Auto-Dating Logic
 
@@ -313,7 +313,7 @@ See [BACKLOG.md](../BACKLOG.md) for test coverage roadmap.
 ### "Could not find public function"
 
 **Cause**: Schema not synced to Convex deployment.
-**Fix**: Run `pnpm convex:push` to sync schema and functions.
+**Fix**: Run `bun run convex:push` to sync schema and functions.
 
 ### "Authentication required"
 
@@ -328,7 +328,7 @@ See [BACKLOG.md](../BACKLOG.md) for test coverage roadmap.
 ### Type errors after schema change
 
 **Cause**: Generated types out of sync.
-**Fix**: Run `pnpm convex:push` to regenerate types, restart `pnpm dev` if needed.
+**Fix**: Run `bun run convex:push` to regenerate types, restart `bun run dev` if needed.
 
 ## Best Practices
 

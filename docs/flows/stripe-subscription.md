@@ -69,6 +69,7 @@ sequenceDiagram
     participant User
     participant Pricing as /pricing
     participant Checkout as /api/stripe/checkout
+    participant Confirm as /api/stripe/checkout/confirm
     participant Convex
     participant Stripe
 
@@ -76,6 +77,7 @@ sequenceDiagram
     Pricing->>Checkout: POST { priceType: "annual" }
     Checkout->>Convex: Check rate limit
     Checkout->>Convex: Get existing subscription
+    Checkout->>Convex: Billing preflight (assertWebhookConfiguration)
     Note over Checkout: Determine trial eligibility
 
     alt First-time subscriber
@@ -95,7 +97,10 @@ sequenceDiagram
     Webhook->>Convex: upsertFromWebhook()
     Convex->>Convex: Update subscription record
 
-    Stripe-->>User: Redirect to /library?checkout=success
+    Stripe-->>User: Redirect to /library?checkout=success&session_id=...
+    User->>Confirm: POST { sessionId }
+    Confirm->>Convex: upsertFromWebhook()
+    Confirm-->>User: { hasAccess }
 ```
 
 ## Webhook Event Flow
