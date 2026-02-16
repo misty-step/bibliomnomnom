@@ -179,7 +179,7 @@ export const updatePrivacy = mutation(...)
 
 ### Module 3: Notes & Content
 
-**Purpose**: Manages notes, quotes, and reflections with book ownership validation.
+**Purpose**: Manages notes and quotes with book ownership validation.
 
 **Responsibilities**:
 
@@ -202,7 +202,6 @@ export const remove = mutation(...) // Delete note
 
 - `note` - General observations or thoughts
 - `quote` - Direct quotes from the book
-- `reflection` - Personal insights or analysis
 
 **Ownership Model**:
 

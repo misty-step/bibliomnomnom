@@ -2,7 +2,7 @@
 
 A digital garden for voracious readers—a beautiful, private-first book tracking application.
 
-**Why bibliomnomnom?** Track your reading journey with a privacy-first approach. Unlike Goodreads or StoryGraph, your data stays yours. Built for readers who want a beautiful, intentional way to catalog books, notes, quotes, and reflections without algorithms or social pressure.
+**Why bibliomnomnom?** Track your reading journey with a privacy-first approach. Unlike Goodreads or StoryGraph, your data stays yours. Built for readers who want a beautiful, intentional way to catalog books, notes, and quotes without algorithms or social pressure.
 
 ## Prerequisites
 
@@ -289,7 +289,7 @@ await updateStatus({ id: bookId, status: "read" });
 const createNote = useMutation(api.notes.create);
 await createNote({
   bookId,
-  type: "note", // or "quote", "reflection"
+  type: "note", // or "quote"
   content: "This is my note in markdown",
 });
 ```

@@ -8,7 +8,7 @@ This directory contains all React components for bibliomnomnom, organized by dom
 components/
 ├── ui/                 # shadcn/ui primitives (generated)
 ├── book/               # Book-related components
-├── notes/              # Note/quote/reflection components
+├── notes/              # Note/quote components
 ├── navigation/         # Navigation and layout
 └── shared/             # Shared utilities (error, loading, empty states)
 ```

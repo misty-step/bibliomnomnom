@@ -6,11 +6,51 @@ Voice-first note capture for readers who want to keep reading while talking thro
 
 - One-tap recording from book detail.
 - Clear active-recording UI.
-- Real-time transcript feedback.
+- Optional live transcript feedback (browser-dependent).
 - Long-session support (30+ min).
 - Safe cap handling with audible + visual warning and forced rollover.
 - Always save raw transcript.
 - Generate useful artifacts in book context.
+
+## Current MVP Implementation (2026-02-16)
+
+This is what actually ships today (not the aspirational design below).
+
+### End-to-End Pipeline
+
+1. **Record**
+   - UI: `components/notes/ListeningSessionRecorder.tsx`
+   - Capture: `MediaRecorder` chunks to memory (1s slices).
+   - Live transcript: best-effort `SpeechRecognition` / `webkitSpeechRecognition` (not guaranteed).
+
+2. **Upload audio**
+   - Client: `@vercel/blob/client` `upload()` with `handleUploadUrl=/api/blob/upload-audio`
+   - Server: `app/api/blob/upload-audio/route.ts` uses `handleUpload()` to mint a client token.
+   - Gotcha: codec content-types (for example `audio/webm;codecs=opus`) must be normalized/allowed.
+
+3. **Transcribe (batch)**
+   - Route: `app/api/listening-sessions/transcribe/route.ts`
+   - Audio bytes are fetched from the blob URL, then sent to:
+     - Deepgram (preferred if `DEEPGRAM_API_KEY` is set)
+       - Model: `DEEPGRAM_STT_MODEL` (default `nova-3`)
+     - ElevenLabs (fallback if `ELEVENLABS_API_KEY` is set)
+       - Model: `ELEVENLABS_STT_MODEL` (default `scribe_v2`)
+
+4. **Synthesize (LLM)**
+   - Route: `app/api/listening-sessions/synthesize/route.ts`
+   - Provider: OpenRouter (`OPENROUTER_API_KEY`)
+   - Output: strict JSON schema via `response_format=json_schema`
+   - Model + knobs:
+     - Model: `OPENROUTER_LISTENING_MODEL` (default in `lib/ai/models.ts`)
+     - Temperature: `OPENROUTER_LISTENING_TEMPERATURE` (default in `lib/listening-sessions/synthesisConfig.ts`)
+     - Max output tokens: `OPENROUTER_LISTENING_MAX_TOKENS`
+     - Optional: `OPENROUTER_LISTENING_TOP_P`, `OPENROUTER_LISTENING_SEED`
+   - Prompt template: `lib/listening-sessions/synthesisPrompt.ts`
+
+5. **Persist**
+   - Convex: `convex/listeningSessions.ts`
+   - Always writes/updates a **raw transcript note**.
+   - Writes **one synthesized note** plus **quote notes** (note types are `note` or `quote`).
 
 ## State Machine
 

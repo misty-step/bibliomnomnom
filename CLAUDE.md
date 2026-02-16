@@ -73,7 +73,7 @@ bun run lint
 **Module 4: Notes & Content** (`convex/notes.ts`)
 
 - Hides note CRUD complexity and ownership validation via book relationship
-- Supports three types: note, quote, reflection
+- Supports two types: note, quote
 - Markdown content storage with rich text editor (Tiptap) on frontend
 
 **Module 5: File Upload** (`app/api/blob/upload/route.ts`)
