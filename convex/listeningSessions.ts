@@ -264,14 +264,14 @@ export const complete = mutation({
       ? [...session.synthesizedNoteIds]
       : [];
 
-    const createSynthesizedNote = async (type: Doc<"notes">["type"], content: string) => {
+    const addSynthesizedNote = async (type: "note" | "quote", content: string) => {
       if (synthesizedNoteIds.length >= MAX_SYNTH_NOTES) return;
       const cleaned = content.trim();
       if (!cleaned) return;
       const noteId = await ctx.db.insert("notes", {
         bookId: session.bookId,
         userId,
-        type,
+        type: type satisfies Doc<"notes">["type"],
         content: cleaned,
         createdAt: now,
         updatedAt: now,
@@ -279,25 +279,65 @@ export const complete = mutation({
       synthesizedNoteIds.push(noteId);
     };
 
+    const renderSynthesisNote = (synth: NonNullable<SynthesisArtifacts>) => {
+      const lines: string[] = ["## Voice Synthesis", ""];
+
+      if (synth.insights.length > 0) {
+        lines.push("### Key insights", "");
+        for (const insight of synth.insights.slice(0, 6)) {
+          lines.push(`#### ${insight.title}`, "", insight.content.trim(), "");
+        }
+      }
+
+      if (synth.openQuestions.length > 0) {
+        lines.push("### Open questions", "");
+        for (const question of synth.openQuestions.slice(0, 6)) {
+          lines.push(`- ${question.trim()}`);
+        }
+        lines.push("");
+      }
+
+      if (synth.followUpQuestions.length > 0) {
+        lines.push("### Follow-ups", "");
+        for (const question of synth.followUpQuestions.slice(0, 6)) {
+          lines.push(`- ${question.trim()}`);
+        }
+        lines.push("");
+      }
+
+      if (synth.contextExpansions.length > 0) {
+        lines.push("### Context expansions", "");
+        for (const expansion of synth.contextExpansions.slice(0, 4)) {
+          lines.push(`#### ${expansion.title}`, "", expansion.content.trim(), "");
+        }
+      }
+
+      return lines.join("\n").trim();
+    };
+
     const synth = args.synthesis;
     if (synth && synthesizedNoteIds.length === 0) {
-      for (const insight of synth.insights.slice(0, 4)) {
-        await createSynthesizedNote("note", `### Insight: ${insight.title}\n\n${insight.content}`);
+      const hasSynthesisNote =
+        synth.insights.length > 0 ||
+        synth.openQuestions.length > 0 ||
+        synth.followUpQuestions.length > 0 ||
+        synth.contextExpansions.length > 0;
+
+      if (hasSynthesisNote) {
+        await addSynthesizedNote("note", renderSynthesisNote(synth));
       }
-      for (const quote of synth.quotes.slice(0, 4)) {
-        await createSynthesizedNote("quote", quote.text);
-      }
-      for (const question of synth.openQuestions.slice(0, 2)) {
-        await createSynthesizedNote("reflection", `### Open Question\n\n${question}`);
-      }
-      for (const question of synth.followUpQuestions.slice(0, 2)) {
-        await createSynthesizedNote("reflection", `### Follow-up\n\n${question}`);
-      }
-      for (const expansion of synth.contextExpansions.slice(0, 2)) {
-        await createSynthesizedNote(
-          "reflection",
-          `### Context Expansion: ${expansion.title}\n\n${expansion.content}`,
-        );
+
+      const seenQuotes = new Set<string>();
+      for (const quote of synth.quotes.slice(0, 6)) {
+        const normalized = quote.text.trim().replace(/\s+/g, " ");
+        if (!normalized || seenQuotes.has(normalized)) continue;
+        seenQuotes.add(normalized);
+
+        const content = quote.source?.trim()
+          ? `> ${quote.text.trim()}\n\n— ${quote.source.trim()}`
+          : `> ${quote.text.trim()}`;
+
+        await addSynthesizedNote("quote", content);
       }
     }
 
@@ -351,12 +391,13 @@ export const getSynthesisContext = query({
       .collect();
 
     const bookTitles = new Map(books.map((book) => [book._id, book.title]));
-    const recentNotes = notes
+    type RecentSynthesisNote = { bookTitle: string; type: "note" | "quote"; content: string };
+    const recentNotes: RecentSynthesisNote[] = notes
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, 20)
-      .map((note) => ({
+      .map<RecentSynthesisNote>((note) => ({
         bookTitle: bookTitles.get(note.bookId) ?? "Unknown book",
-        type: note.type,
+        type: note.type === "quote" ? "quote" : "note",
         content: truncate(note.content, 280),
       }));
 

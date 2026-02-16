@@ -669,7 +669,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
                   <span>Session auto-processes in {remainingSeconds}s at cap.</span>
                 </div>
               ) : (
-                "Speak freely. Transcript updates in real time."
+                "Speak freely. Live transcript is best-effort and browser-dependent."
               )}
             </div>
 

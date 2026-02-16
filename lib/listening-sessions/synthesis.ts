@@ -32,7 +32,7 @@ export type SynthesisContext = {
   read: Array<{ title: string; author: string }>;
   recentNotes: Array<{
     bookTitle: string;
-    type: "note" | "quote" | "reflection";
+    type: "note" | "quote";
     content: string;
   }>;
 };
@@ -49,7 +49,7 @@ export function clampArtifacts(input: SynthesisArtifacts): SynthesisArtifacts {
   return {
     insights: input.insights.slice(0, 8).map((insight) => ({
       title: insight.title.trim().slice(0, 140),
-      content: insight.content.trim().slice(0, 800),
+      content: insight.content.trim().slice(0, 1200),
     })),
     openQuestions: input.openQuestions.slice(0, 8).map((item) => item.trim().slice(0, 320)),
     quotes: input.quotes.slice(0, 8).map((quote) => ({
@@ -59,7 +59,7 @@ export function clampArtifacts(input: SynthesisArtifacts): SynthesisArtifacts {
     followUpQuestions: input.followUpQuestions.slice(0, 8).map((item) => item.trim().slice(0, 320)),
     contextExpansions: input.contextExpansions.slice(0, 6).map((item) => ({
       title: item.title.trim().slice(0, 140),
-      content: item.content.trim().slice(0, 800),
+      content: item.content.trim().slice(0, 1200),
     })),
   };
 }

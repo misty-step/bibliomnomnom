@@ -1,7 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { log, withObservability } from "@/lib/api/withObservability";
-import { DEFAULT_MODEL } from "@/lib/ai/models";
 import { OpenRouterApiError, openRouterChatCompletion } from "@/lib/ai/openrouter";
 import {
   clampArtifacts,
@@ -9,6 +8,8 @@ import {
   type SynthesisArtifacts,
   type SynthesisContext,
 } from "@/lib/listening-sessions/synthesis";
+import { getListeningSynthesisConfig } from "@/lib/listening-sessions/synthesisConfig";
+import { buildListeningSynthesisPrompt } from "@/lib/listening-sessions/synthesisPrompt";
 
 type SynthesizeRequest = {
   transcript: string;
@@ -155,36 +156,6 @@ function makeFallbackArtifacts(transcript: string, context?: SynthesisContext): 
   });
 }
 
-function buildPrompt(transcript: string, context?: SynthesisContext): string {
-  const contextPayload = context
-    ? JSON.stringify(context, null, 2)
-    : JSON.stringify(
-        {
-          book: null,
-          currentlyReading: [],
-          wantToRead: [],
-          read: [],
-          recentNotes: [],
-        },
-        null,
-        2,
-      );
-
-  return [
-    "Synthesize this reading voice transcript into practical artifacts for the reader.",
-    "Keep artifacts specific and grounded in the transcript and provided reading context.",
-    "Do not invent quotes or facts.",
-    "",
-    "Return only valid JSON that matches the schema.",
-    "",
-    "Context:",
-    contextPayload,
-    "",
-    "Transcript:",
-    transcript,
-  ].join("\n");
-}
-
 export const POST = withObservability(async (request: Request) => {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const { userId } = await auth();
@@ -233,7 +204,7 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
-  const model = process.env.OPENROUTER_LISTENING_MODEL || DEFAULT_MODEL;
+  const config = getListeningSynthesisConfig();
   try {
     const { content } = await openRouterChatCompletion({
       apiKey: openRouterApiKey,
@@ -241,9 +212,11 @@ export const POST = withObservability(async (request: Request) => {
       referer: process.env.NEXT_PUBLIC_APP_URL || "https://bibliomnomnom.app",
       title: "bibliomnomnom-listening-session",
       request: {
-        model,
-        temperature: 0.2,
-        max_tokens: 4_096,
+        model: config.model,
+        temperature: config.temperature,
+        max_tokens: config.maxTokens,
+        top_p: config.topP,
+        seed: config.seed,
         response_format: {
           type: "json_schema",
           json_schema: RESPONSE_SCHEMA,
@@ -252,11 +225,14 @@ export const POST = withObservability(async (request: Request) => {
           {
             role: "system",
             content:
-              "You transform spoken reading notes into useful, concrete artifacts for future reading and reflection.",
+              "You transform spoken reading notes into useful, concrete artifacts for future reading and recall.",
           },
           {
             role: "user",
-            content: buildPrompt(body.transcript, body.context),
+            content: buildListeningSynthesisPrompt({
+              transcript: body.transcript,
+              context: body.context,
+            }),
           },
         ],
       },
@@ -267,12 +243,14 @@ export const POST = withObservability(async (request: Request) => {
     log("info", "listening_session_synthesized", {
       requestId,
       userIdSuffix: userId.slice(-6),
-      model,
+      model: config.model,
+      temperature: config.temperature,
+      maxTokens: config.maxTokens,
       insightCount: artifacts.insights.length,
       quoteCount: artifacts.quotes.length,
     });
     return NextResponse.json(
-      { artifacts, source: "openrouter", model },
+      { artifacts, source: "openrouter", model: config.model },
       { headers: { "x-request-id": requestId } },
     );
   } catch (error) {
@@ -281,6 +259,7 @@ export const POST = withObservability(async (request: Request) => {
     log(isRateLimited ? "warn" : "error", "listening_session_synthesis_fallback", {
       requestId,
       userIdSuffix: userId.slice(-6),
+      model: config.model,
       error: error instanceof Error ? error.message : String(error),
       isRateLimited,
     });
