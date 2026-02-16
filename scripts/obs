@@ -178,7 +178,7 @@ cmd_logs() {
 
     if ! command -v vercel &>/dev/null; then
         echo -e "${RED}Error:${NC} vercel CLI not installed"
-        echo "Install with: pnpm add -g vercel"
+        echo "Install with: bun add -g vercel"
         exit 1
     fi
 

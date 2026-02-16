@@ -9,9 +9,9 @@
  * Uses OpenRouter with DeepSeek V3.2 for cost-effective synthesis.
  *
  * Usage:
- *   pnpm generate:releases           # Generate missing releases
- *   pnpm generate:releases --dry-run # Parse only, no LLM calls
- *   pnpm generate:releases --force   # Regenerate all releases
+ *   bun run generate:releases           # Generate missing releases
+ *   bun run generate:releases --dry-run # Parse only, no LLM calls
+ *   bun run generate:releases --force   # Regenerate all releases
  */
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";

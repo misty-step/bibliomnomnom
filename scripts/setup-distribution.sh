@@ -94,15 +94,14 @@ check_dependencies() {
     exit 1
   fi
   
-  # Check pnpm
-  if command -v pnpm &> /dev/null; then
-    PNPM_VERSION=$(pnpm --version)
-    print_success "pnpm $PNPM_VERSION"
+  # Check Bun
+  if command -v bun &> /dev/null; then
+    BUN_VERSION=$(bun --version)
+    print_success "bun $BUN_VERSION"
   else
-    print_warning "pnpm not installed"
-    echo "Installing pnpm..."
-    npm install -g pnpm
-    print_success "Installed pnpm"
+    print_warning "bun not installed"
+    echo "Install bun from https://bun.sh"
+    exit 1
   fi
   
   # Check Stripe CLI
@@ -227,20 +226,20 @@ CONVEX_WEBHOOK_TOKEN=$(grep "^CONVEX_WEBHOOK_TOKEN=" "$ENV_FILE" | cut -d'=' -f2
 cd "$PROJECT_ROOT"
 
 # Set Stripe keys
-npx convex env set STRIPE_SECRET_KEY "sk_test_xxx"
-npx convex env set STRIPE_WEBHOOK_SECRET "whsec_xxx"
-npx convex env set CONVEX_WEBHOOK_TOKEN "$(grep "^CONVEX_WEBHOOK_TOKEN=" "$ENV_FILE" | cut -d'=' -f2)"
-npx convex env set STRIPE_PRICE_MONTHLY "price_monthly_test_xxx"
-npx convex env set STRIPE_PRICE_ANNUAL "price_annual_test_xxx"
+bunx convex env set STRIPE_SECRET_KEY "sk_test_xxx"
+bunx convex env set STRIPE_WEBHOOK_SECRET "whsec_xxx"
+bunx convex env set CONVEX_WEBHOOK_TOKEN "$(grep "^CONVEX_WEBHOOK_TOKEN=" "$ENV_FILE" | cut -d'=' -f2)"
+bunx convex env set STRIPE_PRICE_MONTHLY "price_monthly_test_xxx"
+bunx convex env set STRIPE_PRICE_ANNUAL "price_annual_test_xxx"
 \`\`\`
 
 ### 4. Run Development Server
 \`\`\`bash
 # Install dependencies
-pnpm install
+bun install
 
 # Start development
-pnpm dev
+bun run dev
 \`\`\`
 
 ### 5. Test
@@ -256,10 +255,10 @@ pnpm dev
 ./scripts/validate-env.sh
 
 # Run tests
-pnpm test
+bun run test
 
 # Deploy to production
-pnpm convex:deploy
+bun run convex:deploy
 vercel --prod
 \`\`\`
 
@@ -293,11 +292,11 @@ run_validation() {
   
   # Check TypeScript
   echo "Checking TypeScript compilation..."
-  if pnpm typecheck &> /dev/null; then
+  if bun run typecheck &> /dev/null; then
     print_success "TypeScript compilation passes"
   else
     print_error "TypeScript compilation failed"
-    pnpm typecheck
+    bun run typecheck
   fi
 }
 
@@ -320,7 +319,7 @@ main() {
   echo "2. Read DISTRIBUTION-READINESS.md for complete guide"
   echo "3. Get API keys from service dashboards"
   echo "4. Update .env.local with your keys"
-  echo "5. Run 'pnpm dev' to start development"
+  echo "5. Run 'bun run dev' to start development"
   echo ""
   echo "Estimated time to production-ready: 60 minutes"
 }

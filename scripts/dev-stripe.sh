@@ -7,6 +7,9 @@ set -eo pipefail
 WEBHOOK_URL="localhost:3000/api/stripe/webhook"
 ENV_FILE=".env.local"
 
+# Keep Convex webhook auth token in sync before listening.
+./scripts/ensure-convex-webhook-token.sh
+
 # Check Stripe CLI
 if ! command -v stripe &> /dev/null; then
   echo "[Stripe] CLI not installed. Install: brew install stripe/stripe-cli/stripe"

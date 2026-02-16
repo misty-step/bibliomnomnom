@@ -35,7 +35,7 @@ for var in "${vars[@]}"; do
   if [[ -z "${value}" ]]; then
     continue
   fi
-  ./scripts/pnpm.sh convex env set "${var}" "${value}"
+  ./scripts/bun.sh convex env set "${var}" "${value}"
 done
 
 echo "Synced OpenRouter env vars to Convex (dev deployment)"

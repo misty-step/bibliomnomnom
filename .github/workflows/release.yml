@@ -25,22 +25,23 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.17"
 
       - name: Use Node
         uses: actions/setup-node@v6
         with:
           node-version: 20
-          cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run semantic-release
         id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
-        run: pnpm release
+        run: bun run release
 
   generate-content:
     name: Generate Release Content
@@ -54,16 +55,17 @@ jobs:
           # Use PAT for pushing changes back
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.17"
 
       - name: Use Node
         uses: actions/setup-node@v6
         with:
           node-version: 20
-          cache: "pnpm"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Pull latest changes
         run: git pull origin master
@@ -71,7 +73,7 @@ jobs:
       - name: Generate release content
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-        run: pnpm generate:releases
+        run: bun run generate:releases
 
       - name: Commit and push content
         run: |
