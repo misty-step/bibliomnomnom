@@ -91,7 +91,7 @@ export function CreateNote({ bookId }: CreateNoteProps) {
           <Editor
             initialContent={content}
             onChange={setContent}
-            placeholder={isExpanded ? "What's on your mind?" : "Add a note, quote, or reflection…"}
+            placeholder={isExpanded ? "What's on your mind?" : "Add a note or quote…"}
             autoFocus={isExpanded}
             className={cn("min-h-[2.5rem]", isExpanded && "min-h-[6rem]")}
             editable={!isSaving}

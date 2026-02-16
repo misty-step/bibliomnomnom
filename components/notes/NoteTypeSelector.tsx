@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 
-export type NoteType = "note" | "quote" | "reflection";
+export type NoteType = "note" | "quote";
 
 const TYPES: Array<{
   value: NoteType;
@@ -10,7 +10,6 @@ const TYPES: Array<{
 }> = [
   { value: "note", label: "Note" },
   { value: "quote", label: "Quote" },
-  { value: "reflection", label: "Reflection" },
 ];
 
 type NoteTypeSelectorProps = {
