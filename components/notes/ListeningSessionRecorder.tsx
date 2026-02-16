@@ -94,6 +94,12 @@ function extensionForMimeType(mimeType: string): string {
   return "webm";
 }
 
+function normalizeContentType(mimeType: string | undefined): string | undefined {
+  if (!mimeType) return undefined;
+  const base = mimeType.split(";")[0]?.trim();
+  return base || undefined;
+}
+
 function pickSupportedMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
@@ -367,10 +373,12 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
         throw new Error("Captured audio was empty.");
       }
 
-      const extension = extensionForMimeType(blob.type || recorder.mimeType || "audio/webm");
+      const contentType = normalizeContentType(blob.type || recorder.mimeType) || "audio/webm";
+      const extension = extensionForMimeType(contentType);
       const filename = `listening-sessions/${bookId}-${Date.now()}.${extension}`;
       const uploaded = await upload(filename, blob, {
         access: "public",
+        contentType,
         handleUploadUrl: "/api/blob/upload-audio",
       });
 
@@ -382,10 +390,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
         transcriptLive: liveTranscript.slice(0, LIVE_TRANSCRIPT_MAX_CHARS) || undefined,
       });
 
-      const transcription = await requestTranscription(
-        uploaded.url,
-        blob.type || recorder.mimeType,
-      );
+      const transcription = await requestTranscription(uploaded.url, contentType);
       await markSynthesizing({ sessionId });
 
       let synthesized = EMPTY_SYNTHESIS_ARTIFACTS;
@@ -554,7 +559,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
 
   return (
     <>
-      <Surface elevation="soft" className="border border-accent-teal/20 bg-accent-teal/5">
+      <Surface elevation="soft" className="border border-line-ghost/60 bg-paper">
         <div className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -620,16 +625,24 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
 
           {sessions && sessions.length > 0 ? (
             <div className="rounded-md border border-line-ghost/70 bg-canvas-bone px-3 py-2">
-              <p className="text-xs uppercase tracking-wider text-text-inkSubtle">
-                Recent sessions: {sessions.length}
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs uppercase tracking-wider text-text-inkSubtle">
+                  Recent sessions: {sessions.length}
+                </p>
+                {sessions[0]?.status && sessions[0]?.status !== "complete" ? (
+                  <p className="text-xs text-text-inkMuted">Latest: {sessions[0].status}</p>
+                ) : null}
+              </div>
+              {sessions[0]?.status === "failed" && sessions[0]?.lastError ? (
+                <p className="mt-2 text-xs text-status-danger">{sessions[0].lastError}</p>
+              ) : null}
             </div>
           ) : null}
         </div>
       </Surface>
 
       {isRecording ? (
-        <div className="fixed inset-0 z-[60] bg-text-ink/95 text-canvas-bone">
+        <div className="fixed inset-0 z-[60] bg-black/90 text-canvas-bone backdrop-blur-sm">
           <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-6 py-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

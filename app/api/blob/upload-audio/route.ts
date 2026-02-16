@@ -6,11 +6,13 @@ import { captureError } from "@/lib/sentry";
 
 const ALLOWED_TYPES = [
   "audio/webm",
+  "audio/webm;codecs=opus",
   "audio/wav",
   "audio/x-wav",
   "audio/mpeg",
   "audio/mp4",
   "audio/ogg",
+  "audio/ogg;codecs=opus",
   "audio/x-m4a",
 ];
 const MAX_FILE_SIZE = 120 * 1024 * 1024; // 120MB
