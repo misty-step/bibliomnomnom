@@ -41,11 +41,17 @@ This is what actually ships today (not the aspirational design below).
    - Provider: OpenRouter (`OPENROUTER_API_KEY`)
    - Output: strict JSON schema via `response_format=json_schema`
    - Model + knobs:
-     - Model: `OPENROUTER_LISTENING_MODEL` (default in `lib/ai/models.ts`)
-     - Temperature: `OPENROUTER_LISTENING_TEMPERATURE` (default in `lib/listening-sessions/synthesisConfig.ts`)
-     - Max output tokens: `OPENROUTER_LISTENING_MAX_TOKENS`
+     - Model: `OPENROUTER_LISTENING_MODEL` (default `google/gemini-3-pro-preview`)
+     - Fallback models: `OPENROUTER_LISTENING_FALLBACK_MODELS` (CSV; defaults are model-dependent)
+     - Temperature: `OPENROUTER_LISTENING_TEMPERATURE` (default `0.35`, omitted by default for OpenAI GPT-5 models)
+     - Max output tokens: `OPENROUTER_LISTENING_MAX_TOKENS` (default `4096`)
      - Optional: `OPENROUTER_LISTENING_TOP_P`, `OPENROUTER_LISTENING_SEED`
+     - Optional: `OPENROUTER_LISTENING_REASONING_EFFORT` (`low|medium|high`, reasoning excluded from response)
    - Prompt template: `lib/listening-sessions/synthesisPrompt.ts`
+   - Reliability hardening:
+     - `provider.require_parameters=true` so OpenRouter won't route to providers that ignore structured outputs.
+     - `response-healing` plugin enabled (best-effort JSON repair).
+     - Model fallbacks enabled via OpenRouter `models` parameter.
 
 5. **Persist**
    - Convex: `convex/listeningSessions.ts`
