@@ -5,6 +5,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { Masthead } from "@/components/navigation/Masthead";
 import { FadeInContent } from "@/components/layout/FadeInContent";
 import { TrialBanner } from "@/components/subscription/TrialBanner";
+import { CheckoutReturnSync } from "@/components/subscription/CheckoutReturnSync";
 import { SubscriptionGate } from "@/components/subscription/SubscriptionGate";
 
 type DashboardLayoutProps = {
@@ -33,6 +34,7 @@ export default async function DashboardLayout({ children }: DashboardLayoutProps
       <div className="relative">
         <Masthead />
         <TrialBanner />
+        <CheckoutReturnSync />
         <main className="py-8">
           <SubscriptionGate>
             <FadeInContent>{children}</FadeInContent>

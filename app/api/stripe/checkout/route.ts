@@ -6,6 +6,7 @@ import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
 import { withObservability } from "@/lib/api/withObservability";
 
 const MIN_TRIAL_MS = 2 * 24 * 60 * 60 * 1000; // Stripe requires trial_end >= 2 days out.
+const BILLING_UNAVAILABLE = "Billing is temporarily unavailable. Please try again shortly.";
 
 /**
  * POST /api/stripe/checkout
@@ -59,6 +60,12 @@ export const POST = withObservability(async (request: Request) => {
 
   const priceType = body.priceType === "monthly" ? "monthly" : "annual";
   const priceId = PRICES[priceType];
+  const webhookToken = process.env.CONVEX_WEBHOOK_TOKEN?.trim();
+
+  if (!webhookToken) {
+    console.error("Stripe checkout blocked: CONVEX_WEBHOOK_TOKEN is missing");
+    return NextResponse.json({ error: BILLING_UNAVAILABLE }, { status: 503 });
+  }
 
   if (!priceId) {
     return NextResponse.json(
@@ -75,6 +82,16 @@ export const POST = withObservability(async (request: Request) => {
       return NextResponse.json({ error: "Authentication token missing" }, { status: 401 });
     }
     convex.setAuth(token);
+
+    // Critical preflight: block checkout if Vercel and Convex webhook auth are out of sync.
+    try {
+      await convex.action(api.subscriptions.assertWebhookConfiguration, {
+        webhookToken,
+      });
+    } catch (error) {
+      console.error("Stripe checkout blocked: webhook auth preflight failed", error);
+      return NextResponse.json({ error: BILLING_UNAVAILABLE }, { status: 503 });
+    }
 
     // Check existing subscription for customer ID and trial eligibility
     const existingSubscription = await convex.query(api.subscriptions.get);
@@ -119,7 +136,7 @@ export const POST = withObservability(async (request: Request) => {
         },
       ],
       subscription_data: subscriptionData,
-      success_url: `${getBaseUrl()}/library?checkout=success`,
+      success_url: `${getBaseUrl()}/library?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${getBaseUrl()}/pricing?checkout=canceled`,
       metadata: {
         clerkId,

@@ -39,14 +39,6 @@ function sanitizeId(id: string | null | undefined): string {
  * This is fired when a customer completes checkout with a trial.
  */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const clerkId = session.metadata?.clerkId;
-  if (!clerkId) {
-    log("error", "stripe_webhook_missing_clerk_id", {
-      event: "checkout.session.completed",
-    });
-    return;
-  }
-
   // Type-safe extraction of Stripe IDs (can be string, object, or null)
   const customerId = typeof session.customer === "string" ? session.customer : null;
   const subscriptionId = typeof session.subscription === "string" ? session.subscription : null;
@@ -54,13 +46,34 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (!customerId || !subscriptionId) {
     log("error", "stripe_webhook_missing_customer_or_subscription", {
       event: "checkout.session.completed",
-      clerkIdPrefix: sanitizeId(clerkId),
+      clerkIdPrefix: sanitizeId(session.metadata?.clerkId),
     });
     return;
   }
 
-  // Retrieve the subscription to get trial details
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  let subscription: Stripe.Subscription | null = null;
+  let clerkId = session.metadata?.clerkId;
+
+  if (!clerkId) {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    clerkId = subscription.metadata?.clerkId;
+    if (!clerkId) {
+      log("error", "stripe_webhook_missing_clerk_id", {
+        event: "checkout.session.completed",
+      });
+      return;
+    }
+
+    log("warn", "stripe_webhook_checkout_clerk_fallback", {
+      event: "checkout.session.completed",
+      clerkIdPrefix: sanitizeId(clerkId),
+    });
+  }
+
+  if (!subscription) {
+    // Retrieve the subscription to get trial and billing details
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  }
 
   // In newer Stripe API versions, billing period is on the item
   const subscriptionItem = subscription.items.data[0];
@@ -100,17 +113,45 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   // In newer Stripe API versions, billing period is on the item
   const subscriptionItem = subscription.items.data[0];
   const currentPeriodEnd = subscriptionItem?.current_period_end;
-
-  await convex.action(api.subscriptions.updateByStripeCustomer, {
-    webhookToken: getWebhookToken(),
+  const mappedStatus = mapStripeStatus(subscription.status);
+  const sharedPayload = {
     stripeCustomerId: customerId,
     stripeSubscriptionId: subscription.id,
-    status: mapStripeStatus(subscription.status),
+    status: mappedStatus,
     priceId: subscriptionItem?.price?.id,
     currentPeriodEnd: currentPeriodEnd ? stripeTimestampToMs(currentPeriodEnd) : undefined,
     trialEndsAt: subscription.trial_end ? stripeTimestampToMs(subscription.trial_end) : undefined,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
+  };
+
+  const updatedSubscriptionId = await convex.action(api.subscriptions.updateByStripeCustomer, {
+    webhookToken: getWebhookToken(),
+    ...sharedPayload,
   });
+
+  if (!updatedSubscriptionId) {
+    const clerkId = subscription.metadata?.clerkId;
+    if (!clerkId) {
+      log("warn", "stripe_webhook_subscription_update_missing_mapping", {
+        event: "customer.subscription.updated",
+        stripeCustomerIdPrefix: sanitizeId(customerId),
+        stripeSubscriptionIdPrefix: sanitizeId(subscription.id),
+      });
+      return;
+    }
+
+    await convex.action(api.subscriptions.upsertFromWebhook, {
+      webhookToken: getWebhookToken(),
+      clerkId,
+      ...sharedPayload,
+    });
+
+    log("warn", "stripe_webhook_subscription_upsert_fallback", {
+      event: "customer.subscription.updated",
+      clerkIdPrefix: sanitizeId(clerkId),
+      stripeCustomerIdPrefix: sanitizeId(customerId),
+    });
+  }
 
   log("info", "stripe_webhook_subscription_updated", {
     event: "subscription.updated",

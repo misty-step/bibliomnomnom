@@ -357,6 +357,25 @@ export const updateByStripeCustomer = action({
   },
 });
 
+/**
+ * Secure action: Validate webhook token wiring before checkout.
+ * Called from Next.js checkout route to fail fast when Vercel/Convex token parity is broken.
+ */
+export const assertWebhookConfiguration = action({
+  args: {
+    webhookToken: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ ok: true }> => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Unauthenticated: User must be signed in");
+    }
+
+    validateWebhookToken(args.webhookToken);
+    return { ok: true };
+  },
+});
+
 // ============================================================================
 // Internal Webhook Mutations (only callable from Convex actions)
 // ============================================================================

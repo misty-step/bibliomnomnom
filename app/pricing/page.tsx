@@ -6,6 +6,7 @@ import { Sparkles, BookOpen, Camera, BarChart3, Download, Import, Loader2 } from
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { Surface } from "@/components/ui/Surface";
 import { Footer } from "@/components/layout/Footer";
+import { useToast } from "@/hooks/use-toast";
 import { useSubscriptionState, type SubscriptionState } from "@/lib/hooks/useSubscriptionState";
 
 const features = [
@@ -125,6 +126,7 @@ function getHeroContent(state: SubscriptionState) {
 // Pricing CTA component with state-aware rendering
 function PricingCTA({ isAnnual, state }: { isAnnual: boolean; state: SubscriptionState }) {
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleCheckout = async () => {
     setIsLoading(true);
@@ -134,12 +136,19 @@ function PricingCTA({ isAnnual, state }: { isAnnual: boolean; state: Subscriptio
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priceType: isAnnual ? "annual" : "monthly" }),
       });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Could not start checkout.");
       }
+      window.location.href = data.url;
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not start checkout.";
       console.error("Checkout error:", error);
+      toast({
+        title: "Checkout failed",
+        description: message,
+        variant: "destructive",
+      });
       setIsLoading(false);
     }
   };
@@ -148,12 +157,19 @@ function PricingCTA({ isAnnual, state }: { isAnnual: boolean; state: Subscriptio
     setIsLoading(true);
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Could not open billing portal.");
       }
+      window.location.href = data.url;
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not open billing portal.";
       console.error("Portal error:", error);
+      toast({
+        title: "Could not open billing portal",
+        description: message,
+        variant: "destructive",
+      });
       setIsLoading(false);
     }
   };
@@ -243,6 +259,7 @@ function PricingCTA({ isAnnual, state }: { isAnnual: boolean; state: Subscriptio
 // Bottom CTA with state-aware rendering
 function BottomCTA({ state }: { state: SubscriptionState }) {
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleCheckout = async () => {
     setIsLoading(true);
@@ -252,12 +269,19 @@ function BottomCTA({ state }: { state: SubscriptionState }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ priceType: "annual" }), // Default to annual for bottom CTA
       });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        throw new Error(data.error || "Could not start checkout.");
       }
+      window.location.href = data.url;
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not start checkout.";
       console.error("Checkout error:", error);
+      toast({
+        title: "Checkout failed",
+        description: message,
+        variant: "destructive",
+      });
       setIsLoading(false);
     }
   };

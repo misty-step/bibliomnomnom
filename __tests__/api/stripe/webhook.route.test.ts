@@ -169,6 +169,21 @@ describe("Stripe Webhook Route", () => {
       };
 
       mockConstructEvent.mockReturnValue(event);
+      mockSubscriptionsRetrieve.mockResolvedValue({
+        id: "sub_456",
+        status: "active",
+        trial_end: null,
+        cancel_at_period_end: false,
+        metadata: {},
+        items: {
+          data: [
+            {
+              price: { id: "price_monthly" },
+              current_period_end: 1704844800,
+            },
+          ],
+        },
+      });
 
       const response = await POST(makeRequest());
 
@@ -179,6 +194,51 @@ describe("Stripe Webhook Route", () => {
       expect(mockAction).not.toHaveBeenCalled();
 
       consoleSpy.mockRestore();
+    });
+
+    it("falls back to clerkId from subscription metadata", async () => {
+      const event = {
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            mode: "subscription",
+            metadata: {},
+            customer: "cus_123",
+            subscription: "sub_456",
+          },
+        },
+      };
+
+      mockConstructEvent.mockReturnValue(event);
+      mockSubscriptionsRetrieve.mockResolvedValue({
+        id: "sub_456",
+        status: "active",
+        trial_end: null,
+        cancel_at_period_end: false,
+        metadata: { clerkId: "user_abc123" },
+        items: {
+          data: [
+            {
+              price: { id: "price_monthly" },
+              current_period_end: 1704844800,
+            },
+          ],
+        },
+      });
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockAction).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          webhookToken: "test_webhook_token",
+          clerkId: "user_abc123",
+          stripeCustomerId: "cus_123",
+          stripeSubscriptionId: "sub_456",
+          status: "active",
+        }),
+      );
     });
   });
 
@@ -259,6 +319,58 @@ describe("Stripe Webhook Route", () => {
           status: "active", // Still active until period ends
         }),
       );
+    });
+
+    it("falls back to upsert when customer lookup misses but clerkId exists", async () => {
+      const event = {
+        type: "customer.subscription.updated",
+        data: {
+          object: {
+            id: "sub_456",
+            customer: "cus_123",
+            status: "active",
+            metadata: { clerkId: "user_abc123" },
+            trial_end: null,
+            cancel_at_period_end: false,
+            items: {
+              data: [
+                {
+                  price: { id: "price_monthly" },
+                  current_period_end: 1707523200,
+                },
+              ],
+            },
+          },
+        },
+      };
+
+      mockConstructEvent.mockReturnValue(event);
+      mockAction.mockResolvedValueOnce(null).mockResolvedValueOnce("sub_doc_123");
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(mockAction).toHaveBeenNthCalledWith(1, expect.anything(), {
+        webhookToken: "test_webhook_token",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_456",
+        status: "active",
+        priceId: "price_monthly",
+        currentPeriodEnd: 1707523200000,
+        trialEndsAt: undefined,
+        cancelAtPeriodEnd: false,
+      });
+      expect(mockAction).toHaveBeenNthCalledWith(2, expect.anything(), {
+        webhookToken: "test_webhook_token",
+        clerkId: "user_abc123",
+        stripeCustomerId: "cus_123",
+        stripeSubscriptionId: "sub_456",
+        status: "active",
+        priceId: "price_monthly",
+        currentPeriodEnd: 1707523200000,
+        trialEndsAt: undefined,
+        cancelAtPeriodEnd: false,
+      });
     });
   });
 
