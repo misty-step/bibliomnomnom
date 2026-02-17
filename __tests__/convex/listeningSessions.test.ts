@@ -379,7 +379,7 @@ describe("listening session state machine handlers", () => {
         sessionId: SESSION_ID,
         transcript: "There is audio",
       }),
-    ).rejects.toThrow("Cannot complete session from state: recording");
+    ).rejects.toThrow("Invalid session transition from recording to complete");
   });
 
   it("creates raw transcript note when missing and updates session on completion", async () => {

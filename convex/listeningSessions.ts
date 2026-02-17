@@ -239,9 +239,7 @@ export const completeListeningSessionHandler = async (
   const session = await getOwnedSession(ctx, userId, args.sessionId);
   await getOwnedBook(ctx, userId, session.bookId);
 
-  if (!["transcribing", "synthesizing", "review", "complete"].includes(session.status)) {
-    throw new ConvexError(`Cannot complete session from state: ${session.status}`);
-  }
+  assertTransition(session.status, "complete");
 
   const now = Date.now();
   const cleanedTranscript = args.transcript.trim();
