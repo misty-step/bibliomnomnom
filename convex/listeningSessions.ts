@@ -1,6 +1,6 @@
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import { requireAuth } from "./auth";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
 const synthesisArtifacts = v.object({
@@ -66,7 +66,7 @@ function assertTransition(current: SessionStatus, next: SessionStatus) {
   if (current === next) return;
   const allowed = ALLOWED_TRANSITIONS[current];
   if (!allowed.includes(next)) {
-    throw new Error(`Invalid session transition from ${current} to ${next}`);
+    throw new ConvexError(`Invalid session transition from ${current} to ${next}`);
   }
 }
 
@@ -91,7 +91,7 @@ async function getOwnedBook(
 ) {
   const book = await ctx.db.get(bookId);
   if (!book || book.userId !== userId) {
-    throw new Error("Book not found or access denied");
+    throw new ConvexError("Book not found or access denied");
   }
   return book;
 }
@@ -103,7 +103,7 @@ async function getOwnedSession(
 ) {
   const session = await ctx.db.get(sessionId);
   if (!session || session.userId !== userId) {
-    throw new Error("Listening session not found or access denied");
+    throw new ConvexError("Listening session not found or access denied");
   }
   return session;
 }
@@ -240,13 +240,13 @@ export const completeListeningSessionHandler = async (
   await getOwnedBook(ctx, userId, session.bookId);
 
   if (!["transcribing", "synthesizing", "review", "complete"].includes(session.status)) {
-    throw new Error(`Cannot complete session from state: ${session.status}`);
+    throw new ConvexError(`Cannot complete session from state: ${session.status}`);
   }
 
   const now = Date.now();
   const cleanedTranscript = args.transcript.trim();
   if (!cleanedTranscript) {
-    throw new Error("Transcript cannot be empty");
+    throw new ConvexError("Transcript cannot be empty");
   }
 
   const startedLabel = new Date(session.startedAt).toLocaleString();
@@ -266,6 +266,10 @@ export const completeListeningSessionHandler = async (
 
   let rawNoteId = session.rawNoteId;
   if (rawNoteId) {
+    const rawNote = await ctx.db.get(rawNoteId);
+    if (!rawNote || rawNote.userId !== userId) {
+      throw new ConvexError("Raw note not found or access denied");
+    }
     await ctx.db.patch(rawNoteId, {
       content: rawNoteContent,
       updatedAt: now,
