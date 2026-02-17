@@ -12,32 +12,32 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Start full dev environment (Next.js + Convex + Stripe webhook listener)
-pnpm dev
+bun run dev
 
 # Start without Stripe listener (if running on different port)
-pnpm dev:no-stripe
+bun run dev:no-stripe
 
 # Start Convex dev server (for live backend logs/updates)
-pnpm convex:dev
+bun run convex:dev
 
 # Push Convex schema changes (one-time sync)
-pnpm convex:push
+bun run convex:push
 
 # Build for production
-pnpm build
+bun run build
 
 # Start production server
-pnpm start
+bun run start
 
 # Lint
-pnpm lint
+bun run lint
 ```
 
 ### Package Manager Enforcement
 
-- **MUST use pnpm** - enforced via preinstall hook and .npmrc
-- npm/yarn/bun are blocked
-- pnpm >=9.0.0 required
+- **MUST use bun** - enforced via preinstall hook and `packageManager`
+- npm/yarn/pnpm are blocked
+- bun >=1.2.17 required
 
 ## Architecture Overview
 
@@ -73,7 +73,7 @@ pnpm lint
 **Module 4: Notes & Content** (`convex/notes.ts`)
 
 - Hides note CRUD complexity and ownership validation via book relationship
-- Supports three types: note, quote, reflection
+- Supports two types: note, quote
 - Markdown content storage with rich text editor (Tiptap) on frontend
 
 **Module 5: File Upload** (`app/api/blob/upload/route.ts`)
@@ -246,9 +246,9 @@ UI updates instantly before server confirmation:
 ### Modifying Convex Schema
 
 1. Edit `convex/schema.ts`
-2. Run `pnpm convex:push` to sync to dev deployment
+2. Run `bun run convex:push` to sync to dev deployment
 3. Verify in Convex dashboard that schema updated
-4. Restart `pnpm dev` if needed for type updates
+4. Restart `bun run dev` if needed for type updates
 
 ### Adding Shadcn/UI Components
 
@@ -280,7 +280,7 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 ### "Could not find public function" error
 
 **Cause**: Convex schema not synced to deployment
-**Fix**: Run `pnpm convex:push` to sync schema
+**Fix**: Run `bun run convex:push` to sync schema
 
 ### Clerk returns 404 for `/tokens/convex`
 
@@ -295,7 +295,7 @@ Components added to `components/ui/` and auto-configured for bibliophile theme.
 ### Build fails with type errors
 
 **Cause**: Convex types out of sync
-**Fix**: Run `pnpm convex:push` to regenerate types
+**Fix**: Run `bun run convex:push` to regenerate types
 
 ### Next.js Image Error: "hostname is not configured"
 
@@ -321,7 +321,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 # It will look like: whsec_...
 ```
 
-**Note**: `pnpm dev` now runs the Stripe listener automatically. If running on a different port, run `stripe listen` manually with the correct port. Use `pnpm dev:no-stripe` to run without the listener.
+**Note**: `bun run dev` now runs the Stripe listener automatically. If running on a different port, run `stripe listen` manually with the correct port. Use `bun run dev:no-stripe` to run without the listener.
 
 ### Stripe webhook signature verification fails (400 errors)
 
@@ -339,7 +339,7 @@ stripe listen --forward-to localhost:3000/api/stripe/webhook
 2. Update `.env.local`: `STRIPE_WEBHOOK_SECRET=whsec_<new-secret>`
 3. Restart Next.js dev server to pick up the new env var
 
-**Prevention**: Run `pnpm dev` fresh (not `dev:no-stripe` + manual listener) to ensure secret stays in sync.
+**Prevention**: Run `bun run dev` fresh (not `dev:no-stripe` + manual listener) to ensure secret stays in sync.
 
 ## Testing Strategy
 
@@ -497,7 +497,7 @@ export const POST = withObservability(async (req) => {
 
 ## Important Notes
 
-- **pnpm only** - Do not use npm/yarn/bun (enforced)
+- **bun only** - Do not use npm/yarn/pnpm (enforced)
 - **Manual book entry only** - Google Books integration deferred
 - **No dark mode** - Single light theme (warm sepia aesthetic)
 - **No offline support** - Requires internet connection
@@ -532,7 +532,7 @@ From quality infrastructure audit (2025-11-20):
 
 1. **Quality gates prevent production fires** - No CI/CD = type errors in production. No git hooks = secrets committed. No backend tests = privacy bugs ship. Infrastructure isn't overhead—it's prevention.
 
-2. **Convex build order is critical** - `npx convex deploy && next build` (not just `next build`). Types depend on Convex schema. Wrong order = guaranteed Vercel deploy failures.
+2. **Convex build order is critical** - `bunx convex deploy && next build` (not just `next build`). Types depend on Convex schema. Wrong order = guaranteed Vercel deploy failures.
 
 3. **Coverage for confidence, not vanity** - Track critical paths only (auth, privacy, payments) at 75% threshold. Don't waste time testing shadcn components or hitting 100% everywhere.
 

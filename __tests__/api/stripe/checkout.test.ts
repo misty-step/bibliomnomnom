@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 const {
   mockQuery,
   mockMutation,
+  mockAction,
   mockCreate,
   mockAuth,
   mockCurrentUser,
@@ -12,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   mockQuery: vi.fn(),
   mockMutation: vi.fn(),
+  mockAction: vi.fn(),
   mockCreate: vi.fn(),
   mockAuth: vi.fn(),
   mockCurrentUser: vi.fn(),
@@ -23,6 +25,7 @@ vi.mock("convex/browser", () => ({
   ConvexHttpClient: class MockConvexHttpClient {
     query = mockQuery;
     mutation = mockMutation;
+    action = mockAction;
     setAuth = mockSetAuth;
   },
 }));
@@ -50,6 +53,7 @@ vi.mock("@/lib/stripe", () => ({
 
 vi.mock("@/lib/api/withObservability", () => ({
   withObservability: (handler: Function) => handler,
+  log: vi.fn(),
 }));
 
 import { POST } from "../../../app/api/stripe/checkout/route";
@@ -59,9 +63,14 @@ describe("Stripe Checkout Route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv };
+    process.env = {
+      ...originalEnv,
+      CONVEX_WEBHOOK_TOKEN: "test_webhook_token",
+      NEXT_PUBLIC_CONVEX_URL: "https://example.convex.cloud",
+    };
     // Default: rate limit allows requests (Convex-based)
     mockMutation.mockResolvedValue({ success: true, remaining: 4, resetMs: 3600000 });
+    mockAction.mockResolvedValue({ ok: true });
   });
 
   afterEach(() => {
@@ -113,11 +122,15 @@ describe("Stripe Checkout Route", () => {
             clerkId: "clerk_user_123",
           },
         },
-        success_url: "https://bibliomnomnom.com/library?checkout=success",
+        success_url:
+          "https://bibliomnomnom.com/library?checkout=success&session_id={CHECKOUT_SESSION_ID}",
         cancel_url: "https://bibliomnomnom.com/pricing?checkout=canceled",
         metadata: {
           clerkId: "clerk_user_123",
         },
+      });
+      expect(mockAction).toHaveBeenCalledWith(expect.anything(), {
+        webhookToken: "test_webhook_token",
       });
     });
 
@@ -310,6 +323,42 @@ describe("Stripe Checkout Route", () => {
 
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: "Invalid request body" });
+    });
+  });
+
+  describe("billing preflight", () => {
+    beforeEach(() => {
+      mockGetToken.mockResolvedValue("mock_convex_token");
+      mockAuth.mockResolvedValue({ userId: "clerk_user_123", getToken: mockGetToken });
+      mockCurrentUser.mockResolvedValue({
+        emailAddresses: [{ emailAddress: "user@example.com" }],
+      });
+      mockQuery.mockResolvedValue(null);
+    });
+
+    it("returns 503 when CONVEX_WEBHOOK_TOKEN is missing", async () => {
+      delete process.env.CONVEX_WEBHOOK_TOKEN;
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: "Billing is temporarily unavailable. Please try again shortly.",
+      });
+      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockAction).not.toHaveBeenCalled();
+    });
+
+    it("returns 503 when webhook auth preflight fails", async () => {
+      mockAction.mockRejectedValue(new Error("Webhook authentication failed"));
+
+      const response = await POST(makeRequest());
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: "Billing is temporarily unavailable. Please try again shortly.",
+      });
+      expect(mockCreate).not.toHaveBeenCalled();
     });
   });
 

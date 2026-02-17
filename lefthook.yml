@@ -20,16 +20,16 @@ pre-commit:
 
     lint:
       glob: "**/*.{ts,tsx,js,jsx}"
-      run: ./scripts/pnpm.sh eslint --fix --max-warnings 0 --no-warn-ignored {staged_files}
+      run: ./scripts/bun.sh eslint --fix --max-warnings 0 --no-warn-ignored {staged_files}
       stage_fixed: true
 
     format:
       glob: "**/*.{ts,tsx,js,jsx,json,md,css}"
-      run: ./scripts/pnpm.sh prettier --write {staged_files}
+      run: ./scripts/bun.sh prettier --write {staged_files}
       stage_fixed: true
 
     typecheck:
-      run: ./scripts/pnpm.sh tsc --noEmit
+      run: ./scripts/bun.sh tsc --noEmit
 
 pre-push:
   parallel: true
@@ -50,12 +50,12 @@ pre-push:
         - rebase
 
     test:
-      run: ./scripts/pnpm.sh test
+      run: ./scripts/bun.sh test
 
     build:
-      run: ./scripts/pnpm.sh build:local
+      run: ./scripts/bun.sh build:local
 
 commit-msg:
   commands:
     commitlint:
-      run: ./scripts/pnpm.sh commitlint --edit {1}
+      run: ./scripts/bun.sh commitlint --edit {1}

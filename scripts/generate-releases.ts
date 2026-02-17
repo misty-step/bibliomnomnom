@@ -9,9 +9,9 @@
  * Uses OpenRouter with DeepSeek V3.2 for cost-effective synthesis.
  *
  * Usage:
- *   pnpm generate:releases           # Generate missing releases
- *   pnpm generate:releases --dry-run # Parse only, no LLM calls
- *   pnpm generate:releases --force   # Regenerate all releases
+ *   bun run generate:releases           # Generate missing releases
+ *   bun run generate:releases --dry-run # Parse only, no LLM calls
+ *   bun run generate:releases --force   # Regenerate all releases
  */
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "fs";
@@ -139,25 +139,38 @@ REQUIREMENTS:
 /**
  * Check if release content already exists.
  */
-function releaseExists(version: string): boolean {
+function getReleasePaths(version: string): {
+  dir: string;
+  changelogPath: string;
+  notesPath: string;
+} {
   const dir = join(CONTENT_DIR, `v${version}`);
-  return existsSync(join(dir, "changelog.json")) && existsSync(join(dir, "notes.md"));
+  return {
+    dir,
+    changelogPath: join(dir, "changelog.json"),
+    notesPath: join(dir, "notes.md"),
+  };
 }
 
 /**
  * Save release content to disk.
  */
-function saveRelease(release: Release, productNotes: string): void {
-  const dir = join(CONTENT_DIR, `v${release.version}`);
-  mkdirSync(dir, { recursive: true });
+function saveRelease(params: {
+  release: Release;
+  writeChangelog: boolean;
+  writeNotes: boolean;
+  productNotes?: string;
+}): void {
+  const paths = getReleasePaths(params.release.version);
+  mkdirSync(paths.dir, { recursive: true });
 
-  // Save structured changelog
-  writeFileSync(join(dir, "changelog.json"), JSON.stringify(release, null, 2));
+  if (params.writeChangelog) {
+    writeFileSync(paths.changelogPath, JSON.stringify(params.release, null, 2));
+  }
 
-  // Save product notes
-  writeFileSync(join(dir, "notes.md"), productNotes);
-
-  console.log(`  ✓ Saved v${release.version}`);
+  if (params.writeNotes && typeof params.productNotes === "string") {
+    writeFileSync(paths.notesPath, params.productNotes);
+  }
 }
 
 /**
@@ -210,31 +223,55 @@ async function main() {
 
   // Check for API key
   const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    if (process.env.CI) {
-      console.error("❌ OPENROUTER_API_KEY not set in CI environment");
-      process.exit(1);
-    }
-    console.log("⏭️  OPENROUTER_API_KEY not set, skipping synthesis");
-    process.exit(0);
-  }
 
   // Generate missing releases
-  console.log(`Using model: ${MODEL} via OpenRouter`);
+  console.log(`Using model: ${MODEL} via OpenRouter (only when notes are missing)`);
   console.log("Generating release notes...");
   let generated = 0;
+  let notesSkipped = 0;
   let skipped = 0;
+  let notesReused = 0;
+  let changelogsOnly = 0;
 
   for (const release of releases) {
-    if (!FORCE && releaseExists(release.version)) {
+    const paths = getReleasePaths(release.version);
+    const hasChangelog = existsSync(paths.changelogPath);
+    const hasNotes = existsSync(paths.notesPath);
+    const writeChangelog = FORCE || !hasChangelog;
+    const writeNotes = FORCE || !hasNotes;
+
+    if (!writeChangelog && !writeNotes) {
       skipped++;
       continue;
     }
 
-    console.log(`  Generating v${release.version}...`);
-    const productNotes = await generateProductNotes(release, apiKey);
-    saveRelease(release, productNotes);
-    generated++;
+    let productNotes: string | undefined = undefined;
+    if (writeNotes) {
+      if (!apiKey) {
+        if (process.env.CI) {
+          console.error(
+            `❌ OPENROUTER_API_KEY not set in CI environment (needed for v${release.version})`,
+          );
+          process.exit(1);
+        }
+        console.log(`  ⏭️  OPENROUTER_API_KEY not set, skipping notes for v${release.version}`);
+        notesSkipped++;
+      } else {
+        console.log(`  Generating notes v${release.version}...`);
+        productNotes = await generateProductNotes(release, apiKey);
+        generated++;
+      }
+    } else {
+      notesReused++;
+    }
+
+    saveRelease({ release, writeChangelog, writeNotes, productNotes });
+    if (writeChangelog && !writeNotes) changelogsOnly++;
+
+    const summaryParts: string[] = [];
+    if (writeChangelog) summaryParts.push("changelog");
+    if (writeNotes) summaryParts.push(productNotes ? "notes" : "notes-skipped");
+    console.log(`  ✓ Saved v${release.version} (${summaryParts.join(", ")})`);
 
     // Small delay to avoid rate limits
     await new Promise((r) => setTimeout(r, 500));
@@ -244,7 +281,9 @@ async function main() {
   console.log("\nUpdating manifest...");
   updateManifest(releases);
 
-  console.log(`\nDone! Generated: ${generated}, Skipped: ${skipped}`);
+  console.log(
+    `\nDone! Notes generated: ${generated}, Notes reused: ${notesReused}, Notes skipped: ${notesSkipped}, Changelog-only: ${changelogsOnly}, Skipped: ${skipped}`,
+  );
 }
 
 main().catch((err) => {

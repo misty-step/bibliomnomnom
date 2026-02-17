@@ -153,10 +153,10 @@ export function TrialBanner() {
   // Expired - show lockout (non-dismissible)
   if (accessCheck.reason === "trial_expired" || accessCheck.reason === "subscription_expired") {
     return (
-      <div className="border-b border-status-error/30 bg-status-error/5">
+      <div className="border-b border-status-danger/40 bg-status-danger/10">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-8 py-3">
           <p className="text-sm text-text-inkMuted">
-            <span className="font-medium text-status-error">
+            <span className="font-medium text-status-danger">
               {accessCheck.reason === "trial_expired"
                 ? "Your trial has ended"
                 : "Your subscription has expired"}
@@ -165,7 +165,7 @@ export function TrialBanner() {
           </p>
           <Link
             href="/pricing"
-            className="shrink-0 rounded-md bg-status-error px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-status-error/90"
+            className="shrink-0 rounded-md bg-status-danger px-4 py-1.5 text-sm font-semibold text-white shadow-sm ring-1 ring-status-danger/50 transition-colors hover:bg-status-danger/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-status-danger/70 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas-bone"
           >
             Restore Access
           </Link>

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireAuth, getAuthOrNull } from "./auth";
+import { requireAuth, requireAuthAction, getAuthOrNull } from "./auth";
 import { TRIAL_DAYS, TRIAL_DURATION_MS } from "@/lib/constants";
 import { validateWebhookToken } from "@/lib/security/webhookToken";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -354,6 +354,22 @@ export const updateByStripeCustomer = action({
       internal.subscriptions.updateByStripeCustomerInternal,
       mutationArgs,
     );
+  },
+});
+
+/**
+ * Secure action: Validate webhook token wiring before checkout.
+ * Called from Next.js checkout route to fail fast when Vercel/Convex token parity is broken.
+ */
+export const assertWebhookConfiguration = action({
+  args: {
+    webhookToken: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ ok: true }> => {
+    await requireAuthAction(ctx);
+
+    validateWebhookToken(args.webhookToken);
+    return { ok: true };
   },
 });
 

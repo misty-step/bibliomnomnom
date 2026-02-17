@@ -1,9 +1,7 @@
 import { defineConfig } from "vitest/config";
-import react from "@vitejs/plugin-react";
 import { resolve } from "node:path";
 
 export default defineConfig({
-  plugins: [react()],
   resolve: {
     alias: {
       "@": resolve(__dirname, "."),
@@ -21,10 +19,12 @@ export default defineConfig({
       // Measure critical business logic
       // - lib/import: Import processing logic
       // - lib/stripe-utils.ts: Pure Stripe utility functions
+      // - lib/listening-sessions: Speech-to-text + synthesis orchestration helpers
       // Note: convex/*.ts excluded (requires runtime mocking, tested via E2E)
       // Note: lib/stripe.ts excluded (lazy init, env-dependent)
       include: [
         "lib/import/**/*.{ts,tsx}",
+        "lib/listening-sessions/**/*.{ts,tsx}",
         "lib/stripe-utils.ts",
       ],
       exclude: [

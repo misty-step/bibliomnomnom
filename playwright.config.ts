@@ -28,7 +28,7 @@ export default defineConfig({
   webServer: process.env.CI
     ? undefined
     : {
-        command: "pnpm next:dev",
+        command: "bun run next:dev",
         url: "http://localhost:3000",
         reuseExistingServer: !process.env.CI,
         timeout: 120000,

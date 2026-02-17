@@ -39,6 +39,8 @@ stateDiagram-v2
     end note
 ```
 
+Note: cancellation UX is keyed off `cancelAtPeriodEnd` ("Canceling") even if Stripe status remains `active` until period end.
+
 ## Access Control Logic
 
 ```typescript
@@ -52,10 +54,12 @@ function hasAccess(subscription: Subscription | null): boolean {
       return true;
     case "canceled":
       return subscription.currentPeriodEnd >= Date.now();
-    case "past_due":
-      // 7-day grace period from last update
-      const gracePeriodEnd = subscription.updatedAt + 7 * 24 * 60 * 60 * 1000;
+    case "past_due": {
+      if (!subscription.currentPeriodEnd) return false;
+      const pastDueStart = subscription.pastDueSince ?? subscription.updatedAt;
+      const gracePeriodEnd = pastDueStart + 7 * 24 * 60 * 60 * 1000;
       return Date.now() < gracePeriodEnd && subscription.currentPeriodEnd >= Date.now();
+    }
     case "expired":
       return false;
   }
@@ -69,6 +73,7 @@ sequenceDiagram
     participant User
     participant Pricing as /pricing
     participant Checkout as /api/stripe/checkout
+    participant Confirm as /api/stripe/checkout/confirm
     participant Convex
     participant Stripe
 
@@ -76,6 +81,7 @@ sequenceDiagram
     Pricing->>Checkout: POST { priceType: "annual" }
     Checkout->>Convex: Check rate limit
     Checkout->>Convex: Get existing subscription
+    Checkout->>Convex: Billing preflight (assertWebhookConfiguration)
     Note over Checkout: Determine trial eligibility
 
     alt First-time subscriber
@@ -95,7 +101,10 @@ sequenceDiagram
     Webhook->>Convex: upsertFromWebhook()
     Convex->>Convex: Update subscription record
 
-    Stripe-->>User: Redirect to /library?checkout=success
+    Stripe-->>User: Redirect to /library?checkout=success&session_id=...
+    User->>Confirm: POST { sessionId }
+    Confirm->>Convex: upsertFromWebhook()
+    Confirm-->>User: { hasAccess }
 ```
 
 ## Webhook Event Flow

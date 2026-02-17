@@ -80,10 +80,10 @@ else
   print_status "FAIL" "Node.js not installed"
 fi
 
-if command -v pnpm &> /dev/null; then
-  print_status "OK" "pnpm $(pnpm --version)"
+if command -v bun &> /dev/null; then
+  print_status "OK" "bun $(bun --version)"
 else
-  print_status "WARN" "pnpm not installed (run: npm install -g pnpm)"
+  print_status "WARN" "bun not installed (run: curl -fsSL https://bun.sh/install | bash)"
 fi
 
 # Check 5: Build status
@@ -96,10 +96,10 @@ if [[ -f "package.json" ]]; then
   print_status "OK" "package.json exists"
   
   # Check if dependencies are installed
-  if [[ -d "node_modules" ]] || [[ -f "pnpm-lock.yaml" ]]; then
+  if [[ -d "node_modules" ]] || [[ -f "bun.lock" ]]; then
     print_status "OK" "Dependencies appear installed"
   else
-    print_status "WARN" "Dependencies not installed (run: pnpm install)"
+    print_status "WARN" "Dependencies not installed (run: bun install)"
   fi
 else
   print_status "FAIL" "Missing package.json"

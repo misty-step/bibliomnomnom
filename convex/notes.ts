@@ -3,7 +3,7 @@ import { requireAuth } from "./auth";
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 
-const noteType = v.union(v.literal("note"), v.literal("quote"), v.literal("reflection"));
+const noteType = v.union(v.literal("note"), v.literal("quote"));
 
 export const list = query({
   args: { bookId: v.id("books") },
@@ -67,10 +67,13 @@ export const update = mutation({
       throw new Error("Access denied");
     }
 
+    const nextType =
+      updates.type ?? (note.type === "reflection" ? "note" : (note.type as "note" | "quote"));
+
     await ctx.db.patch(id, {
       content: updates.content ?? note.content,
       page: updates.page ?? note.page,
-      type: updates.type ?? note.type,
+      type: nextType,
       updatedAt: Date.now(),
     });
   },
