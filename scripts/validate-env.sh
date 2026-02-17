@@ -66,6 +66,7 @@ STRIPE_VARS=(
   "STRIPE_WEBHOOK_SECRET"
   "STRIPE_PRICE_MONTHLY"
   "STRIPE_PRICE_ANNUAL"
+  "CONVEX_WEBHOOK_TOKEN"
 )
 
 # Optional but recommended vars (warnings only)
@@ -192,6 +193,11 @@ check_local_env() {
         STRIPE_PRICE_*)
           check_stripe_key_format "$var" "price"
           ;;
+        CONVEX_WEBHOOK_TOKEN)
+          if ! [[ "${!var}" =~ ^[a-f0-9]{64}$ ]]; then
+            format_errors+=("$var has invalid format (expected: 64 lowercase hex chars)")
+          fi
+          ;;
         # Note: STRIPE_PUBLISHABLE_KEY is in RECOMMENDED_VARS, not STRIPE_VARS
       esac
     fi
@@ -230,6 +236,18 @@ check_local_env() {
     echo ""
     echo -e "${YELLOW}  Subscription features will not work without these.${NC}"
     # Don't fail for Stripe, just warn (might be testing non-Stripe features)
+    local configured_stripe_vars=0
+    for var in "${STRIPE_VARS[@]}"; do
+      if [[ -n "${!var}" ]]; then
+        configured_stripe_vars=$((configured_stripe_vars + 1))
+      fi
+    done
+
+    # Partial Stripe config is dangerous: checkout may process payment without entitlement sync.
+    # Fail if at least one Stripe var is set but not all required Stripe vars are present.
+    if [[ "$configured_stripe_vars" -gt 0 ]]; then
+      return 1
+    fi
   fi
 
   if [[ ${#missing_recommended[@]} -gt 0 ]]; then
@@ -269,7 +287,7 @@ check_convex_dev_env() {
 
   # Get current dev env vars (default, no --prod flag)
   local dev_env=""
-  dev_env=$(npx convex env list 2>/dev/null || echo "")
+  dev_env=$(bunx convex env list 2>/dev/null || echo "")
 
   if [[ -z "$dev_env" ]]; then
     echo -e "${RED}  Failed to fetch dev environment variables.${NC}"
@@ -338,7 +356,7 @@ check_convex_dev_env() {
     done
     echo ""
     echo -e "${YELLOW}  This is dangerous! Dev operations will affect production services.${NC}"
-    echo -e "${YELLOW}  Fix with: npx convex env set <VAR_NAME> \"<test_value>\"${NC}"
+    echo -e "${YELLOW}  Fix with: bunx convex env set <VAR_NAME> \"<test_value>\"${NC}"
     return 1
   fi
 
@@ -354,7 +372,7 @@ check_convex_prod_env() {
 
   # Get current prod env vars using --prod flag (more reliable than env var)
   local prod_env=""
-  prod_env=$(npx convex env list --prod 2>/dev/null || echo "")
+  prod_env=$(bunx convex env list --prod 2>/dev/null || echo "")
 
   if [[ -z "$prod_env" ]]; then
     echo -e "${RED}  Failed to fetch production environment variables.${NC}"
@@ -414,6 +432,11 @@ check_convex_prod_env() {
             format_errors+=("$var is a TEST key - use pk_live_ for production")
           fi
           ;;
+        CONVEX_WEBHOOK_TOKEN)
+          if ! [[ "$value" =~ ^[a-f0-9]{64}$ ]]; then
+            format_errors+=("$var has invalid format (expected: 64 lowercase hex chars)")
+          fi
+          ;;
       esac
 
       # Move any new errors to prod_format_errors
@@ -431,7 +454,7 @@ check_convex_prod_env() {
     done
     echo ""
     echo -e "${YELLOW}  Set these with:${NC}"
-    echo -e "    ${CYAN}npx convex env set --prod <VAR_NAME> \"value\"${NC}"
+    echo -e "    ${CYAN}bunx convex env set --prod <VAR_NAME> \"value\"${NC}"
     has_errors=true
   fi
 
@@ -442,7 +465,7 @@ check_convex_prod_env() {
     done
     echo ""
     echo -e "${YELLOW}  Fix: Re-set the variable without trailing whitespace:${NC}"
-    echo -e "    ${CYAN}npx convex env set --prod <VAR_NAME> \"\$(printf '%s' 'value')\"${NC}"
+    echo -e "    ${CYAN}bunx convex env set --prod <VAR_NAME> \"\$(printf '%s' 'value')\"${NC}"
     has_errors=true
   fi
 

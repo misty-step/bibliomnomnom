@@ -11,6 +11,7 @@ Mermaid diagrams for complex state machines and data flows in bibliomnomnom.
 | [Import Flow](./import-flow.md)                 | `hooks/useImportJob.ts`                   | 7 states | High - async, pagination, LLM          |
 | [Photo Quote Capture](./photo-quote-capture.md) | `components/notes/PhotoQuoteCapture.tsx`  | 5 states | Medium - OCR timeout, image processing |
 | [Profile Generation](./profile-generation.md)   | `components/profile/ProfilePage.tsx`      | 6 states | Medium - long-running AI generation    |
+| [Listening Sessions](./listening-sessions.md)   | `BookDetail + notes/session pipeline`     | 9 states | High - long audio, async AI, rollover  |
 | [User Provisioning](./user-provisioning.md)     | `app/ConvexClientProvider.tsx`            | 3 states | High - first-login race condition      |
 | [Subscription Banner](./subscription-banner.md) | `components/subscription/TrialBanner.tsx` | 4 states | Low - display only                     |
 | [Stripe Subscription](./stripe-subscription.md) | `convex/subscriptions.ts`, `api/stripe/*` | 6 states | High - payments, webhooks, race conds  |

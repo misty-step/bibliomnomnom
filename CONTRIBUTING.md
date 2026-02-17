@@ -16,18 +16,18 @@ Thank you for your interest in contributing! This guide will help you understand
 
 ### Prerequisites
 
-- Node.js >=20.0.0
-- pnpm >=9.0.0 (enforced - npm/yarn/bun will not work)
+- Node.js >=20.9.0
+- bun >=1.2.17 (enforced - npm/yarn/pnpm will not work)
 - Git configured with your name and email
 
 ### Initial Setup
 
 1. Fork and clone the repository
-2. Install dependencies: `pnpm install`
+2. Install dependencies: `bun install`
 3. Copy environment template: `cp .env.example .env.local`
 4. Fill in required credentials (see README.md)
-5. Push Convex schema: `pnpm convex:push`
-6. Start dev servers: `pnpm dev`
+5. Push Convex schema: `bun run convex:push`
+6. Start dev servers: `bun run dev`
 
 Git hooks will be installed automatically via the `prepare` script.
 
@@ -157,20 +157,20 @@ Fixed files are automatically staged.
 
 ```bash
 # Quick validation (no coverage, no build)
-pnpm validate:fast
+bun run validate:fast
 
 # Full validation (includes coverage + build)
-pnpm validate
+bun run validate
 
 # Individual checks
-pnpm lint
-pnpm typecheck
-pnpm test
-pnpm test:coverage
-pnpm build:local
+bun run lint
+bun run typecheck
+bun run test
+bun run test:coverage
+bun run build:local
 ```
 
-**Recommendation**: Run `pnpm validate:fast` before committing to catch issues early.
+**Recommendation**: Run `bun run validate:fast` before committing to catch issues early.
 
 ## Testing Requirements
 
@@ -190,7 +190,6 @@ Tests are optional for:
 ### Coverage Standards
 
 - **Target**: 80%+ patch coverage (new code only)
-- **Baseline**: 88% statements, 75% branches (as of 2025-11-25)
 - Coverage reports are generated on PRs via GitHub Actions
 - Focus on meaningful coverage, not hitting percentages
 
@@ -198,13 +197,13 @@ Tests are optional for:
 
 ```bash
 # Run tests once
-pnpm test
+bun run test
 
 # Run tests in watch mode
-pnpm test:watch
+bun run test:watch
 
 # Generate coverage report
-pnpm test:coverage
+bun run test:coverage
 ```
 
 ### Test File Location
@@ -243,6 +242,12 @@ Include:
 3. **How** to test it (manual testing steps)
 4. **Screenshots** (for UI changes)
 5. **Related issues** (e.g., "Closes #123")
+
+### CI Automation
+
+- `CI` runs on PRs to `master` (lint/typecheck/test/build/e2e).
+- `Cerberus Council` (`.github/workflows/cerberus.yml`) posts an advisory AI review verdict (skips forks).
+- `Release` (`.github/workflows/release.yml`) uses Landfall to cut releases + generate `content/releases/*` after CI on `master` (maintainers only).
 
 ### Review Process
 
@@ -288,7 +293,7 @@ git commit --no-verify -m "feat: skip pre-commit"
 If hooks aren't running:
 ```bash
 # Reinstall hooks
-pnpm hooks:install
+bun run hooks:install
 
 # Verify installation
 ls -la .git/hooks/
@@ -310,25 +315,25 @@ If trufflehog flags a false positive:
 
 ```bash
 # Check for type errors
-pnpm typecheck
+bun run typecheck
 
 # Common fixes
-pnpm install              # Update dependencies
-pnpm convex:push          # Regenerate Convex types
-rm -rf .next && pnpm dev  # Clear Next.js cache
+bun install              # Update dependencies
+bun run convex:push          # Regenerate Convex types
+rm -rf .next && bun run dev  # Clear Next.js cache
 ```
 
 ### Test Failures
 
 ```bash
 # Run specific test file
-pnpm test path/to/file.test.ts
+bun run test path/to/file.test.ts
 
 # Run tests in watch mode (auto-rerun on changes)
-pnpm test:watch
+bun run test:watch
 
 # Update snapshots (if using snapshots)
-pnpm test -- -u
+bun run test -- -u
 ```
 
 ### Slow Pre-Commit Hooks
@@ -336,19 +341,19 @@ pnpm test -- -u
 Pre-commit hooks should complete in < 10 seconds. If they're slow:
 1. Check staged file count: `git diff --cached --name-only | wc -l`
 2. Stage fewer files per commit (prefer atomic commits)
-3. Run `pnpm typecheck` separately while developing
-4. Use `pnpm validate:fast` for quick feedback loop
+3. Run `bun run typecheck` separately while developing
+4. Use `bun run validate:fast` for quick feedback loop
 
 ### Build Failures
 
 ```bash
 # Local build (no Convex deploy)
-pnpm build:local
+bun run build:local
 
 # Check for common issues
-pnpm typecheck            # Type errors
-pnpm lint                 # Linting errors
-rm -rf .next && pnpm dev  # Clear cache
+bun run typecheck            # Type errors
+bun run lint                 # Linting errors
+rm -rf .next && bun run dev  # Clear cache
 ```
 
 ## Questions or Issues?
@@ -360,6 +365,6 @@ rm -rf .next && pnpm dev  # Clear cache
 
 ---
 
-**Remember**: Quality gates exist to prevent bugs, security issues, and broken builds. They save time by catching problems early. When in doubt, run `pnpm validate` before pushing.
+**Remember**: Quality gates exist to prevent bugs, security issues, and broken builds. They save time by catching problems early. When in doubt, run `bun run validate` before pushing.
 
 Happy contributing! 📚✨

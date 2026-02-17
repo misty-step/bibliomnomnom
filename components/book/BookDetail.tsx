@@ -10,6 +10,7 @@ import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { CreateNote } from "@/components/notes/CreateNote";
+import { ListeningSessionRecorder } from "@/components/notes/ListeningSessionRecorder";
 import { NoteList } from "@/components/notes/NoteList";
 import { BOOK_STATUS_OPTIONS } from "./constants";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -356,6 +357,7 @@ export function BookDetail({ bookId }: BookDetailProps) {
             Notes
           </h2>
           <div className="space-y-6">
+            <ListeningSessionRecorder bookId={book._id} />
             <CreateNote bookId={book._id} />
             <NoteList bookId={book._id} notes={notes} />
           </div>

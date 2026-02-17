@@ -2,21 +2,18 @@
 
 A digital garden for voracious readers—a beautiful, private-first book tracking application.
 
-**Why bibliomnomnom?** Track your reading journey with a privacy-first approach. Unlike Goodreads or StoryGraph, your data stays yours. Built for readers who want a beautiful, intentional way to catalog books, notes, quotes, and reflections without algorithms or social pressure.
+**Why bibliomnomnom?** Track your reading journey with a privacy-first approach. Unlike Goodreads or StoryGraph, your data stays yours. Built for readers who want a beautiful, intentional way to catalog books, notes, and quotes without algorithms or social pressure.
 
 ## Prerequisites
 
-- **Node.js** >=20.0.0
-- **pnpm** >=9.0.0 (enforced)
+- **Node.js** >=20.9.0
+- **bun** >=1.2.17 (enforced)
 
-### Installing pnpm
+### Installing bun
 
 ```bash
-# Via npm (one-time)
-npm install -g pnpm
-
-# OR via Corepack (recommended)
-corepack enable
+# One-time install
+curl -fsSL https://bun.sh/install | bash
 ```
 
 ## Before You Start: Create Service Accounts
@@ -65,7 +62,7 @@ Sign up before proceeding with installation.
 Push the database schema to your Convex deployment:
 
 ```bash
-pnpm convex:push
+bun run convex:push
 ```
 
 This creates the `users`, `books`, and `notes` tables and makes queries like `api.books.list` available.
@@ -87,14 +84,14 @@ Convex authentication requires a Clerk JWT template:
 ### 3. Install Dependencies
 
 ```bash
-pnpm install
+bun install
 ```
 
 ### 4. Enable Imports (Goodreads/CSV/TXT/MD)
 
 - Feature flag: `NEXT_PUBLIC_IMPORT_ENABLED=true` (defaults to true). Toggle to hide the import UI if needed.
-- LLM (for TXT/MD/unknown CSV): set `OPENROUTER_API_KEY` (and optionally `OPENROUTER_IMPORT_MODEL`) in `.env.local` (or `~/.secrets`) **and** in Convex env vars (`pnpm convex:env:sync` or `pnpm convex env set OPENROUTER_API_KEY or_...`).
-- Schema updates: run `pnpm convex:push` after pulling to apply `importRuns` and `importPreviews` tables and regenerate Convex types.
+- LLM (for TXT/MD/unknown CSV): set `OPENROUTER_API_KEY` (and optionally `OPENROUTER_IMPORT_MODEL`) in `.env.local` (or `~/.secrets`) **and** in Convex env vars (`bun run convex:env:sync` or `bunx convex env set OPENROUTER_API_KEY or_...`).
+- Schema updates: run `bun run convex:push` after pulling to apply `importRuns` and `importPreviews` tables and regenerate Convex types.
 - Rate limits: enforced per user (5 imports/day, 2 concurrent previews); adjust constants in `convex/imports.ts` if policy changes.
 - File limits: accepts CSV/TXT/MD up to 10MB; previews paginate at 300 rows/page.
 - Privacy: CSV stays client-side; TXT/MD data sent to LLM only; imported books default to `private`.
@@ -104,18 +101,19 @@ pnpm install
 Now that services and configuration are complete:
 
 ```bash
-# Start both Next.js and Convex dev servers
-pnpm dev
+# Start Next.js + Convex + Stripe listener
+bun run dev
 ```
 
-This runs two servers concurrently:
+`bun run dev` first syncs `CONVEX_WEBHOOK_TOKEN` between `.env.local` and Convex dev, then runs:
 
 - **Next.js**: http://localhost:3000 (frontend)
 - **Convex**: Live backend with real-time logs
+- **Stripe CLI listener**: forwards webhooks to `/api/stripe/webhook`
 
 ### Verify Your Setup
 
-After running `pnpm dev`, you should see:
+After running `bun run dev`, you should see:
 
 - ✅ Next.js running at http://localhost:3000
 - ✅ Convex dev server logs showing function calls
@@ -127,10 +125,10 @@ Visit http://localhost:3000 and click "Sign In". If the Clerk modal opens, you'r
 
 ```bash
 # Build for production (runs Convex deploy first)
-pnpm build
+bun run build
 
 # Start production server (after build)
-pnpm start
+bun run start
 ```
 
 **Note**: The build command automatically deploys Convex before building Next.js to ensure type safety.
@@ -141,7 +139,7 @@ This project is configured for deployment on **Vercel** with **Convex** and **Cl
 
 ### Quick Deploy
 
-1. **Push to GitHub** - Vercel auto-deploys from `main` branch
+1. **Push to GitHub** - Vercel auto-deploys from `master` branch
 2. **Set Environment Variables** - Configure in Vercel Dashboard (see [DEPLOYMENT.md](./DEPLOYMENT.md))
 3. **Verify Deployment** - Check `/api/health` endpoint
 
@@ -291,7 +289,7 @@ await updateStatus({ id: bookId, status: "read" });
 const createNote = useMutation(api.notes.create);
 await createNote({
   bookId,
-  type: "note", // or "quote", "reflection"
+  type: "note", // or "quote"
   content: "This is my note in markdown",
 });
 ```
@@ -300,13 +298,13 @@ See [CLAUDE.md](./CLAUDE.md) for complete API reference and architecture details
 
 ## Package Manager Enforcement
 
-This project **exclusively uses pnpm**. Attempts to use npm, yarn, or bun will be blocked:
+This project **exclusively uses bun**. Attempts to use npm, yarn, or pnpm will be blocked:
 
-- `package.json` includes `"packageManager": "pnpm@9.15.0"` for Corepack enforcement
+- `package.json` includes `"packageManager": "bun@1.2.17"` for package-manager enforcement
 - `preinstall` script blocks other package managers
 - `.npmrc` enforces engine-strict mode
 
-### Why pnpm?
+### Why bun?
 
 - **Production-stable**: Battle-tested, reliable, predictable
 - **Fast**: Significantly faster than npm/yarn via hard links
@@ -318,18 +316,18 @@ This project **exclusively uses pnpm**. Attempts to use npm, yarn, or bun will b
 
 | Command             | Description                                                |
 | ------------------- | ---------------------------------------------------------- |
-| `pnpm dev`          | Start dev servers (Next.js + Convex concurrently)          |
-| `pnpm convex:push`  | Sync schema to Convex (run once after pull/schema changes) |
-| `pnpm convex:dev`   | Run Convex dev server standalone (for live logs)           |
-| `pnpm build`        | Production build                                           |
-| `pnpm start`        | Start production server (after build)                      |
-| `pnpm lint`         | Run ESLint                                                 |
-| `pnpm typecheck`    | Run TypeScript compiler check                              |
-| `pnpm tokens:build` | Regenerate design tokens from source                       |
-| `pnpm test`         | Run test suite                                             |
-| `pnpm test:coverage`| Run tests with coverage report                             |
-| `pnpm validate`     | Run all quality checks (lint, typecheck, coverage, build)  |
-| `pnpm validate:fast`| Run quick checks (lint, typecheck, tests only)             |
+| `bun run dev`          | Sync webhook token, then start Next.js + Convex + Stripe listener |
+| `bun run convex:push`  | Sync schema to Convex (run once after pull/schema changes) |
+| `bun run convex:dev`   | Run Convex dev server standalone (for live logs)           |
+| `bun run build`        | Production build                                           |
+| `bun run start`        | Start production server (after build)                      |
+| `bun run lint`         | Run ESLint                                                 |
+| `bun run typecheck`    | Run TypeScript compiler check                              |
+| `bun run tokens:build` | Regenerate design tokens from source                    |
+| `bun run test`         | Run test suite                                             |
+| `bun run test:coverage`| Run tests with coverage report                             |
+| `bun run validate`     | Run all quality checks (lint, typecheck, coverage, build)  |
+| `bun run validate:fast`| Run quick checks (lint, typecheck, tests only)             |
 
 ## Quality Checks
 
@@ -339,25 +337,25 @@ This project uses automated quality gates to ensure code quality and prevent bug
 
 ```bash
 # Run all quality checks (recommended before pushing)
-pnpm validate
+bun run validate
 
 # Run quick checks (no coverage, no build) - faster feedback
-pnpm validate:fast
+bun run validate:fast
 
 # Format code
-pnpm format
+bun run format
 
 # Check code formatting
-pnpm format:check
+bun run format:check
 
 # Type check
-pnpm typecheck
+bun run typecheck
 
 # Run tests
-pnpm test
+bun run test
 
 # Run tests with coverage report
-pnpm test:coverage
+bun run test:coverage
 ```
 
 ### Git Hooks
@@ -368,7 +366,7 @@ Quality checks run automatically via [Lefthook](https://github.com/evilmartians/
 - **Pre-push**: Environment validation, tests, build verification
 - **Commit-msg**: Conventional commit format enforcement
 
-Hooks are installed automatically via `pnpm install`.
+Hooks are installed automatically via `bun install`.
 
 ### Skipping Hooks (Emergency Use Only)
 
@@ -391,7 +389,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete contributor guidelines and
 
 ### Frontend
 
-- **Framework**: Next.js 16 (App Router, Turbopack)
+- **Framework**: Next.js 16 (App Router)
 - **React**: 19 (with Server Components)
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS 3.4 + custom bibliophile palette
@@ -414,56 +412,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete contributor guidelines and
 
 See [DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md) for complete token documentation.
 
-## Project Structure
+## Project Structure (High-Level)
 
-```
-bibliomnomnom/
-├── app/                         # Next.js App Router
-│   ├── (auth)/                 # Public auth routes
-│   │   ├── sign-in/
-│   │   └── sign-up/
-│   ├── (dashboard)/            # Protected routes
-│   │   ├── layout.tsx          # Dashboard layout with nav
-│   │   └── library/            # Main library view
-│   │       ├── page.tsx
-│   │       └── books/[id]/     # Private book detail
-│   ├── books/[id]/             # Public book view
-│   ├── api/
-│   │   ├── blob/upload/        # Vercel Blob presigned URLs
-│   │   └── webhooks/clerk/     # Clerk user sync
-│   ├── layout.tsx              # Root layout with providers
-│   ├── page.tsx                # Landing page
-│   └── globals.css             # Global styles + Tailwind
-│
-├── components/
-│   ├── ui/                     # shadcn/ui primitives
-│   ├── book/                   # Book components
-│   ├── notes/                  # Note/quote components
-│   ├── navigation/             # Nav components
-│   └── shared/                 # Error/loading states
-│
-├── convex/                      # Convex backend (5 core modules)
-│   ├── _generated/             # Auto-generated types
-│   ├── schema.ts               # Database schema
-│   ├── auth.ts                 # Auth helpers
-│   ├── users.ts                # User queries/mutations
-│   ├── books.ts                # Book queries/mutations
-│   └── notes.ts                # Note queries/mutations
-│
-├── lib/
-│   ├── design/                 # Design tokens
-│   ├── hooks/                  # Custom React hooks
-│   └── utils.ts                # Utility functions
-│
-├── public/                     # Static assets
-│
-├── CLAUDE.md                   # AI assistant patterns & troubleshooting
-├── DESIGN-SYSTEM.md            # Design tokens & components
-└── docs/
-    ├── adr/                    # Architecture Decision Records
-    ├── flows/                  # User journey diagrams
-    └── postmortems/            # Incident reports
-```
+- `app/`: Next.js App Router (routes + API)
+- `convex/`: Convex schema + queries/mutations/actions
+- `components/`: UI components
+- `lib/`: shared helpers/hooks
+- `docs/`: architecture + flow docs
+- `scripts/`: repo tooling
 
 ## Documentation
 
