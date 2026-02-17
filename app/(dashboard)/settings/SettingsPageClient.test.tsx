@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -14,16 +14,25 @@ vi.mock("@/lib/sentry", () => ({
   captureError: vi.fn(),
 }));
 
+vi.mock("@/lib/browser/redirect-to", () => ({
+  redirectTo: vi.fn(),
+}));
+
 import { useQuery } from "convex/react";
 import { useToast } from "@/hooks/use-toast";
 import { captureError } from "@/lib/sentry";
+import { redirectTo } from "@/lib/browser/redirect-to";
 import SettingsPageClient from "./SettingsPageClient";
 
 describe("SettingsPageClient", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     (useToast as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ toast: vi.fn() });
-    globalThis.fetch = vi.fn() as unknown as typeof fetch;
+    vi.stubGlobal("fetch", vi.fn() as unknown as typeof fetch);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders loading state while subscription is loading", () => {
@@ -75,11 +84,11 @@ describe("SettingsPageClient", () => {
       daysRemaining: 10,
     });
 
-    globalThis.fetch = vi.fn().mockResolvedValue({
+    (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: false,
       status: 500,
       json: vi.fn().mockResolvedValue({ error: "Nope" }),
-    }) as unknown as typeof fetch;
+    });
 
     render(<SettingsPageClient priceIds={{ monthly: "price_monthly", annual: "price_annual" }} />);
 
@@ -96,5 +105,32 @@ describe("SettingsPageClient", () => {
     );
 
     expect(captureError).toHaveBeenCalled();
+  });
+
+  it("redirects to billing portal when request succeeds", async () => {
+    (useQuery as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      status: "active",
+      cancelAtPeriodEnd: false,
+      priceId: "price_monthly",
+      stripeCustomerId: "cus_123",
+      currentPeriodEnd: Date.UTC(2026, 0, 1),
+      trialEndsAt: null,
+      daysRemaining: 10,
+    });
+
+    (globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({ url: "https://billing.stripe.com/p/session_123" }),
+    });
+
+    render(<SettingsPageClient priceIds={{ monthly: "price_monthly", annual: "price_annual" }} />);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Manage Subscription" }));
+
+    await waitFor(() =>
+      expect(redirectTo).toHaveBeenCalledWith("https://billing.stripe.com/p/session_123"),
+    );
   });
 });
