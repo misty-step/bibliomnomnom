@@ -39,6 +39,34 @@ const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
 const originalListeningModel = process.env.OPENROUTER_LISTENING_MODEL;
 const originalListeningFallbackModels = process.env.OPENROUTER_LISTENING_FALLBACK_MODELS;
 describe("listening sessions synthesize route", () => {
+  afterEach(() => {
+    if (originalOpenRouterApiKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
+    }
+
+    if (originalListeningModel === undefined) {
+      delete process.env.OPENROUTER_LISTENING_MODEL;
+    } else {
+      process.env.OPENROUTER_LISTENING_MODEL = originalListeningModel;
+    }
+
+    if (originalListeningFallbackModels === undefined) {
+      delete process.env.OPENROUTER_LISTENING_FALLBACK_MODELS;
+    } else {
+      process.env.OPENROUTER_LISTENING_FALLBACK_MODELS = originalListeningFallbackModels;
+    }
+
+    authMock.mockReset();
+    openRouterChatCompletionMock.mockReset();
+    convexQueryMock.mockReset();
+    entitlementMock.mockReset();
+
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("returns 401 when unauthenticated", async () => {
     authMock.mockResolvedValueOnce({ userId: null, getToken: vi.fn() });
 
@@ -268,32 +296,4 @@ describe("listening sessions synthesize route", () => {
     expect(body.error).toBe("Subscription required to use voice sessions.");
     expect(openRouterChatCompletionMock).not.toHaveBeenCalled();
   });
-});
-
-afterEach(() => {
-  if (originalOpenRouterApiKey === undefined) {
-    delete process.env.OPENROUTER_API_KEY;
-  } else {
-    process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
-  }
-
-  if (originalListeningModel === undefined) {
-    delete process.env.OPENROUTER_LISTENING_MODEL;
-  } else {
-    process.env.OPENROUTER_LISTENING_MODEL = originalListeningModel;
-  }
-
-  if (originalListeningFallbackModels === undefined) {
-    delete process.env.OPENROUTER_LISTENING_FALLBACK_MODELS;
-  } else {
-    process.env.OPENROUTER_LISTENING_FALLBACK_MODELS = originalListeningFallbackModels;
-  }
-
-  authMock.mockReset();
-  openRouterChatCompletionMock.mockReset();
-  convexQueryMock.mockReset();
-  entitlementMock.mockReset();
-
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
 });
