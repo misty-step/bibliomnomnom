@@ -1,4 +1,4 @@
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
 import { requireAuth } from "./auth";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -130,33 +130,70 @@ export const get = query({
   },
 });
 
+export const createListeningSessionHandler = async (
+  ctx: MutationCtx,
+  args: {
+    bookId: Id<"books">;
+    capDurationMs?: number;
+    warningDurationMs?: number;
+  },
+) => {
+  const userId = await requireAuth(ctx);
+  await getOwnedBook(ctx, userId, args.bookId);
+
+  const now = Date.now();
+  const capDurationMs = normalizeCapDuration(args.capDurationMs);
+  const warningDurationMs = normalizeWarningDuration(args.warningDurationMs, capDurationMs);
+
+  return await ctx.db.insert("listeningSessions", {
+    userId,
+    bookId: args.bookId,
+    status: "recording",
+    capReached: false,
+    capDurationMs,
+    warningDurationMs,
+    startedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+};
+
 export const create = mutation({
   args: {
     bookId: v.id("books"),
     capDurationMs: v.optional(v.number()),
     warningDurationMs: v.optional(v.number()),
   },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    await getOwnedBook(ctx, userId, args.bookId);
-
-    const now = Date.now();
-    const capDurationMs = normalizeCapDuration(args.capDurationMs);
-    const warningDurationMs = normalizeWarningDuration(args.warningDurationMs, capDurationMs);
-
-    return await ctx.db.insert("listeningSessions", {
-      userId,
-      bookId: args.bookId,
-      status: "recording",
-      capReached: false,
-      capDurationMs,
-      warningDurationMs,
-      startedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    });
-  },
+  handler: createListeningSessionHandler,
 });
+
+export const markTranscribingHandler = async (
+  ctx: MutationCtx,
+  args: {
+    sessionId: Id<"listeningSessions">;
+    audioUrl: string;
+    durationMs: number;
+    capReached: boolean;
+    transcriptLive?: string;
+  },
+) => {
+  const userId = await requireAuth(ctx);
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+
+  assertTransition(session.status, "transcribing");
+
+  const now = Date.now();
+  await ctx.db.patch(session._id, {
+    status: "transcribing",
+    audioUrl: args.audioUrl,
+    durationMs: Math.max(0, Math.floor(args.durationMs)),
+    capReached: args.capReached,
+    transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
+    endedAt: now,
+    updatedAt: now,
+    lastError: undefined,
+  });
+};
 
 export const markTranscribing = mutation({
   args: {
@@ -166,40 +203,179 @@ export const markTranscribing = mutation({
     capReached: v.boolean(),
     transcriptLive: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    const session = await getOwnedSession(ctx, userId, args.sessionId);
-
-    assertTransition(session.status, "transcribing");
-
-    const now = Date.now();
-    await ctx.db.patch(session._id, {
-      status: "transcribing",
-      audioUrl: args.audioUrl,
-      durationMs: Math.max(0, Math.floor(args.durationMs)),
-      capReached: args.capReached,
-      transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
-      endedAt: now,
-      updatedAt: now,
-      lastError: undefined,
-    });
-  },
+  handler: markTranscribingHandler,
 });
+
+export const markSynthesizingHandler = async (
+  ctx: MutationCtx,
+  args: { sessionId: Id<"listeningSessions"> },
+) => {
+  const userId = await requireAuth(ctx);
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+  assertTransition(session.status, "synthesizing");
+
+  await ctx.db.patch(session._id, {
+    status: "synthesizing",
+    updatedAt: Date.now(),
+    lastError: undefined,
+  });
+};
 
 export const markSynthesizing = mutation({
   args: { sessionId: v.id("listeningSessions") },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    const session = await getOwnedSession(ctx, userId, args.sessionId);
-    assertTransition(session.status, "synthesizing");
-
-    await ctx.db.patch(session._id, {
-      status: "synthesizing",
-      updatedAt: Date.now(),
-      lastError: undefined,
-    });
-  },
+  handler: markSynthesizingHandler,
 });
+
+export const completeListeningSessionHandler = async (
+  ctx: MutationCtx,
+  args: {
+    sessionId: Id<"listeningSessions">;
+    transcript: string;
+    transcriptProvider?: string;
+    synthesis?: SynthesisArtifacts;
+  },
+) => {
+  const userId = await requireAuth(ctx);
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+  await getOwnedBook(ctx, userId, session.bookId);
+
+  if (!["transcribing", "synthesizing", "review", "complete"].includes(session.status)) {
+    throw new Error(`Cannot complete session from state: ${session.status}`);
+  }
+
+  const now = Date.now();
+  const cleanedTranscript = args.transcript.trim();
+  if (!cleanedTranscript) {
+    throw new Error("Transcript cannot be empty");
+  }
+
+  const startedLabel = new Date(session.startedAt).toLocaleString();
+  const endedLabel = session.endedAt ? new Date(session.endedAt).toLocaleString() : "Unknown";
+  const provider = args.transcriptProvider?.trim() || session.transcriptProvider || "unknown";
+
+  const rawNoteContent = [
+    "## Voice Transcript",
+    "",
+    `Recorded: ${startedLabel}`,
+    `Ended: ${endedLabel}`,
+    `Duration: ${formatDuration(session.durationMs)}`,
+    `Provider: ${provider}`,
+    "",
+    cleanedTranscript,
+  ].join("\n");
+
+  let rawNoteId = session.rawNoteId;
+  if (rawNoteId) {
+    await ctx.db.patch(rawNoteId, {
+      content: rawNoteContent,
+      updatedAt: now,
+    });
+  } else {
+    rawNoteId = await ctx.db.insert("notes", {
+      bookId: session.bookId,
+      userId,
+      type: "note",
+      content: rawNoteContent,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  const synthesizedNoteIds: Id<"notes">[] = session.synthesizedNoteIds
+    ? [...session.synthesizedNoteIds]
+    : [];
+
+  const addSynthesizedNote = async (type: "note" | "quote", content: string) => {
+    if (synthesizedNoteIds.length >= MAX_SYNTH_NOTES) return;
+    const cleaned = content.trim();
+    if (!cleaned) return;
+    const noteId = await ctx.db.insert("notes", {
+      bookId: session.bookId,
+      userId,
+      type: type satisfies Doc<"notes">["type"],
+      content: cleaned,
+      createdAt: now,
+      updatedAt: now,
+    });
+    synthesizedNoteIds.push(noteId);
+  };
+
+  const renderSynthesisNote = (synth: NonNullable<SynthesisArtifacts>) => {
+    const lines: string[] = ["## Voice Synthesis", ""];
+
+    if (synth.insights.length > 0) {
+      lines.push("### Key insights", "");
+      for (const insight of synth.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+        lines.push(`#### ${insight.title}`, "", insight.content.trim(), "");
+      }
+    }
+
+    if (synth.openQuestions.length > 0) {
+      lines.push("### Open questions", "");
+      for (const question of synth.openQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+        lines.push(`- ${question.trim()}`);
+      }
+      lines.push("");
+    }
+
+    if (synth.followUpQuestions.length > 0) {
+      lines.push("### Follow-ups", "");
+      for (const question of synth.followUpQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+        lines.push(`- ${question.trim()}`);
+      }
+      lines.push("");
+    }
+
+    if (synth.contextExpansions.length > 0) {
+      lines.push("### Context expansions", "");
+      for (const expansion of synth.contextExpansions.slice(0, MAX_SYNTH_CONTEXT_EXPANSIONS)) {
+        lines.push(`#### ${expansion.title}`, "", expansion.content.trim(), "");
+      }
+    }
+
+    return lines.join("\n").trim();
+  };
+
+  const synth = args.synthesis;
+  if (synth && synthesizedNoteIds.length === 0) {
+    const hasSynthesisNote =
+      synth.insights.length > 0 ||
+      synth.openQuestions.length > 0 ||
+      synth.followUpQuestions.length > 0 ||
+      synth.contextExpansions.length > 0;
+
+    if (hasSynthesisNote) {
+      await addSynthesizedNote("note", renderSynthesisNote(synth));
+    }
+
+    const seenQuotes = new Set<string>();
+    for (const quote of synth.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+      const normalized = quote.text.trim().replace(/\s+/g, " ");
+      if (!normalized || seenQuotes.has(normalized)) continue;
+      seenQuotes.add(normalized);
+
+      const content = quote.source?.trim()
+        ? `> ${quote.text.trim()}\n\n— ${quote.source.trim()}`
+        : `> ${quote.text.trim()}`;
+
+      await addSynthesizedNote("quote", content);
+    }
+  }
+
+  await ctx.db.patch(session._id, {
+    status: "complete",
+    transcript: cleanedTranscript,
+    transcriptChars: cleanedTranscript.length,
+    transcriptProvider: provider,
+    rawNoteId,
+    synthesizedNoteIds: synthesizedNoteIds.length > 0 ? synthesizedNoteIds : undefined,
+    synthesis: synth,
+    updatedAt: now,
+    lastError: undefined,
+  });
+
+  return { rawNoteId, synthesizedNoteIds };
+};
 
 export const complete = mutation({
   args: {
@@ -208,165 +384,29 @@ export const complete = mutation({
     transcriptProvider: v.optional(v.string()),
     synthesis: v.optional(synthesisArtifacts),
   },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    const session = await getOwnedSession(ctx, userId, args.sessionId);
-    await getOwnedBook(ctx, userId, session.bookId);
-
-    if (!["transcribing", "synthesizing", "review", "complete"].includes(session.status)) {
-      throw new Error(`Cannot complete session from state: ${session.status}`);
-    }
-
-    const now = Date.now();
-    const cleanedTranscript = args.transcript.trim();
-    if (!cleanedTranscript) {
-      throw new Error("Transcript cannot be empty");
-    }
-
-    const startedLabel = new Date(session.startedAt).toLocaleString();
-    const endedLabel = session.endedAt ? new Date(session.endedAt).toLocaleString() : "Unknown";
-    const provider = args.transcriptProvider?.trim() || session.transcriptProvider || "unknown";
-
-    const rawNoteContent = [
-      "## Voice Transcript",
-      "",
-      `Recorded: ${startedLabel}`,
-      `Ended: ${endedLabel}`,
-      `Duration: ${formatDuration(session.durationMs)}`,
-      `Provider: ${provider}`,
-      "",
-      cleanedTranscript,
-    ].join("\n");
-
-    let rawNoteId = session.rawNoteId;
-    if (rawNoteId) {
-      await ctx.db.patch(rawNoteId, {
-        content: rawNoteContent,
-        updatedAt: now,
-      });
-    } else {
-      rawNoteId = await ctx.db.insert("notes", {
-        bookId: session.bookId,
-        userId,
-        type: "note",
-        content: rawNoteContent,
-        createdAt: now,
-        updatedAt: now,
-      });
-    }
-
-    const synthesizedNoteIds: Id<"notes">[] = session.synthesizedNoteIds
-      ? [...session.synthesizedNoteIds]
-      : [];
-
-    const addSynthesizedNote = async (type: "note" | "quote", content: string) => {
-      if (synthesizedNoteIds.length >= MAX_SYNTH_NOTES) return;
-      const cleaned = content.trim();
-      if (!cleaned) return;
-      const noteId = await ctx.db.insert("notes", {
-        bookId: session.bookId,
-        userId,
-        type: type satisfies Doc<"notes">["type"],
-        content: cleaned,
-        createdAt: now,
-        updatedAt: now,
-      });
-      synthesizedNoteIds.push(noteId);
-    };
-
-    const renderSynthesisNote = (synth: NonNullable<SynthesisArtifacts>) => {
-      const lines: string[] = ["## Voice Synthesis", ""];
-
-      if (synth.insights.length > 0) {
-        lines.push("### Key insights", "");
-        for (const insight of synth.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-          lines.push(`#### ${insight.title}`, "", insight.content.trim(), "");
-        }
-      }
-
-      if (synth.openQuestions.length > 0) {
-        lines.push("### Open questions", "");
-        for (const question of synth.openQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-          lines.push(`- ${question.trim()}`);
-        }
-        lines.push("");
-      }
-
-      if (synth.followUpQuestions.length > 0) {
-        lines.push("### Follow-ups", "");
-        for (const question of synth.followUpQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-          lines.push(`- ${question.trim()}`);
-        }
-        lines.push("");
-      }
-
-      if (synth.contextExpansions.length > 0) {
-        lines.push("### Context expansions", "");
-        for (const expansion of synth.contextExpansions.slice(0, MAX_SYNTH_CONTEXT_EXPANSIONS)) {
-          lines.push(`#### ${expansion.title}`, "", expansion.content.trim(), "");
-        }
-      }
-
-      return lines.join("\n").trim();
-    };
-
-    const synth = args.synthesis;
-    if (synth && synthesizedNoteIds.length === 0) {
-      const hasSynthesisNote =
-        synth.insights.length > 0 ||
-        synth.openQuestions.length > 0 ||
-        synth.followUpQuestions.length > 0 ||
-        synth.contextExpansions.length > 0;
-
-      if (hasSynthesisNote) {
-        await addSynthesizedNote("note", renderSynthesisNote(synth));
-      }
-
-      const seenQuotes = new Set<string>();
-      for (const quote of synth.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-        const normalized = quote.text.trim().replace(/\s+/g, " ");
-        if (!normalized || seenQuotes.has(normalized)) continue;
-        seenQuotes.add(normalized);
-
-        const content = quote.source?.trim()
-          ? `> ${quote.text.trim()}\n\n— ${quote.source.trim()}`
-          : `> ${quote.text.trim()}`;
-
-        await addSynthesizedNote("quote", content);
-      }
-    }
-
-    await ctx.db.patch(session._id, {
-      status: "complete",
-      transcript: cleanedTranscript,
-      transcriptChars: cleanedTranscript.length,
-      transcriptProvider: provider,
-      rawNoteId,
-      synthesizedNoteIds: synthesizedNoteIds.length > 0 ? synthesizedNoteIds : undefined,
-      synthesis: synth,
-      updatedAt: now,
-      lastError: undefined,
-    });
-
-    return { rawNoteId, synthesizedNoteIds };
-  },
+  handler: completeListeningSessionHandler,
 });
+
+export const failListeningSessionHandler = async (
+  ctx: MutationCtx,
+  args: { sessionId: Id<"listeningSessions">; message: string },
+) => {
+  const userId = await requireAuth(ctx);
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+
+  await ctx.db.patch(session._id, {
+    status: "failed",
+    lastError: truncate(args.message, 1_000),
+    updatedAt: Date.now(),
+  });
+};
 
 export const fail = mutation({
   args: {
     sessionId: v.id("listeningSessions"),
     message: v.string(),
   },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    const session = await getOwnedSession(ctx, userId, args.sessionId);
-
-    await ctx.db.patch(session._id, {
-      status: "failed",
-      lastError: truncate(args.message, 1_000),
-      updatedAt: Date.now(),
-    });
-  },
+  handler: failListeningSessionHandler,
 });
 
 export const getSynthesisContext = query({
