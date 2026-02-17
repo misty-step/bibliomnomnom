@@ -3,8 +3,12 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { captureError } from "@/lib/sentry";
 import { getPlanNameFromPriceId, type StripePriceIds } from "@/lib/subscription/plan-name";
+import { useToast } from "@/hooks/use-toast";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { Surface } from "@/components/ui/Surface";
 import { CreditCard, Calendar, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 
@@ -95,27 +99,39 @@ function SubscriptionCard({ priceIds }: { priceIds: StripePriceIds }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const subscription = useQuery(api.subscriptions.get);
+  const { toast } = useToast();
 
   const handleManageSubscription = async () => {
     setIsLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/stripe/portal", { method: "POST" });
-      // Check response status before parsing JSON
-      if (!res.ok) {
-        setError("Failed to open subscription portal. Please try again.");
+      const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+
+      if (!res.ok || !data.url) {
+        const message = data.error || "Failed to open subscription portal. Please try again.";
+        toast({
+          title: "Could not open billing portal",
+          description: message,
+          variant: "destructive",
+        });
+        captureError(new Error("stripe_portal_request_failed"), {
+          tags: { feature: "stripe_portal" },
+          extra: { status: res.status, message },
+        });
+        setError(message);
         setIsLoading(false);
         return;
       }
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        // Handle unexpected response shape or explicit error
-        setError(data.error || "Unable to open subscription portal.");
-        setIsLoading(false);
-      }
-    } catch {
+
+      window.location.href = data.url;
+    } catch (err) {
+      toast({
+        title: "Could not open billing portal",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+      captureError(err, { tags: { feature: "stripe_portal" } });
       setError("Failed to open subscription portal. Please try again.");
       setIsLoading(false);
     }
@@ -135,17 +151,19 @@ function SubscriptionCard({ priceIds }: { priceIds: StripePriceIds }) {
   // No subscription
   if (!subscription) {
     return (
-      <Surface elevation="raised" padding="lg">
-        <div className="text-center py-4">
-          <p className="text-text-inkMuted">No subscription found.</p>
+      <EmptyState
+        title="No subscription found"
+        description="Start a trial or subscribe to unlock everything."
+        className="py-8"
+        action={
           <a
             href="/pricing"
-            className="mt-4 inline-block text-text-ink underline hover:no-underline"
+            className="inline-flex items-center justify-center rounded-md bg-text-ink px-4 py-2.5 text-sm font-medium text-canvas-bone transition-colors hover:bg-text-inkMuted"
           >
             View pricing
           </a>
-        </div>
-      </Surface>
+        }
+      />
     );
   }
 
@@ -186,7 +204,7 @@ function SubscriptionCard({ priceIds }: { priceIds: StripePriceIds }) {
                 )}
               </p>
               {subscription.daysRemaining !== null && subscription.daysRemaining <= 7 && (
-                <p className="mt-1 text-sm text-amber-700 dark:text-status-warning">
+                <p className="mt-1 text-sm text-status-warning">
                   {subscription.daysRemaining} {subscription.daysRemaining === 1 ? "day" : "days"}{" "}
                   remaining
                 </p>
@@ -221,12 +239,9 @@ function SubscriptionCard({ priceIds }: { priceIds: StripePriceIds }) {
         )}
 
         {/* Error Message */}
-        {error && (
-          <div className="flex items-start gap-3 rounded-md bg-status-error/5 p-4">
-            <AlertCircle className="mt-0.5 h-5 w-5 text-status-error" />
-            <p className="text-sm text-status-error">{error}</p>
-          </div>
-        )}
+        {error ? (
+          <ErrorState message={error} onRetry={() => void handleManageSubscription()} />
+        ) : null}
 
         {/* Actions */}
         <div className="flex flex-col gap-3 sm:flex-row">
