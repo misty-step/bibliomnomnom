@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { requireAuth, getAuthOrNull } from "./auth";
+import { requireAuth, requireAuthAction, getAuthOrNull } from "./auth";
 import { TRIAL_DAYS, TRIAL_DURATION_MS } from "@/lib/constants";
 import { validateWebhookToken } from "@/lib/security/webhookToken";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -366,10 +366,7 @@ export const assertWebhookConfiguration = action({
     webhookToken: v.string(),
   },
   handler: async (ctx, args): Promise<{ ok: true }> => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) {
-      throw new Error("Unauthenticated: User must be signed in");
-    }
+    await requireAuthAction(ctx);
 
     validateWebhookToken(args.webhookToken);
     return { ok: true };
