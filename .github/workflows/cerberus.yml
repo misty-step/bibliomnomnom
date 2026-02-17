@@ -67,3 +67,5 @@ jobs:
       - uses: misty-step/cerberus/verdict@v2.22.1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Start advisory: always post the council verdict, but don't block merges on AI output.
+          fail-on-verdict: "false"
