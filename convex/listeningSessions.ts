@@ -267,7 +267,7 @@ export const completeListeningSessionHandler = async (
   let rawNoteId = session.rawNoteId;
   if (rawNoteId) {
     const rawNote = await ctx.db.get(rawNoteId);
-    if (!rawNote || rawNote.userId !== userId) {
+    if (!rawNote || rawNote.userId !== userId || rawNote.bookId !== session.bookId) {
       throw new ConvexError("Raw note not found or access denied");
     }
     await ctx.db.patch(rawNoteId, {
@@ -397,6 +397,7 @@ export const failListeningSessionHandler = async (
 ) => {
   const userId = await requireAuth(ctx);
   const session = await getOwnedSession(ctx, userId, args.sessionId);
+  assertTransition(session.status, "failed");
 
   await ctx.db.patch(session._id, {
     status: "failed",

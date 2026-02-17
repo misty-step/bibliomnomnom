@@ -14,6 +14,7 @@ const userId = "user_1" as unknown as Id<"users">;
 const otherUserId = "user_2" as unknown as Id<"users">;
 
 const BOOK_ID = "book_1" as unknown as Id<"books">;
+const OTHER_BOOK_ID = "book_2" as unknown as Id<"books">;
 const SESSION_ID = "session_1" as unknown as Id<"listeningSessions">;
 const noteId = (n: number) => `note_${n}` as unknown as Id<"notes">;
 
@@ -434,6 +435,23 @@ describe("listening session state machine handlers", () => {
     expect(rawNote.content).not.toContain("old content");
   });
 
+  it("rejects completion when raw note belongs to another book", async () => {
+    const { ctx } = makeCtx({
+      books: [buildBook()],
+      notes: [
+        { _id: noteId(1), type: "note", content: "old content", bookId: OTHER_BOOK_ID, userId },
+      ],
+      sessions: [buildSession({ status: "transcribing", rawNoteId: noteId(1) })],
+    });
+
+    await expect(
+      completeListeningSessionHandler(mutationCtx(ctx), {
+        sessionId: SESSION_ID,
+        transcript: "Final transcript",
+      }),
+    ).rejects.toThrow("Raw note not found or access denied");
+  });
+
   it("creates synthesis artifacts with caps, dedup, and note cap behavior", async () => {
     const { ctx, data } = makeCtx({
       books: [buildBook()],
@@ -546,5 +564,19 @@ describe("listening session state machine handlers", () => {
     expect(session.status).toBe("failed");
     expect(session.lastError).toHaveLength(1_000);
     expect(session.lastError!.endsWith("…")).toBe(true);
+  });
+
+  it("rejects failing a complete session", async () => {
+    const { ctx } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ status: "complete" })],
+    });
+
+    await expect(
+      failListeningSessionHandler(mutationCtx(ctx), {
+        sessionId: SESSION_ID,
+        message: "boom",
+      }),
+    ).rejects.toThrow("Invalid session transition from complete to failed");
   });
 });
