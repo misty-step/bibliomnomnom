@@ -3,15 +3,6 @@ import { requireAuth } from "./auth";
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 
-const sessionStatus = v.union(
-  v.literal("recording"),
-  v.literal("transcribing"),
-  v.literal("synthesizing"),
-  v.literal("review"),
-  v.literal("complete"),
-  v.literal("failed"),
-);
-
 const synthesisArtifacts = v.object({
   insights: v.array(
     v.object({

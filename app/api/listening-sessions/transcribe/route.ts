@@ -2,10 +2,11 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { log, withObservability } from "@/lib/api/withObservability";
 import { MAX_LISTENING_SESSION_AUDIO_BYTES } from "@/lib/constants";
+import { DEFAULT_AUDIO_MIME_TYPE, normalizeAudioMimeType } from "@/lib/listening-sessions/mime";
+import { requireListeningSessionEntitlement } from "@/lib/listening-sessions/entitlements";
 
 type TranscribeRequest = {
   audioUrl: string;
-  mimeType?: string;
 };
 
 type TranscribeResponse = {
@@ -13,6 +14,16 @@ type TranscribeResponse = {
   provider: "deepgram" | "elevenlabs";
   confidence?: number;
 };
+
+class TranscribeHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "TranscribeHttpError";
+    this.status = status;
+  }
+}
 
 function cleanTranscript(input: string): string {
   return input
@@ -30,7 +41,7 @@ async function readArrayBufferLimited(response: Response, maxBytes: number): Pro
   if (contentLength) {
     const declared = Number(contentLength);
     if (Number.isFinite(declared) && declared > maxBytes) {
-      throw new Error("Uploaded audio is too large");
+      throw new TranscribeHttpError(413, "Uploaded audio is too large");
     }
   }
 
@@ -38,7 +49,7 @@ async function readArrayBufferLimited(response: Response, maxBytes: number): Pro
   if (!reader) {
     const bytes = await response.arrayBuffer();
     if (bytes.byteLength > maxBytes) {
-      throw new Error("Uploaded audio is too large");
+      throw new TranscribeHttpError(413, "Uploaded audio is too large");
     }
     return bytes;
   }
@@ -56,7 +67,7 @@ async function readArrayBufferLimited(response: Response, maxBytes: number): Pro
       } catch {
         // ignore
       }
-      throw new Error("Uploaded audio is too large");
+      throw new TranscribeHttpError(413, "Uploaded audio is too large");
     }
     chunks.push(value);
   }
@@ -75,10 +86,10 @@ async function readAudioFromUrl(
 ): Promise<{ bytes: ArrayBuffer; mimeType: string }> {
   const parsed = new URL(audioUrl);
   if (!["http:", "https:"].includes(parsed.protocol)) {
-    throw new Error("Invalid audio URL");
+    throw new TranscribeHttpError(400, "Invalid audio URL");
   }
   if (!isTrustedAudioHost(parsed.hostname)) {
-    throw new Error("Untrusted audio host");
+    throw new TranscribeHttpError(400, "Untrusted audio host");
   }
 
   const response = await fetch(audioUrl, { redirect: "error" });
@@ -91,7 +102,8 @@ async function readAudioFromUrl(
     throw new Error("Uploaded audio is empty");
   }
 
-  const mimeType = response.headers.get("content-type") || "audio/webm";
+  const mimeType =
+    normalizeAudioMimeType(response.headers.get("content-type")) ?? DEFAULT_AUDIO_MIME_TYPE;
   return { bytes, mimeType };
 }
 
@@ -188,7 +200,7 @@ async function transcribeWithElevenLabs(params: {
 
 export const POST = withObservability(async (request: Request) => {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: "Please sign in to transcribe audio." },
@@ -205,10 +217,7 @@ export const POST = withObservability(async (request: Request) => {
         { status: 400, headers: { "x-request-id": requestId } },
       );
     }
-    body = {
-      audioUrl: parsed.audioUrl,
-      mimeType: typeof parsed.mimeType === "string" ? parsed.mimeType : undefined,
-    };
+    body = { audioUrl: parsed.audioUrl };
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body." },
@@ -227,9 +236,26 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
+  const entitlement = await requireListeningSessionEntitlement({
+    requestId,
+    clerkId: userId,
+    getToken,
+    rateLimit: {
+      key: `listening-sessions:transcribe:${userId}`,
+      limit: 30,
+      windowMs: 24 * 60 * 60 * 1000,
+      errorMessage: "Too many voice sessions today. Please try again later.",
+    },
+  });
+  if (!entitlement.ok) {
+    return NextResponse.json(
+      { error: entitlement.error },
+      { status: entitlement.status, headers: { "x-request-id": requestId } },
+    );
+  }
+
   try {
-    const { bytes, mimeType: fetchedMimeType } = await readAudioFromUrl(body.audioUrl);
-    const mimeType = body.mimeType || fetchedMimeType || "audio/webm";
+    const { bytes, mimeType } = await readAudioFromUrl(body.audioUrl);
 
     const providerErrors: string[] = [];
     let transcription: TranscribeResponse | null = null;
@@ -281,12 +307,7 @@ export const POST = withObservability(async (request: Request) => {
       userIdSuffix: userId.slice(-6),
       error: message,
     });
-    const status =
-      message === "Invalid audio URL" || message === "Untrusted audio host"
-        ? 400
-        : message === "Uploaded audio is too large"
-          ? 413
-          : 500;
+    const status = error instanceof TranscribeHttpError ? error.status : 500;
     return NextResponse.json(
       { error: message },
       { status, headers: { "x-request-id": requestId } },

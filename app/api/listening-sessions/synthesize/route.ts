@@ -1,7 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { log, withObservability } from "@/lib/api/withObservability";
 import { OpenRouterApiError, openRouterChatCompletion } from "@/lib/ai/openrouter";
+import { requireListeningSessionEntitlement } from "@/lib/listening-sessions/entitlements";
 import {
   clampArtifacts,
   EMPTY_SYNTHESIS_ARTIFACTS,
@@ -13,8 +16,10 @@ import { buildListeningSynthesisPrompt } from "@/lib/listening-sessions/synthesi
 
 type SynthesizeRequest = {
   transcript: string;
-  context?: SynthesisContext;
+  bookId: Id<"books">;
 };
+
+const MAX_SYNTHESIS_TRANSCRIPT_CHARS = 50_000;
 
 const RESPONSE_SCHEMA = {
   name: "listening_session_artifacts",
@@ -185,7 +190,7 @@ function makeFallbackArtifacts(transcript: string, context?: SynthesisContext): 
 
 export const POST = withObservability(async (request: Request) => {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
-  const { userId } = await auth();
+  const { userId, getToken } = await auth();
   if (!userId) {
     return NextResponse.json(
       { error: "Please sign in to synthesize notes." },
@@ -195,24 +200,45 @@ export const POST = withObservability(async (request: Request) => {
 
   let body: SynthesizeRequest;
   try {
-    const parsed = (await request.json()) as Partial<SynthesizeRequest>;
+    const parsed = (await request.json()) as Partial<{ transcript: unknown; bookId: unknown }>;
     if (!parsed.transcript || typeof parsed.transcript !== "string") {
       return NextResponse.json(
         { error: "transcript is required." },
         { status: 400, headers: { "x-request-id": requestId } },
       );
     }
+    if (!parsed.bookId || typeof parsed.bookId !== "string" || !parsed.bookId.trim()) {
+      return NextResponse.json(
+        { error: "bookId is required." },
+        { status: 400, headers: { "x-request-id": requestId } },
+      );
+    }
     body = {
       transcript: parsed.transcript.trim(),
-      context:
-        parsed.context && typeof parsed.context === "object"
-          ? (parsed.context as SynthesisContext)
-          : undefined,
+      bookId: parsed.bookId.trim() as Id<"books">,
     };
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body." },
       { status: 400, headers: { "x-request-id": requestId } },
+    );
+  }
+
+  const entitlement = await requireListeningSessionEntitlement({
+    requestId,
+    clerkId: userId,
+    getToken,
+    rateLimit: {
+      key: `listening-sessions:synthesize:${userId}`,
+      limit: 60,
+      windowMs: 24 * 60 * 60 * 1000,
+      errorMessage: "Too many voice sessions today. Please try again later.",
+    },
+  });
+  if (!entitlement.ok) {
+    return NextResponse.json(
+      { error: entitlement.error },
+      { status: entitlement.status, headers: { "x-request-id": requestId } },
     );
   }
 
@@ -223,10 +249,29 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
+  const transcriptRaw = body.transcript.trim();
+  const transcript =
+    transcriptRaw.length > MAX_SYNTHESIS_TRANSCRIPT_CHARS
+      ? transcriptRaw.slice(0, MAX_SYNTHESIS_TRANSCRIPT_CHARS)
+      : transcriptRaw;
+
+  let context: SynthesisContext | undefined;
+  try {
+    context = await entitlement.convex.query(api.listeningSessions.getSynthesisContext, {
+      bookId: body.bookId,
+    });
+  } catch (error) {
+    log("warn", "listening_session_synthesis_context_unavailable", {
+      requestId,
+      userIdSuffix: userId.slice(-6),
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!openRouterApiKey) {
     return NextResponse.json(
-      { artifacts: makeFallbackArtifacts(body.transcript, body.context), source: "fallback" },
+      { artifacts: makeFallbackArtifacts(transcript, context), source: "fallback" },
       { headers: { "x-request-id": requestId } },
     );
   }
@@ -264,8 +309,8 @@ export const POST = withObservability(async (request: Request) => {
           {
             role: "user",
             content: buildListeningSynthesisPrompt({
-              transcript: body.transcript,
-              context: body.context,
+              transcript,
+              context,
             }),
           },
         ],
@@ -284,6 +329,8 @@ export const POST = withObservability(async (request: Request) => {
       temperature: config.temperature,
       maxTokens: config.maxTokens,
       usage: raw.usage,
+      transcriptChars: transcript.length,
+      transcriptClamped: transcript.length !== transcriptRaw.length,
       insightCount: artifacts.insights.length,
       quoteCount: artifacts.quotes.length,
     });
@@ -293,7 +340,7 @@ export const POST = withObservability(async (request: Request) => {
     );
   } catch (error) {
     const isRateLimited = error instanceof OpenRouterApiError && error.status === 429;
-    const fallback = makeFallbackArtifacts(body.transcript, body.context);
+    const fallback = makeFallbackArtifacts(transcript, context);
     log(isRateLimited ? "warn" : "error", "listening_session_synthesis_fallback", {
       requestId,
       userIdSuffix: userId.slice(-6),
