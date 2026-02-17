@@ -136,7 +136,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
 
       {isRecording ? (
         <div className="fixed inset-0 z-[60] bg-black/90 text-canvas-bone backdrop-blur-sm">
-          <div className="mx-auto flex h-full w-full max-w-3xl flex-col px-6 py-8">
+          <div className="mx-auto flex h-full w-full max-w-3xl min-h-0 flex-col px-6 py-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 animate-pulse rounded-full bg-accent-ember" />
@@ -166,13 +166,13 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
               )}
             </div>
 
-            <div className="mt-6 flex-1 overflow-hidden rounded-xl border border-canvas-bone/20 bg-white/5 px-4 py-4">
+            <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-canvas-bone/20 bg-white/5 px-4 py-4">
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-canvas-bone/70">
                 Live transcript
               </p>
-              <p className="mt-3 h-full overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-canvas-bone/95">
+              <div className="mt-3 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-canvas-bone/95">
                 {liveTranscript || "Listening…"}
-              </p>
+              </div>
             </div>
 
             <div className="mt-6 flex justify-center">
