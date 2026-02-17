@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { stripe, PRICES, TRIAL_DAYS, getBaseUrl } from "@/lib/stripe";
-import { withObservability } from "@/lib/api/withObservability";
+import { log, withObservability } from "@/lib/api/withObservability";
 
 const MIN_TRIAL_MS = 2 * 24 * 60 * 60 * 1000; // Stripe requires trial_end >= 2 days out.
 const BILLING_UNAVAILABLE = "Billing is temporarily unavailable. Please try again shortly.";
@@ -20,14 +20,30 @@ const BILLING_UNAVAILABLE = "Billing is temporarily unavailable. Please try agai
  * - priceType: "monthly" | "annual"
  */
 export const POST = withObservability(async (request: Request) => {
+  const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const { userId: clerkId, getToken } = await auth();
 
   if (!clerkId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "x-request-id": requestId } },
+    );
+  }
+
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL?.trim();
+  if (!convexUrl) {
+    log("error", "stripe_checkout_missing_convex_url", {
+      requestId,
+      clerkIdPrefix: clerkId.slice(0, 8),
+    });
+    return NextResponse.json(
+      { error: BILLING_UNAVAILABLE },
+      { status: 503, headers: { "x-request-id": requestId } },
+    );
   }
 
   // Create Convex client for rate limiting (no auth needed for rate limit check)
-  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+  const convex = new ConvexHttpClient(convexUrl);
 
   // Rate limit: 5 checkout attempts per hour per user (distributed via Convex)
   const rateLimitResult = await convex.mutation(api.rateLimit.check, {
@@ -39,13 +55,16 @@ export const POST = withObservability(async (request: Request) => {
   if (!rateLimitResult.success) {
     return NextResponse.json(
       { error: "Too many checkout attempts. Please try again later." },
-      { status: 429 },
+      { status: 429, headers: { "x-request-id": requestId } },
     );
   }
 
   const user = await currentUser();
   if (!user?.emailAddresses?.[0]?.emailAddress) {
-    return NextResponse.json({ error: "User email not found" }, { status: 400 });
+    return NextResponse.json(
+      { error: "User email not found" },
+      { status: 400, headers: { "x-request-id": requestId } },
+    );
   }
 
   const email = user.emailAddresses[0].emailAddress;
@@ -55,7 +74,10 @@ export const POST = withObservability(async (request: Request) => {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400, headers: { "x-request-id": requestId } },
+    );
   }
 
   const priceType = body.priceType === "monthly" ? "monthly" : "annual";
@@ -63,14 +85,20 @@ export const POST = withObservability(async (request: Request) => {
   const webhookToken = process.env.CONVEX_WEBHOOK_TOKEN?.trim();
 
   if (!webhookToken) {
-    console.error("Stripe checkout blocked: CONVEX_WEBHOOK_TOKEN is missing");
-    return NextResponse.json({ error: BILLING_UNAVAILABLE }, { status: 503 });
+    log("error", "stripe_checkout_blocked_missing_webhook_token", {
+      requestId,
+      clerkIdPrefix: clerkId.slice(0, 8),
+    });
+    return NextResponse.json(
+      { error: BILLING_UNAVAILABLE },
+      { status: 503, headers: { "x-request-id": requestId } },
+    );
   }
 
   if (!priceId) {
     return NextResponse.json(
       { error: `Price ID not configured for ${priceType}` },
-      { status: 500 },
+      { status: 500, headers: { "x-request-id": requestId } },
     );
   }
 
@@ -78,8 +106,14 @@ export const POST = withObservability(async (request: Request) => {
     // Set auth token on Convex client for authenticated queries
     const token = await getToken({ template: "convex" });
     if (!token) {
-      console.error("Could not retrieve Convex auth token for authenticated user");
-      return NextResponse.json({ error: "Authentication token missing" }, { status: 401 });
+      log("error", "stripe_checkout_missing_convex_auth_token", {
+        requestId,
+        clerkIdPrefix: clerkId.slice(0, 8),
+      });
+      return NextResponse.json(
+        { error: "Authentication token missing" },
+        { status: 401, headers: { "x-request-id": requestId } },
+      );
     }
     convex.setAuth(token);
 
@@ -89,8 +123,15 @@ export const POST = withObservability(async (request: Request) => {
         webhookToken,
       });
     } catch (error) {
-      console.error("Stripe checkout blocked: webhook auth preflight failed", error);
-      return NextResponse.json({ error: BILLING_UNAVAILABLE }, { status: 503 });
+      log("error", "stripe_checkout_blocked_webhook_preflight_failed", {
+        requestId,
+        clerkIdPrefix: clerkId.slice(0, 8),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return NextResponse.json(
+        { error: BILLING_UNAVAILABLE },
+        { status: 503, headers: { "x-request-id": requestId } },
+      );
     }
 
     // Check existing subscription for customer ID and trial eligibility
@@ -143,10 +184,17 @@ export const POST = withObservability(async (request: Request) => {
       },
     });
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url }, { headers: { "x-request-id": requestId } });
   } catch (error) {
-    console.error("Stripe checkout error:", error);
     const message = error instanceof Error ? error.message : "Failed to create checkout session";
-    return NextResponse.json({ error: message }, { status: 500 });
+    log("error", "stripe_checkout_failed", {
+      requestId,
+      clerkIdPrefix: clerkId.slice(0, 8),
+      error: message,
+    });
+    return NextResponse.json(
+      { error: message },
+      { status: 500, headers: { "x-request-id": requestId } },
+    );
   }
 }, "stripe-checkout");

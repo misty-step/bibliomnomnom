@@ -53,6 +53,7 @@ vi.mock("@/lib/stripe", () => ({
 
 vi.mock("@/lib/api/withObservability", () => ({
   withObservability: (handler: Function) => handler,
+  log: vi.fn(),
 }));
 
 import { POST } from "../../../app/api/stripe/checkout/route";
@@ -62,7 +63,11 @@ describe("Stripe Checkout Route", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env = { ...originalEnv, CONVEX_WEBHOOK_TOKEN: "test_webhook_token" };
+    process.env = {
+      ...originalEnv,
+      CONVEX_WEBHOOK_TOKEN: "test_webhook_token",
+      NEXT_PUBLIC_CONVEX_URL: "https://example.convex.cloud",
+    };
     // Default: rate limit allows requests (Convex-based)
     mockMutation.mockResolvedValue({ success: true, remaining: 4, resetMs: 3600000 });
     mockAction.mockResolvedValue({ ok: true });
