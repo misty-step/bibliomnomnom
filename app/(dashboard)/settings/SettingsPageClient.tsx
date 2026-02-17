@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { redirectTo } from "@/lib/browser/redirect-to";
 import { captureError } from "@/lib/sentry";
 import { getPlanNameFromPriceId, type StripePriceIds } from "@/lib/subscription/plan-name";
 import { useToast } from "@/hooks/use-toast";
@@ -124,7 +125,7 @@ function SubscriptionCard({ priceIds }: { priceIds: StripePriceIds }) {
         return;
       }
 
-      window.location.href = data.url;
+      redirectTo(data.url);
     } catch (err) {
       toast({
         title: "Could not open billing portal",
