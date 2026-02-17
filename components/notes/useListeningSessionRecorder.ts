@@ -508,15 +508,38 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
   };
 
   useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    if (!isRecording) return;
+    window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isRecording]);
+
+  useEffect(() => {
+    return () => {
+      const sessionId = sessionIdRef.current;
+      const wasRecording = isRecordingRef.current;
+
       clearTiming();
       stopSpeechRecognition();
       stopMediaStream();
       mediaRecorderRef.current = null;
       sessionIdRef.current = null;
       isRecordingRef.current = false;
+
+      if (wasRecording && sessionId) {
+        void failSession({
+          sessionId,
+          message: "Session ended before processing completed.",
+        }).catch(() => {});
+      }
     };
-  }, []);
+  }, [failSession]);
 
   return {
     sessions,
