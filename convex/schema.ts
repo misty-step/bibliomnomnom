@@ -49,7 +49,63 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_book", ["bookId"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_user_updatedAt", ["userId", "updatedAt"]),
+  listeningSessions: defineTable({
+    userId: v.id("users"),
+    bookId: v.id("books"),
+    status: v.union(
+      v.literal("recording"),
+      v.literal("transcribing"),
+      v.literal("synthesizing"),
+      v.literal("review"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    audioUrl: v.optional(v.string()),
+    durationMs: v.optional(v.number()),
+    capReached: v.boolean(),
+    capDurationMs: v.number(),
+    warningDurationMs: v.number(),
+    startedAt: v.number(),
+    endedAt: v.optional(v.number()),
+    transcriptLive: v.optional(v.string()),
+    transcript: v.optional(v.string()),
+    transcriptProvider: v.optional(v.string()),
+    transcriptChars: v.optional(v.number()),
+    rawNoteId: v.optional(v.id("notes")),
+    synthesizedNoteIds: v.optional(v.array(v.id("notes"))),
+    synthesis: v.optional(
+      v.object({
+        insights: v.array(
+          v.object({
+            title: v.string(),
+            content: v.string(),
+          }),
+        ),
+        openQuestions: v.array(v.string()),
+        quotes: v.array(
+          v.object({
+            text: v.string(),
+            source: v.optional(v.string()),
+          }),
+        ),
+        followUpQuestions: v.array(v.string()),
+        contextExpansions: v.array(
+          v.object({
+            title: v.string(),
+            content: v.string(),
+          }),
+        ),
+      }),
+    ),
+    lastError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_book", ["bookId"])
+    .index("by_user_status", ["userId", "status"]),
   importRuns: defineTable({
     userId: v.id("users"),
     importRunId: v.string(),

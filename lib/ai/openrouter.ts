@@ -26,11 +26,13 @@ export type OpenRouterResponseFormat =
 
 export type OpenRouterChatCompletionRequest = {
   model: string;
+  models?: string[];
   messages: OpenRouterChatMessage[];
   temperature?: number;
   max_tokens?: number;
   response_format?: OpenRouterResponseFormat;
   provider?: unknown;
+  plugins?: unknown;
   include_reasoning?: boolean;
   reasoning?: unknown;
   seed?: number;
@@ -42,11 +44,17 @@ export type OpenRouterChatCompletionRequest = {
 };
 
 type OpenRouterChatCompletionResponse = {
+  model?: string;
   choices?: Array<{
     message?: {
       content?: string;
     };
   }>;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
   error?: {
     message: string;
     code?: string | number;

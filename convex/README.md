@@ -15,13 +15,13 @@ Convex is a real-time backend platform that provides:
 
 ### Core Modules
 
-| File          | Purpose                    | Lines | Exports        | Depth              |
-| ------------- | -------------------------- | ----- | -------------- | ------------------ |
-| **auth.ts**   | Auth helpers               | 41    | 2 functions    | Deep (9/10)        |
-| **books.ts**  | Book CRUD + privacy        | 298   | 8 functions    | Deep (9/10)        |
-| **notes.ts**  | Note/quote/reflection CRUD | 95    | 4 functions    | Medium-Deep (8/10) |
-| **users.ts**  | User lifecycle             | 61    | 3 functions    | Medium (7/10)      |
-| **schema.ts** | Database schema            | 62    | Schema exports | N/A (config)       |
+| File          | Purpose             | Lines | Exports        | Depth              |
+| ------------- | ------------------- | ----- | -------------- | ------------------ |
+| **auth.ts**   | Auth helpers        | 41    | 2 functions    | Deep (9/10)        |
+| **books.ts**  | Book CRUD + privacy | 298   | 8 functions    | Deep (9/10)        |
+| **notes.ts**  | Note/quote CRUD     | 95    | 4 functions    | Medium-Deep (8/10) |
+| **users.ts**  | User lifecycle      | 61    | 3 functions    | Medium (7/10)      |
+| **schema.ts** | Database schema     | 62    | Schema exports | N/A (config)       |
 
 ### Generated Files (Do Not Edit)
 
@@ -186,7 +186,7 @@ export const getPublic = query({
 
 - `userId` (id<"users">) - Owner (for index only, ownership validated via book)
 - `bookId` (id<"books">) - Parent book
-- `type` (string) - Note type ("note", "quote", "reflection")
+- `type` (string) - Note type ("note", "quote") (legacy reflections are treated as notes)
 - `content` (string) - Markdown content
 - `_creationTime` (number) - Auto-set timestamp
 
@@ -211,7 +211,7 @@ export const getPublic = query({
 
 - `by_user_run` - Find a run by userId + importRunId (idempotency + rate limit guard)
 
-**After schema edits**: run `pnpm convex:push` to apply changes and regenerate `_generated/*` types.
+**After schema edits**: run `bun run convex:push` to apply changes and regenerate `_generated/*` types.
 
 ## Auto-Dating Logic
 
@@ -313,7 +313,7 @@ See [BACKLOG.md](../BACKLOG.md) for test coverage roadmap.
 ### "Could not find public function"
 
 **Cause**: Schema not synced to Convex deployment.
-**Fix**: Run `pnpm convex:push` to sync schema and functions.
+**Fix**: Run `bun run convex:push` to sync schema and functions.
 
 ### "Authentication required"
 
@@ -328,7 +328,7 @@ See [BACKLOG.md](../BACKLOG.md) for test coverage roadmap.
 ### Type errors after schema change
 
 **Cause**: Generated types out of sync.
-**Fix**: Run `pnpm convex:push` to regenerate types, restart `pnpm dev` if needed.
+**Fix**: Run `bun run convex:push` to regenerate types, restart `bun run dev` if needed.
 
 ## Best Practices
 

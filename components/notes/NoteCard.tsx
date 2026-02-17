@@ -37,10 +37,6 @@ const TYPE_STYLES: Record<NoteType, { label: string; className: string }> = {
     label: "Quote",
     className: "bg-ink/10 text-ink",
   },
-  reflection: {
-    label: "Reflection",
-    className: "bg-primary/10 text-primary",
-  },
 };
 
 export function NoteCard({ note }: NoteCardProps) {
@@ -48,13 +44,16 @@ export function NoteCard({ note }: NoteCardProps) {
   const deleteNote = useMutation(api.notes.remove);
   const { toast } = useToast();
 
+  // Legacy notes may still have type === "reflection". Treat them as "note".
+  const resolvedType: NoteType = note.type === "quote" ? "quote" : "note";
+
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Edit State
   const [content, setContent] = useState(note.content);
-  const [type, setType] = useState<NoteType>(note.type ?? "note");
+  const [type, setType] = useState<NoteType>(resolvedType);
   const [page, setPage] = useState(note.page ?? "");
 
   const handleSave = async () => {
@@ -101,7 +100,7 @@ export function NoteCard({ note }: NoteCardProps) {
     return DOMPurify.sanitize(raw);
   }, [note.content]);
 
-  const meta = TYPE_STYLES[note.type ?? "note"];
+  const meta = TYPE_STYLES[resolvedType];
   const updatedAt = new Date(note.updatedAt);
 
   if (isEditing) {
@@ -162,7 +161,7 @@ export function NoteCard({ note }: NoteCardProps) {
               size="sm"
               onClick={() => {
                 setContent(note.content); // Revert
-                setType(note.type ?? "note");
+                setType(resolvedType);
                 setPage(note.page ?? "");
                 setIsEditing(false);
               }}

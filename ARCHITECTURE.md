@@ -179,7 +179,7 @@ export const updatePrivacy = mutation(...)
 
 ### Module 3: Notes & Content
 
-**Purpose**: Manages notes, quotes, and reflections with book ownership validation.
+**Purpose**: Manages notes and quotes with book ownership validation.
 
 **Responsibilities**:
 
@@ -202,7 +202,6 @@ export const remove = mutation(...) // Delete note
 
 - `note` - General observations or thoughts
 - `quote` - Direct quotes from the book
-- `reflection` - Personal insights or analysis
 
 **Ownership Model**:
 
@@ -775,8 +774,8 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 **Pre-Push** (runs on `git push`):
 
 1. **Environment validation** - Checks required env vars exist (via `scripts/validate-env.sh`)
-2. **Test suite** - Runs all 54 tests with Vitest
-3. **Build verification** - Ensures production build succeeds (`pnpm build:local`)
+2. **Test suite** - Runs the test suite with Vitest
+3. **Build verification** - Ensures production build succeeds (`bun run build:local`)
 
 **Commit-Msg** (runs on commit message creation):
 
@@ -787,34 +786,23 @@ Fixed files are automatically re-staged. Hooks run in parallel, complete in 1-5 
 **On Pull Request**:
 
 - Checkout code
-- Install dependencies (pnpm)
+- Install dependencies (bun)
 - Run linting (ESLint)
 - Run type checking (TypeScript)
 - Run test suite with coverage
 - Build production bundle
 - Comment coverage report on PR
 
-**On Push to Main**:
+**On push to `master`**:
 
 - Same checks as PR
-- Deploy to Vercel (automatic)
-- Deploy Convex schema (via `npx convex deploy`)
+- Vercel Git integration deploys (preview + production)
+- Convex deploy runs as part of the Vercel build command (see `vercel.json`)
 
 ### Coverage Tracking
 
-**Baseline** (Week 1 - 2025-11-25):
-
-- 88.07% statements, 75.47% branches, 86.04% functions, 89.34% lines
-- HTML reports generated in `coverage/` directory
-- Coverage enforced in CI (fails if below threshold)
-
-**Ratcheting Strategy** (4-week plan):
-
-- Week 2: 55% branches (focus: `rateLimit.ts` edge cases)
-- Week 3: 65% branches (expand to `import/repository/`)
-- Week 4: 75% branches (production-ready coverage)
-
-**Coverage Provider**: Vitest with v8 (fast, accurate, native Node.js coverage)
+- Coverage is enforced in CI via `bun run test:coverage` and `vitest.config.ts` thresholds.
+- PRs receive a coverage comment via `davelosert/vitest-coverage-report-action`.
 
 ### Secret Detection
 
@@ -858,17 +846,17 @@ git commit --no-verify -m "fix: urgent"
 
 ```bash
 # Quick validation (no coverage, no build) - 30s
-pnpm validate:fast
+bun run validate:fast
 
 # Full validation (includes coverage + build) - 2-3min
-pnpm validate
+bun run validate
 
 # Individual checks
-pnpm lint              # ESLint
-pnpm typecheck         # TypeScript
-pnpm test              # Vitest
-pnpm test:coverage     # Vitest with coverage report
-pnpm build:local       # Next.js production build
+bun run lint              # ESLint
+bun run typecheck         # TypeScript
+bun run test              # Vitest
+bun run test:coverage     # Vitest with coverage report
+bun run build:local       # Next.js production build
 ```
 
 ## Testing Strategy
@@ -942,39 +930,34 @@ pnpm build:local       # Next.js production build
 
 ### Schema Migrations
 
-**Current Process** (dev):
+**Development**:
 
 1. Edit `convex/schema.ts`
-2. Run `pnpm convex:push` to sync schema
+2. Run `bun run convex:push` to sync schema
 3. Convex auto-migrates (adds fields, creates indexes)
 
-**Future Process** (production):
+**Production**:
 
-1. Schema changes deployed via Vercel
+1. Schema changes deploy via Vercel (see `vercel.json` build command)
 2. Convex handles migrations automatically (backward compatible)
 3. Breaking changes require data migration scripts (Convex supports)
 
 ### Monitoring
 
-**Current** (MVP):
-
 - Convex dashboard: Query performance, error rates
 - Vercel dashboard: Deployment status, build logs
 - Clerk dashboard: User activity, auth failures
-
-**Future** (post-MVP):
-
-- Sentry: Error tracking and alerting
-- Structured logging: Pino for server-side logs
-- Analytics: PostHog for user behavior
+- Sentry: Error tracking (exceptions + performance traces)
+- PostHog: Product analytics + feature adoption tracking
+- Structured JSON logs: `withObservability()` emits machine-readable logs captured by Vercel
 
 ### Deployment
 
 **Current Flow**:
 
-1. Push to `main` branch (GitHub)
+1. Push to `master` branch (GitHub)
 2. Vercel auto-deploys (preview + production)
-3. Convex auto-syncs schema on deploy
+3. Convex deploy runs as part of the Vercel build command (see `vercel.json`)
 4. Clerk webhooks continue to work (no downtime)
 
 **Zero-Downtime Deployments**:

@@ -116,10 +116,10 @@ vercel --prod
 #### Start development server
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Start all services
-pnpm dev
+bun run dev
 
 # This runs:
 # - Convex dev backend
@@ -151,7 +151,7 @@ pnpm dev
 #### Deploy
 ```bash
 # Build and deploy
-pnpm convex:deploy  # Deploy Convex functions
+bun run convex:deploy  # Deploy Convex functions
 vercel --prod       # Deploy frontend
 ```
 

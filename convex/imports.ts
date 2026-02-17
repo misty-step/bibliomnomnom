@@ -115,7 +115,7 @@ export const extractBooks = action({
         errors: [
           {
             message:
-              "No LLM provider configured. Set OPENROUTER_API_KEY in Convex env vars (or run `pnpm convex:env:sync`) to enable TXT/MD imports.",
+              "No LLM provider configured. Set OPENROUTER_API_KEY in Convex env vars (or run `bun run convex:env:sync`) to enable TXT/MD imports.",
           },
         ] as ParseError[],
       };

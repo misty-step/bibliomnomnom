@@ -122,7 +122,7 @@ echo ""
 echo -e "${BOLD}4. TypeScript Compilation${NC}"
 echo "---"
 
-if pnpm tsc --noEmit 2>/dev/null; then
+if bun run tsc --noEmit 2>/dev/null; then
   check_pass "TypeScript compiles without errors"
 else
   check_fail "TypeScript compilation failed"
@@ -136,7 +136,7 @@ echo ""
 echo -e "${BOLD}5. Test Suite${NC}"
 echo "---"
 
-if pnpm test 2>/dev/null; then
+if bun run test 2>/dev/null; then
   check_pass "All tests pass"
 else
   check_fail "Tests failed"
@@ -151,7 +151,7 @@ echo -e "${BOLD}6. Build${NC}"
 echo "---"
 
 echo "  Skipping full build (run manually if needed)"
-check_skip "Build check (run: pnpm build)"
+check_skip "Build check (run: bun run build)"
 
 echo ""
 
@@ -162,7 +162,7 @@ echo -e "${BOLD}7. Cross-Platform Parity${NC}"
 echo "---"
 
 # Get CONVEX_WEBHOOK_TOKEN from Convex prod
-convex_token=$(npx convex env list --prod 2>/dev/null | grep "^CONVEX_WEBHOOK_TOKEN=" | cut -d= -f2-)
+convex_token=$(bunx convex env list --prod 2>/dev/null | grep "^CONVEX_WEBHOOK_TOKEN=" | cut -d= -f2-)
 # Strip quotes if present
 convex_token="${convex_token%\"}"
 convex_token="${convex_token#\"}"
@@ -172,10 +172,10 @@ if [[ -z "$convex_token" ]]; then
 else
   # Try to get from Vercel (may fail if not logged in or no access)
   # vercel env pull requires interactive or specific setup, so we do best-effort
-  if command -v vercel &> /dev/null || command -v npx &> /dev/null; then
+  if command -v vercel &> /dev/null || command -v bunx &> /dev/null; then
     # Pull vercel env to temp file
     vercel_temp=$(mktemp)
-    if npx vercel env pull "$vercel_temp" --environment production --yes 2>/dev/null; then
+    if bunx vercel env pull "$vercel_temp" --environment production --yes 2>/dev/null; then
       vercel_token=$(grep "^CONVEX_WEBHOOK_TOKEN=" "$vercel_temp" | cut -d= -f2-)
       # Strip quotes if present
       vercel_token="${vercel_token%\"}"
