@@ -23,8 +23,12 @@ function formatDate(timestamp: number | undefined): string {
  * Get plan name from price ID.
  */
 const PRICE_ID_TO_PLAN_NAME: Record<string, string> = {
-  [process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY ?? ""]: "Monthly",
-  [process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ?? ""]: "Annual",
+  ...(process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY
+    ? { [process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY]: "Monthly" }
+    : {}),
+  ...(process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL
+    ? { [process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL]: "Annual" }
+    : {}),
 };
 
 function getPlanName(priceId: string | undefined): string {
