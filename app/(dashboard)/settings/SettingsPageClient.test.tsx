@@ -71,6 +71,41 @@ describe("SettingsPageClient", () => {
     expect(screen.getByRole("button", { name: "Manage Subscription" })).toBeInTheDocument();
   });
 
+  it("renders trialing state and days remaining warning", () => {
+    (useQuery as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      status: "trialing",
+      cancelAtPeriodEnd: false,
+      priceId: "price_monthly",
+      stripeCustomerId: "cus_123",
+      currentPeriodEnd: Date.UTC(2026, 0, 1),
+      trialEndsAt: Date.UTC(2026, 0, 15),
+      daysRemaining: 5,
+    });
+
+    render(<SettingsPageClient priceIds={{ monthly: "price_monthly", annual: "price_annual" }} />);
+
+    expect(screen.getByText("Trial")).toBeInTheDocument();
+    expect(screen.getByText("Trial Ends")).toBeInTheDocument();
+    expect(screen.getByText(/5 days remaining/i)).toBeInTheDocument();
+  });
+
+  it("renders canceling state when cancelAtPeriodEnd is true", () => {
+    (useQuery as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      status: "active",
+      cancelAtPeriodEnd: true,
+      priceId: "price_monthly",
+      stripeCustomerId: "cus_123",
+      currentPeriodEnd: Date.UTC(2026, 0, 1),
+      trialEndsAt: null,
+      daysRemaining: null,
+    });
+
+    render(<SettingsPageClient priceIds={{ monthly: "price_monthly", annual: "price_annual" }} />);
+
+    expect(screen.getByText("Canceling")).toBeInTheDocument();
+    expect(screen.getByText("Access Until")).toBeInTheDocument();
+  });
+
   it("shows an error state and reports when billing portal request fails", async () => {
     const toast = vi.fn();
     (useToast as unknown as ReturnType<typeof vi.fn>).mockReturnValue({ toast });
