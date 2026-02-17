@@ -16,7 +16,7 @@ Thank you for your interest in contributing! This guide will help you understand
 
 ### Prerequisites
 
-- Node.js >=20.0.0
+- Node.js >=20.9.0
 - bun >=1.2.17 (enforced - npm/yarn/pnpm will not work)
 - Git configured with your name and email
 
@@ -190,7 +190,6 @@ Tests are optional for:
 ### Coverage Standards
 
 - **Target**: 80%+ patch coverage (new code only)
-- **Baseline**: 88% statements, 75% branches (as of 2025-11-25)
 - Coverage reports are generated on PRs via GitHub Actions
 - Focus on meaningful coverage, not hitting percentages
 
@@ -243,6 +242,12 @@ Include:
 3. **How** to test it (manual testing steps)
 4. **Screenshots** (for UI changes)
 5. **Related issues** (e.g., "Closes #123")
+
+### CI Automation
+
+- `CI` runs on PRs to `master` (lint/typecheck/test/build/e2e).
+- `Cerberus Council` (`.github/workflows/cerberus.yml`) posts an advisory AI review verdict (skips forks).
+- `Release` (`.github/workflows/release.yml`) uses Landfall to cut releases + generate `content/releases/*` after CI on `master` (maintainers only).
 
 ### Review Process
 

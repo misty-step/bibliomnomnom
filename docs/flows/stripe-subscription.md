@@ -39,6 +39,8 @@ stateDiagram-v2
     end note
 ```
 
+Note: cancellation UX is keyed off `cancelAtPeriodEnd` ("Canceling") even if Stripe status remains `active` until period end.
+
 ## Access Control Logic
 
 ```typescript
@@ -52,10 +54,12 @@ function hasAccess(subscription: Subscription | null): boolean {
       return true;
     case "canceled":
       return subscription.currentPeriodEnd >= Date.now();
-    case "past_due":
-      // 7-day grace period from last update
-      const gracePeriodEnd = subscription.updatedAt + 7 * 24 * 60 * 60 * 1000;
+    case "past_due": {
+      if (!subscription.currentPeriodEnd) return false;
+      const pastDueStart = subscription.pastDueSince ?? subscription.updatedAt;
+      const gracePeriodEnd = pastDueStart + 7 * 24 * 60 * 60 * 1000;
       return Date.now() < gracePeriodEnd && subscription.currentPeriodEnd >= Date.now();
+    }
     case "expired":
       return false;
   }

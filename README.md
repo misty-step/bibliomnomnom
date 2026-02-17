@@ -6,7 +6,7 @@ A digital garden for voracious readers—a beautiful, private-first book trackin
 
 ## Prerequisites
 
-- **Node.js** >=20.0.0
+- **Node.js** >=20.9.0
 - **bun** >=1.2.17 (enforced)
 
 ### Installing bun
@@ -139,7 +139,7 @@ This project is configured for deployment on **Vercel** with **Convex** and **Cl
 
 ### Quick Deploy
 
-1. **Push to GitHub** - Vercel auto-deploys from `main` branch
+1. **Push to GitHub** - Vercel auto-deploys from `master` branch
 2. **Set Environment Variables** - Configure in Vercel Dashboard (see [DEPLOYMENT.md](./DEPLOYMENT.md))
 3. **Verify Deployment** - Check `/api/health` endpoint
 
@@ -389,7 +389,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete contributor guidelines and
 
 ### Frontend
 
-- **Framework**: Next.js 16 (App Router, Turbopack)
+- **Framework**: Next.js 16 (App Router)
 - **React**: 19 (with Server Components)
 - **Language**: TypeScript 5 (strict mode)
 - **Styling**: Tailwind CSS 3.4 + custom bibliophile palette
@@ -412,56 +412,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for complete contributor guidelines and
 
 See [DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md) for complete token documentation.
 
-## Project Structure
+## Project Structure (High-Level)
 
-```
-bibliomnomnom/
-├── app/                         # Next.js App Router
-│   ├── (auth)/                 # Public auth routes
-│   │   ├── sign-in/
-│   │   └── sign-up/
-│   ├── (dashboard)/            # Protected routes
-│   │   ├── layout.tsx          # Dashboard layout with nav
-│   │   └── library/            # Main library view
-│   │       ├── page.tsx
-│   │       └── books/[id]/     # Private book detail
-│   ├── books/[id]/             # Public book view
-│   ├── api/
-│   │   ├── blob/upload/        # Vercel Blob presigned URLs
-│   │   └── webhooks/clerk/     # Clerk user sync
-│   ├── layout.tsx              # Root layout with providers
-│   ├── page.tsx                # Landing page
-│   └── globals.css             # Global styles + Tailwind
-│
-├── components/
-│   ├── ui/                     # shadcn/ui primitives
-│   ├── book/                   # Book components
-│   ├── notes/                  # Note/quote components
-│   ├── navigation/             # Nav components
-│   └── shared/                 # Error/loading states
-│
-├── convex/                      # Convex backend (5 core modules)
-│   ├── _generated/             # Auto-generated types
-│   ├── schema.ts               # Database schema
-│   ├── auth.ts                 # Auth helpers
-│   ├── users.ts                # User queries/mutations
-│   ├── books.ts                # Book queries/mutations
-│   └── notes.ts                # Note queries/mutations
-│
-├── lib/
-│   ├── design/                 # Design tokens
-│   ├── hooks/                  # Custom React hooks
-│   └── utils.ts                # Utility functions
-│
-├── public/                     # Static assets
-│
-├── CLAUDE.md                   # AI assistant patterns & troubleshooting
-├── DESIGN-SYSTEM.md            # Design tokens & components
-└── docs/
-    ├── adr/                    # Architecture Decision Records
-    ├── flows/                  # User journey diagrams
-    └── postmortems/            # Incident reports
-```
+- `app/`: Next.js App Router (routes + API)
+- `convex/`: Convex schema + queries/mutations/actions
+- `components/`: UI components
+- `lib/`: shared helpers/hooks
+- `docs/`: architecture + flow docs
+- `scripts/`: repo tooling
 
 ## Documentation
 

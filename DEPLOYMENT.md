@@ -38,12 +38,15 @@ You need TWO deploy keys:
 
 ### 1.3 Push Schema to Production
 
+In production, Convex deploy should run as part of the Vercel build command (see Phase 4.2).
+If you need to deploy manually:
+
 ```bash
 # Set production deploy key temporarily
 export CONVEX_DEPLOY_KEY="prod:your-deployment|token"
 
 # Deploy schema and functions to production
-npx convex deploy
+bunx convex deploy
 
 # Verify deployment
 # Check Convex dashboard shows latest schema
@@ -160,11 +163,11 @@ vercel link
 
 ### 4.2 Verify Build Configuration
 
-The project includes `vercel.json` with correct build command:
+The source of truth is `vercel.json`. The key bits:
 
 ```json
 {
-  "buildCommand": "npx convex deploy --cmd 'bun run build'",
+  "buildCommand": "bunx convex deploy --cmd-url-env-var-name NEXT_PUBLIC_CONVEX_URL --cmd 'next build'",
   "installCommand": "bun install --frozen-lockfile"
 }
 ```
@@ -173,12 +176,12 @@ The project includes `vercel.json` with correct build command:
 
 ### 4.3 Deploy to Production
 
-**Option A: Deploy from main branch (recommended)**
+**Option A: Deploy from master branch (recommended)**
 
 ```bash
-# Ensure you're on main branch
-git checkout main
-git pull origin main
+# Ensure you're on master branch
+git checkout master
+git pull origin master
 
 # Deploy to production
 vercel --prod
@@ -186,20 +189,30 @@ vercel --prod
 
 **Option B: Auto-deploy on push**
 
-Push to `main` branch triggers automatic Vercel production deployment:
+Push to `master` branch triggers automatic Vercel production deployment:
 
 ```bash
-git push origin main
+git push origin master
 ```
 
 ### 4.4 Monitor Deployment
 
 1. Watch deployment logs in Vercel Dashboard
 2. Check for errors in:
-   - `npx convex deploy` step (should complete successfully)
+   - `bunx convex deploy` step (should complete successfully)
    - `bun install` step (dependencies)
    - `next build` step (compilation)
 3. If deployment fails, check Vercel logs for specific error
+
+## Releases (Landfall)
+
+Releases cut automatically after CI passes on `master` via `.github/workflows/release.yml`, using Landfall
+(`misty-step/landfall`) to run semantic-release and generate `content/releases/*`.
+
+Required GitHub Action secrets:
+
+- `GH_RELEASE_TOKEN` (repo write access for tags + release edits)
+- `OPENROUTER_API_KEY` (for release-note synthesis)
 
 ## Phase 5: Post-Deployment Verification
 
@@ -382,7 +395,7 @@ Set up external monitoring:
 **Fix**:
 
 - Verify `vercel.json` has correct `buildCommand`
-- Check build logs show `npx convex deploy` running first
+- Check build logs show `bunx convex deploy` running first
 - Ensure `CONVEX_DEPLOY_KEY` set in Vercel env vars
 
 ### Webhook Signature Failed
@@ -461,8 +474,8 @@ vercel promote <deployment-url> --prod
 # Alternative: Redeploy from known-good git commit
 git checkout <known-good-commit>
 export CONVEX_DEPLOY_KEY="prod:..."
-npx convex deploy
-git checkout main
+bunx convex deploy
+git checkout master
 ```
 
 ## Maintenance
@@ -510,5 +523,5 @@ git checkout main
 
 ---
 
-**Last Updated**: 2025-11-22
-**Tested With**: Next.js 15.1.0, Convex 1.28.2, Clerk 6.34.5, Node 20+
+**Last Updated**: 2026-02-17
+**Tested With**: Next.js 16, Convex 1.28.x, Clerk 6.x, Node 20+, Bun 1.2.17+
