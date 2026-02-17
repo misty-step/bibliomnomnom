@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { log, withObservability } from "@/lib/api/withObservability";
+import { MAX_LISTENING_SESSION_AUDIO_BYTES } from "@/lib/constants";
 
 type TranscribeRequest = {
   audioUrl: string;
@@ -20,6 +21,55 @@ function cleanTranscript(input: string): string {
     .trim();
 }
 
+function isTrustedAudioHost(hostname: string): boolean {
+  return hostname === "blob.vercel-storage.com" || hostname.endsWith(".blob.vercel-storage.com");
+}
+
+async function readArrayBufferLimited(response: Response, maxBytes: number): Promise<ArrayBuffer> {
+  const contentLength = response.headers.get("content-length");
+  if (contentLength) {
+    const declared = Number(contentLength);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new Error("Uploaded audio is too large");
+    }
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const bytes = await response.arrayBuffer();
+    if (bytes.byteLength > maxBytes) {
+      throw new Error("Uploaded audio is too large");
+    }
+    return bytes;
+  }
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value?.byteLength) continue;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      try {
+        await reader.cancel();
+      } catch {
+        // ignore
+      }
+      throw new Error("Uploaded audio is too large");
+    }
+    chunks.push(value);
+  }
+
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return merged.buffer;
+}
+
 async function readAudioFromUrl(
   audioUrl: string,
 ): Promise<{ bytes: ArrayBuffer; mimeType: string }> {
@@ -27,13 +77,16 @@ async function readAudioFromUrl(
   if (!["http:", "https:"].includes(parsed.protocol)) {
     throw new Error("Invalid audio URL");
   }
+  if (!isTrustedAudioHost(parsed.hostname)) {
+    throw new Error("Untrusted audio host");
+  }
 
-  const response = await fetch(audioUrl);
+  const response = await fetch(audioUrl, { redirect: "error" });
   if (!response.ok) {
     throw new Error(`Failed to fetch uploaded audio: ${response.status}`);
   }
 
-  const bytes = await response.arrayBuffer();
+  const bytes = await readArrayBufferLimited(response, MAX_LISTENING_SESSION_AUDIO_BYTES);
   if (!bytes.byteLength) {
     throw new Error("Uploaded audio is empty");
   }
@@ -228,9 +281,15 @@ export const POST = withObservability(async (request: Request) => {
       userIdSuffix: userId.slice(-6),
       error: message,
     });
+    const status =
+      message === "Invalid audio URL" || message === "Untrusted audio host"
+        ? 400
+        : message === "Uploaded audio is too large"
+          ? 413
+          : 500;
     return NextResponse.json(
       { error: message },
-      { status: 500, headers: { "x-request-id": requestId } },
+      { status, headers: { "x-request-id": requestId } },
     );
   }
 }, "listening-session-transcribe");

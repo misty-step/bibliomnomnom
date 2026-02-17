@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../route";
+import { MAX_LISTENING_SESSION_AUDIO_BYTES } from "@/lib/constants";
 
 vi.mock("@/lib/api/withObservability", async () => {
   const mod = await vi.importActual<typeof import("@/lib/api/withObservability")>(
@@ -56,21 +57,70 @@ describe("listening sessions transcribe route", () => {
     expect(res.status).toBe(500);
     expect(body.error).toMatch("No STT provider");
   });
-});
 
-afterEach(() => {
-  if (originalDeepgramKey === undefined) {
-    delete process.env.DEEPGRAM_API_KEY;
-  } else {
-    process.env.DEEPGRAM_API_KEY = originalDeepgramKey;
-  }
+  it("returns 400 when audioUrl host is not trusted", async () => {
+    authMock.mockResolvedValueOnce({ userId: "user_123" });
+    process.env.DEEPGRAM_API_KEY = "test_deepgram_key";
 
-  if (originalElevenLabsKey === undefined) {
-    delete process.env.ELEVENLABS_API_KEY;
-  } else {
-    process.env.ELEVENLABS_API_KEY = originalElevenLabsKey;
-  }
+    const res = await POST(
+      new Request("https://example.com/api/listening-sessions/transcribe", {
+        method: "POST",
+        headers: { "x-request-id": "req-transcribe-3", "Content-Type": "application/json" },
+        body: JSON.stringify({ audioUrl: "https://example.com/audio.webm" }),
+      }),
+    );
+    const body = await res.json();
 
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
+    expect(res.status).toBe(400);
+    expect(body.error).toBe("Untrusted audio host");
+  });
+
+  it("returns 413 when uploaded audio exceeds max size", async () => {
+    authMock.mockResolvedValueOnce({ userId: "user_123" });
+    process.env.DEEPGRAM_API_KEY = "test_deepgram_key";
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: {
+            "content-type": "audio/webm",
+            "content-length": String(MAX_LISTENING_SESSION_AUDIO_BYTES + 1),
+          },
+        });
+      }),
+    );
+
+    const res = await POST(
+      new Request("https://example.com/api/listening-sessions/transcribe", {
+        method: "POST",
+        headers: { "x-request-id": "req-transcribe-4", "Content-Type": "application/json" },
+        body: JSON.stringify({
+          audioUrl: "https://blob.vercel-storage.com/listening-sessions/big.webm",
+        }),
+      }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(413);
+    expect(body.error).toBe("Uploaded audio is too large");
+  });
+
+  afterEach(() => {
+    if (originalDeepgramKey === undefined) {
+      delete process.env.DEEPGRAM_API_KEY;
+    } else {
+      process.env.DEEPGRAM_API_KEY = originalDeepgramKey;
+    }
+
+    if (originalElevenLabsKey === undefined) {
+      delete process.env.ELEVENLABS_API_KEY;
+    } else {
+      process.env.ELEVENLABS_API_KEY = originalElevenLabsKey;
+    }
+
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
 });

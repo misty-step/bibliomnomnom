@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { log, withObservability } from "@/lib/api/withObservability";
 import { captureError } from "@/lib/sentry";
+import { MAX_LISTENING_SESSION_AUDIO_BYTES } from "@/lib/constants";
 
 const ALLOWED_TYPES = [
   "audio/webm",
@@ -15,7 +16,6 @@ const ALLOWED_TYPES = [
   "audio/ogg;codecs=opus",
   "audio/x-m4a",
 ];
-const MAX_FILE_SIZE = 120 * 1024 * 1024; // 120MB
 
 export const POST = withObservability(async (request: Request) => {
   const { userId } = await auth();
@@ -37,7 +37,7 @@ export const POST = withObservability(async (request: Request) => {
       onBeforeGenerateToken: async () => {
         return {
           allowedContentTypes: ALLOWED_TYPES,
-          maximumSizeInBytes: MAX_FILE_SIZE,
+          maximumSizeInBytes: MAX_LISTENING_SESSION_AUDIO_BYTES,
           addRandomSuffix: true,
           tokenPayload: JSON.stringify({ userId, kind: "listening-session-audio" }),
         };
