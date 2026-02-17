@@ -45,13 +45,17 @@ Voice-first note capture for readers who want to keep reading while talking thro
 
 ## Server Session Status
 
+Note: `review` exists in the Convex state machine to support a future “curate before saving notes” workflow. The MVP currently goes straight from `synthesizing` → `complete`.
+
 ```mermaid
 stateDiagram-v2
     [*] --> idle
     idle --> recording: listeningSessions.create + start MediaRecorder
     recording --> transcribing: stop/cap -> upload + markTranscribing
     transcribing --> synthesizing: STT ok -> markSynthesizing
-    synthesizing --> complete: complete() (artifacts may be empty on degraded synthesis)
+    synthesizing --> complete: MVP: complete() (artifacts may be empty on degraded synthesis)
+    synthesizing --> review: Future: manual review step
+    review --> complete: Future: publish curated artifacts
     recording --> failed: capture/upload error -> fail()
     transcribing --> failed: STT error -> fail()
     complete --> idle

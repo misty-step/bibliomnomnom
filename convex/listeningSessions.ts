@@ -32,6 +32,10 @@ const MAX_CAP_DURATION_MS = 4 * 60 * 60 * 1000;
 const DEFAULT_WARNING_DURATION_MS = 60 * 1000;
 const MIN_WARNING_DURATION_MS = 15 * 1000;
 const MAX_SYNTH_NOTES = 12;
+const MAX_SYNTH_ARTIFACT_ITEMS = 6;
+const MAX_SYNTH_CONTEXT_EXPANSIONS = 4;
+const MAX_RECENT_NOTES = 20;
+const RECENT_NOTE_SNIPPET_CHARS = 280;
 
 type SessionStatus = Doc<"listeningSessions">["status"];
 type SynthesisArtifacts = Doc<"listeningSessions">["synthesis"];
@@ -275,14 +279,14 @@ export const complete = mutation({
 
       if (synth.insights.length > 0) {
         lines.push("### Key insights", "");
-        for (const insight of synth.insights.slice(0, 6)) {
+        for (const insight of synth.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
           lines.push(`#### ${insight.title}`, "", insight.content.trim(), "");
         }
       }
 
       if (synth.openQuestions.length > 0) {
         lines.push("### Open questions", "");
-        for (const question of synth.openQuestions.slice(0, 6)) {
+        for (const question of synth.openQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
           lines.push(`- ${question.trim()}`);
         }
         lines.push("");
@@ -290,7 +294,7 @@ export const complete = mutation({
 
       if (synth.followUpQuestions.length > 0) {
         lines.push("### Follow-ups", "");
-        for (const question of synth.followUpQuestions.slice(0, 6)) {
+        for (const question of synth.followUpQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
           lines.push(`- ${question.trim()}`);
         }
         lines.push("");
@@ -298,7 +302,7 @@ export const complete = mutation({
 
       if (synth.contextExpansions.length > 0) {
         lines.push("### Context expansions", "");
-        for (const expansion of synth.contextExpansions.slice(0, 4)) {
+        for (const expansion of synth.contextExpansions.slice(0, MAX_SYNTH_CONTEXT_EXPANSIONS)) {
           lines.push(`#### ${expansion.title}`, "", expansion.content.trim(), "");
         }
       }
@@ -319,7 +323,7 @@ export const complete = mutation({
       }
 
       const seenQuotes = new Set<string>();
-      for (const quote of synth.quotes.slice(0, 6)) {
+      for (const quote of synth.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
         const normalized = quote.text.trim().replace(/\s+/g, " ");
         if (!normalized || seenQuotes.has(normalized)) continue;
         seenQuotes.add(normalized);
@@ -371,46 +375,61 @@ export const getSynthesisContext = query({
     const userId = await requireAuth(ctx);
     const currentBook = await getOwnedBook(ctx, userId, args.bookId);
 
-    const books = await ctx.db
-      .query("books")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-
-    const notes = await ctx.db
-      .query("notes")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
-
-    const bookTitles = new Map(books.map((book) => [book._id, book.title]));
-    type RecentSynthesisNote = { bookTitle: string; type: "note" | "quote"; content: string };
-    const recentNotes: RecentSynthesisNote[] = notes
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 20)
-      .map<RecentSynthesisNote>((note) => ({
-        bookTitle: bookTitles.get(note.bookId) ?? "Unknown book",
-        type: note.type === "quote" ? "quote" : "note",
-        content: truncate(note.content, 280),
-      }));
-
     const mapBookItem = (book: Doc<"books">) => ({
       title: book.title,
       author: book.author,
     });
 
-    const currentlyReading = books
-      .filter((book) => book.status === "currently-reading" && book._id !== currentBook._id)
+    const currentlyReadingDocs = await ctx.db
+      .query("books")
+      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "currently-reading"))
+      .take(25);
+
+    const wantToReadDocs = await ctx.db
+      .query("books")
+      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "want-to-read"))
+      .take(25);
+
+    const readDocs = await ctx.db
+      .query("books")
+      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "read"))
+      .take(35);
+
+    const currentlyReading = currentlyReadingDocs
+      .filter((book) => book._id !== currentBook._id)
       .slice(0, 20)
       .map(mapBookItem);
 
-    const wantToRead = books
-      .filter((book) => book.status === "want-to-read" && book._id !== currentBook._id)
+    const wantToRead = wantToReadDocs
+      .filter((book) => book._id !== currentBook._id)
       .slice(0, 20)
       .map(mapBookItem);
 
-    const read = books
-      .filter((book) => book.status === "read" && book._id !== currentBook._id)
+    const read = readDocs
+      .filter((book) => book._id !== currentBook._id)
       .slice(0, 30)
       .map(mapBookItem);
+
+    const recentNotesDocs = await ctx.db
+      .query("notes")
+      .withIndex("by_user_updatedAt", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(MAX_RECENT_NOTES);
+
+    const bookTitleById = new Map<Id<"books">, string>();
+    for (const note of recentNotesDocs) {
+      if (bookTitleById.has(note.bookId)) continue;
+      const book = await ctx.db.get(note.bookId);
+      if (!book || book.userId !== userId) continue;
+      bookTitleById.set(note.bookId, book.title);
+    }
+
+    type RecentSynthesisNote = { bookTitle: string; type: "note" | "quote"; content: string };
+    const recentNotes: RecentSynthesisNote[] = recentNotesDocs.map<RecentSynthesisNote>((note) => ({
+      bookTitle: bookTitleById.get(note.bookId) ?? "Unknown book",
+      type: note.type === "quote" ? "quote" : "note",
+      content: truncate(note.content, RECENT_NOTE_SNIPPET_CHARS),
+    }));
 
     return {
       book: {
