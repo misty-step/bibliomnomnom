@@ -24,8 +24,12 @@ function formatDate(timestamp: number | undefined): string {
  * Maps are looked up directly by price ID for robustness.
  */
 const PRICE_ID_TO_PLAN_NAME: Record<string, string> = {
-  [process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY || ""]: "Monthly",
-  [process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL || ""]: "Annual",
+  ...(process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY
+    ? { [process.env.NEXT_PUBLIC_STRIPE_PRICE_MONTHLY]: "Monthly" }
+    : {}),
+  ...(process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL
+    ? { [process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL]: "Annual" }
+    : {}),
 };
 
 /**
