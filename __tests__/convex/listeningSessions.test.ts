@@ -8,8 +8,10 @@ import {
   markTranscribingHandler,
 } from "../../convex/listeningSessions";
 import * as authModule from "../../convex/auth";
+import type { Id } from "../../convex/_generated/dataModel";
 
-const userId = "user_1" as any;
+const userId = "user_1" as unknown as Id<"users">;
+const otherUserId = "user_2" as unknown as Id<"users">;
 
 type Session = {
   _id: any;
@@ -156,6 +158,57 @@ describe("listening session state machine handlers", () => {
     });
   });
 
+  it("uses create defaults when durations omitted", async () => {
+    const now = new Date("2025-01-01T00:00:00.000Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+
+    const { ctx, data } = makeCtx({ books: [buildBook()] });
+
+    const sessionId = await createListeningSessionHandler(mutationCtx(ctx), {
+      bookId: "book_1" as any,
+    });
+
+    expect(sessionId).toBe("session_1");
+    expect(data.sessions).toHaveLength(1);
+    expect(data.sessions[0]).toMatchObject({
+      _id: "session_1",
+      userId,
+      status: "recording",
+      capDurationMs: 30 * 60 * 1000,
+      warningDurationMs: 60 * 1000,
+      startedAt: now.getTime(),
+      createdAt: now.getTime(),
+      updatedAt: now.getTime(),
+    });
+  });
+
+  it("rejects when book or session are not owned by user", async () => {
+    const createDenied = makeCtx({
+      books: [{ ...buildBook(), userId: otherUserId }],
+    });
+
+    await expect(
+      createListeningSessionHandler(mutationCtx(createDenied.ctx), {
+        bookId: "book_1" as any,
+      }),
+    ).rejects.toThrow("Book not found or access denied");
+
+    const transcribeDenied = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ userId: otherUserId })],
+    });
+
+    await expect(
+      markTranscribingHandler(mutationCtx(transcribeDenied.ctx), {
+        sessionId: "session_1" as any,
+        audioUrl: "https://blob/audio.webm",
+        durationMs: 1000,
+        capReached: false,
+      }),
+    ).rejects.toThrow("Listening session not found or access denied");
+  });
+
   it("requires transcribing transition only from recording", async () => {
     const { ctx, data, patchCalls } = makeCtx({
       books: [buildBook()],
@@ -193,6 +246,25 @@ describe("listening session state machine handlers", () => {
       }),
     ).rejects.toThrow("Invalid session transition from complete to transcribing");
     expect(rejected.patchCalls).toHaveLength(0);
+  });
+
+  it("truncates transcriptLive to 4,000 chars", async () => {
+    const { ctx, patchCalls } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession()],
+    });
+
+    await markTranscribingHandler(mutationCtx(ctx), {
+      sessionId: "session_1" as any,
+      audioUrl: "https://blob/audio.webm",
+      durationMs: 1000,
+      capReached: false,
+      transcriptLive: "x".repeat(4_001),
+    });
+
+    const transcriptLive = patchCalls[0]?.doc?.transcriptLive as string;
+    expect(transcriptLive).toHaveLength(4_000);
+    expect(transcriptLive.endsWith("…")).toBe(true);
   });
 
   it("requires synthesizing transition only from transcribing", async () => {
@@ -249,7 +321,7 @@ describe("listening session state machine handlers", () => {
   it("creates raw transcript note when missing and updates session on completion", async () => {
     const { ctx, data, patchCalls, insertCalls } = makeCtx({
       books: [buildBook()],
-      sessions: [buildSession({ status: "transcribing" })],
+      sessions: [buildSession({ status: "transcribing", durationMs: 65_000 })],
     });
 
     const result = await completeListeningSessionHandler(mutationCtx(ctx), {
@@ -268,6 +340,7 @@ describe("listening session state machine handlers", () => {
       bookId: "book_1",
       content: expect.stringContaining("Final transcript"),
     });
+    expect(data.notes[0].content).toContain("Duration: 1:05");
     expect(data.sessions[0]).toMatchObject({
       status: "complete",
       transcript: "Final transcript",
@@ -340,7 +413,6 @@ describe("listening session state machine handlers", () => {
       },
     });
 
-    expect(result.synthesizedNoteIds).toHaveLength(6);
     expect(result.synthesizedNoteIds).toHaveLength(6);
     expect(data.notes).toHaveLength(20);
     expect(data.sessions[0].synthesizedNoteIds).toHaveLength(6);
