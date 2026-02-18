@@ -551,6 +551,11 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
   }, [isRecording]);
 
   useEffect(() => {
+    setCapNotice(null);
+    setCapRolloverReady(false);
+  }, [bookId]);
+
+  useEffect(() => {
     return () => {
       const sessionId = sessionIdRef.current;
       const wasRecording = isRecordingRef.current;

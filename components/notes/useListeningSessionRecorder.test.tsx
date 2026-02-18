@@ -63,8 +63,8 @@ class MockMediaRecorder extends EventTarget {
   }
 }
 
-function RecorderHarness() {
-  const recorder = useListeningSessionRecorder("book_1" as never);
+function RecorderHarness({ bookId }: { bookId: string }) {
+  const recorder = useListeningSessionRecorder(bookId as never);
 
   return (
     <div>
@@ -72,6 +72,7 @@ function RecorderHarness() {
         start
       </button>
       <span data-testid="rollover">{recorder.capRolloverReady ? "ready" : "idle"}</span>
+      <span data-testid="notice">{recorder.capNotice ?? ""}</span>
     </div>
   );
 }
@@ -152,7 +153,7 @@ describe("useListeningSessionRecorder", () => {
   });
 
   it("sets rollover ready after cap processing and clears it on next session start", async () => {
-    render(<RecorderHarness />);
+    render(<RecorderHarness bookId="book_1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "start" }));
     await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
@@ -208,7 +209,7 @@ describe("useListeningSessionRecorder", () => {
       throw new Error(`Unhandled fetch: ${url}`);
     });
 
-    render(<RecorderHarness />);
+    render(<RecorderHarness bookId="book_1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "start" }));
     await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
@@ -219,5 +220,24 @@ describe("useListeningSessionRecorder", () => {
 
     await waitFor(() => expect(failSessionMock).toHaveBeenCalledTimes(1));
     expect(screen.getByTestId("rollover")).toHaveTextContent("idle");
+  });
+
+  it("resets rollover and cap notice when book changes", async () => {
+    const { rerender } = render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    });
+
+    await waitFor(() => expect(screen.getByTestId("rollover")).toHaveTextContent("ready"));
+    await waitFor(() => expect(screen.getByTestId("notice")).toHaveTextContent("auto-processed"));
+
+    rerender(<RecorderHarness bookId="book_2" />);
+
+    await waitFor(() => expect(screen.getByTestId("rollover")).toHaveTextContent("idle"));
+    expect(screen.getByTestId("notice")).toHaveTextContent("");
   });
 });
