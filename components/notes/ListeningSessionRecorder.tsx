@@ -46,9 +46,12 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
     lastArtifacts,
     speechRecognitionSupported,
     remainingSeconds,
+    capRolloverReady,
     startSession,
     stopAndProcess,
   } = useListeningSessionRecorder(bookId);
+
+  const recordButtonLabel = capRolloverReady ? "Record next session" : "Record";
 
   return (
     <>
@@ -79,7 +82,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
               ) : (
                 <>
                   <Mic className="h-4 w-4" />
-                  Record
+                  {recordButtonLabel}
                 </>
               )}
             </Button>

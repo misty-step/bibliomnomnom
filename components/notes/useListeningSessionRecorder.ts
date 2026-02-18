@@ -5,6 +5,7 @@ import { useMutation } from "convex/react";
 import { upload } from "@vercel/blob/client";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
+import { usePostHog } from "posthog-js/react";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -20,6 +21,9 @@ import {
 const CAP_DURATION_MS = 30 * 60 * 1000;
 const WARNING_DURATION_MS = 60 * 1000;
 const LIVE_TRANSCRIPT_MAX_CHARS = 4_000;
+const EVENT_CAP_WARNING_SHOWN = "cap_warning_shown";
+const EVENT_CAP_REACHED = "cap_reached";
+const EVENT_SESSION_ROLLOVER_STARTED = "session_rollover_started";
 
 type TranscribeResult = {
   transcript: string;
@@ -111,6 +115,7 @@ function playAlertTone(kind: "warning" | "cap") {
 
 export function useListeningSessionRecorder(bookId: Id<"books">) {
   const { toast } = useToast();
+  const posthog = usePostHog();
   const createSession = useMutation(api.listeningSessions.create);
   const markTranscribing = useMutation(api.listeningSessions.markTranscribing);
   const markSynthesizing = useMutation(api.listeningSessions.markSynthesizing);
@@ -128,6 +133,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
   const [lastProvider, setLastProvider] = useState<string>("");
   const [lastArtifacts, setLastArtifacts] = useState<SynthesisArtifacts | null>(null);
   const [capNotice, setCapNotice] = useState<string | null>(null);
+  const [capRolloverReady, setCapRolloverReady] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -181,6 +187,13 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     mediaStreamRef.current = null;
     if (!stream) return;
     stream.getTracks().forEach((track) => track.stop());
+  };
+
+  const trackSessionEvent = (
+    event: string,
+    properties: Record<string, string | number | boolean> = {},
+  ) => {
+    posthog?.capture(event, { bookId, ...properties });
   };
 
   const resetCaptureState = () => {
@@ -376,6 +389,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
           ? "Session reached the processing cap and was auto-processed. Start a new session to continue."
           : null,
       );
+      setCapRolloverReady(capReached);
 
       toast({
         title: "Session processed",
@@ -402,6 +416,9 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
         variant: "destructive",
       });
     } finally {
+      if (!capReached) {
+        setCapRolloverReady(false);
+      }
       sessionIdRef.current = null;
       resetCaptureState();
       setIsProcessing(false);
@@ -422,6 +439,13 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     }
 
     try {
+      if (capRolloverReady) {
+        setCapRolloverReady(false);
+        trackSessionEvent(EVENT_SESSION_ROLLOVER_STARTED, {
+          reason: "cap_reached",
+          capDurationMs: CAP_DURATION_MS,
+        });
+      }
       setCapNotice(null);
       setLastTranscript("");
       setLastProvider("");
@@ -473,6 +497,10 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       warningTimeoutRef.current = window.setTimeout(
         () => {
           setWarningActive(true);
+          trackSessionEvent(EVENT_CAP_WARNING_SHOWN, {
+            warningDurationMs: WARNING_DURATION_MS,
+            capDurationMs: CAP_DURATION_MS,
+          });
           playAlertTone("warning");
         },
         Math.max(0, CAP_DURATION_MS - WARNING_DURATION_MS),
@@ -480,6 +508,10 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
 
       capTimeoutRef.current = window.setTimeout(() => {
         setWarningActive(true);
+        trackSessionEvent(EVENT_CAP_REACHED, {
+          capDurationMs: CAP_DURATION_MS,
+          warningDurationMs: WARNING_DURATION_MS,
+        });
         playAlertTone("cap");
         void stopAndProcess(true);
       }, CAP_DURATION_MS);
@@ -554,6 +586,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     lastArtifacts,
     speechRecognitionSupported,
     remainingSeconds,
+    capRolloverReady,
     startSession,
     stopAndProcess,
   };
