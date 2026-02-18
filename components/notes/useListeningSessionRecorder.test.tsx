@@ -72,7 +72,9 @@ function RecorderHarness({ bookId }: { bookId: string }) {
         start
       </button>
       <span data-testid="rollover">{recorder.capRolloverReady ? "ready" : "idle"}</span>
+      <span data-testid="recording">{recorder.isRecording ? "recording" : "idle"}</span>
       <span data-testid="notice">{recorder.capNotice ?? ""}</span>
+      <span data-testid="transcript">{recorder.lastTranscript}</span>
     </div>
   );
 }
@@ -197,6 +199,32 @@ describe("useListeningSessionRecorder", () => {
     );
   });
 
+  it("keeps rollover cue and avoids rollover telemetry when restart fails", async () => {
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    });
+
+    await waitFor(() => expect(screen.getByTestId("rollover")).toHaveTextContent("ready"));
+    const rolloverCaptureCallsBefore = captureMock.mock.calls.filter(
+      ([event]) => event === "session_rollover_started",
+    ).length;
+
+    getUserMediaMock.mockRejectedValueOnce(new Error("Microphone permission denied"));
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+
+    await waitFor(() => expect(toastMock).toHaveBeenCalled());
+    expect(screen.getByTestId("rollover")).toHaveTextContent("ready");
+    const rolloverCaptureCallsAfter = captureMock.mock.calls.filter(
+      ([event]) => event === "session_rollover_started",
+    ).length;
+    expect(rolloverCaptureCallsAfter).toBe(rolloverCaptureCallsBefore);
+  });
+
   it("keeps rollover disabled when capped processing fails", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -234,10 +262,37 @@ describe("useListeningSessionRecorder", () => {
 
     await waitFor(() => expect(screen.getByTestId("rollover")).toHaveTextContent("ready"));
     await waitFor(() => expect(screen.getByTestId("notice")).toHaveTextContent("auto-processed"));
+    await waitFor(() => expect(screen.getByTestId("transcript")).toHaveTextContent("hello"));
 
     rerender(<RecorderHarness bookId="book_2" />);
 
     await waitFor(() => expect(screen.getByTestId("rollover")).toHaveTextContent("idle"));
     expect(screen.getByTestId("notice")).toHaveTextContent("");
+    expect(screen.getByTestId("transcript")).toHaveTextContent("");
+  });
+
+  it("fails in-flight session and clears timers when switching books", async () => {
+    const { rerender } = render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("recording")).toHaveTextContent("recording");
+
+    rerender(<RecorderHarness bookId="book_2" />);
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith({
+        sessionId: "session_1",
+        message: "Session ended because book context changed.",
+      }),
+    );
+    await waitFor(() => expect(screen.getByTestId("recording")).toHaveTextContent("idle"));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000);
+    });
+    expect(captureMock).not.toHaveBeenCalledWith(
+      "cap_reached",
+      expect.objectContaining({ bookId: "book_1" }),
+    );
   });
 });

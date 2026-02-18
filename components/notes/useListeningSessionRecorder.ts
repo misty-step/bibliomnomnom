@@ -437,13 +437,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     }
 
     try {
-      if (capRolloverReady) {
-        setCapRolloverReady(false);
-        trackSessionEvent(EVENT_SESSION_ROLLOVER_STARTED, {
-          reason: "cap_reached",
-          capDurationMs: CAP_DURATION_MS,
-        });
-      }
+      const shouldTrackRolloverStart = capRolloverReady;
       setCapNotice(null);
       setLastTranscript("");
       setLastProvider("");
@@ -484,6 +478,14 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       setWarningActive(false);
       setIsRecording(true);
       isRecordingRef.current = true;
+
+      if (shouldTrackRolloverStart) {
+        setCapRolloverReady(false);
+        trackSessionEvent(EVENT_SESSION_ROLLOVER_STARTED, {
+          reason: "cap_reached",
+          capDurationMs: CAP_DURATION_MS,
+        });
+      }
 
       startSpeechRecognition();
 
@@ -551,9 +553,66 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
   }, [isRecording]);
 
   useEffect(() => {
+    const previousSessionId = sessionIdRef.current;
+
+    if (warningTimeoutRef.current) {
+      window.clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = null;
+    }
+    if (capTimeoutRef.current) {
+      window.clearTimeout(capTimeoutRef.current);
+      capTimeoutRef.current = null;
+    }
+    if (elapsedIntervalRef.current) {
+      window.clearInterval(elapsedIntervalRef.current);
+      elapsedIntervalRef.current = null;
+    }
+
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      try {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+        recognition.stop();
+      } catch {
+        // no-op
+      }
+    }
+
+    const stream = mediaStreamRef.current;
+    mediaStreamRef.current = null;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+    }
+
+    mediaRecorderRef.current = null;
+    chunksRef.current = [];
+    startTimestampRef.current = null;
+    finalTranscriptRef.current = "";
+    sessionIdRef.current = null;
+    isRecordingRef.current = false;
+    isStoppingRef.current = false;
+
+    if (previousSessionId) {
+      void failSession({
+        sessionId: previousSessionId,
+        message: "Session ended because book context changed.",
+      }).catch(() => {});
+    }
+
+    setIsRecording(false);
+    setIsProcessing(false);
+    setElapsedMs(0);
+    setWarningActive(false);
+    setLiveTranscript("");
     setCapNotice(null);
     setCapRolloverReady(false);
-  }, [bookId]);
+    setLastTranscript("");
+    setLastProvider("");
+    setLastArtifacts(null);
+  }, [bookId, failSession]);
 
   useEffect(() => {
     return () => {
