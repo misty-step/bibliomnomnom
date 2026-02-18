@@ -417,6 +417,9 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
         variant: "destructive",
       });
     } finally {
+      if (!capReached) {
+        setCapRolloverReady(false);
+      }
       sessionIdRef.current = null;
       resetCaptureState();
       setIsProcessing(false);
