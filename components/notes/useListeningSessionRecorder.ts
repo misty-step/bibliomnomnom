@@ -405,6 +405,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Listening session failed.";
+      setCapRolloverReady(false);
       try {
         await failSession({ sessionId, message });
       } catch {
@@ -416,9 +417,6 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
         variant: "destructive",
       });
     } finally {
-      if (!capReached) {
-        setCapRolloverReady(false);
-      }
       sessionIdRef.current = null;
       resetCaptureState();
       setIsProcessing(false);
