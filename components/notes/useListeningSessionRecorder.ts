@@ -117,6 +117,9 @@ function playAlertTone(kind: "warning" | "cap") {
   }
 }
 
+// Each retry hits the upload-audio API route which enforces a 30/day rate limit.
+// With 3 attempts max, worst case is 3x rate limit consumption per session.
+// At typical usage (1-5 sessions/day) this leaves ample headroom.
 async function uploadAudioWithRetry(
   filename: string,
   blob: Blob,
@@ -135,9 +138,10 @@ async function uploadAudioWithRetry(
       lastError = err instanceof Error ? err : new Error("Upload failed");
       onAttemptFailed?.(attempt, lastError);
       if (attempt < UPLOAD_MAX_ATTEMPTS) {
-        await new Promise<void>((resolve) =>
-          window.setTimeout(resolve, UPLOAD_BASE_DELAY_MS * attempt),
-        );
+        // Exponential backoff with jitter to avoid thundering herd
+        const exponentialDelay = UPLOAD_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        const jitter = Math.random() * (UPLOAD_BASE_DELAY_MS / 2);
+        await new Promise<void>((resolve) => window.setTimeout(resolve, exponentialDelay + jitter));
       }
     }
   }

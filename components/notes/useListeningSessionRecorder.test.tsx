@@ -341,6 +341,11 @@ describe("useListeningSessionRecorder", () => {
       ),
     );
     expect(completeSessionMock).not.toHaveBeenCalled();
+    // Terminal attempt must report willRetry: false
+    expect(captureMock).toHaveBeenCalledWith(
+      "audio_upload_attempt_failed",
+      expect.objectContaining({ bookId: "book_1", attempt: 3, willRetry: false }),
+    );
   });
 
   it("fails session with clear message when recording is too short", async () => {
