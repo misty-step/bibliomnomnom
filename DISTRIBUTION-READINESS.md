@@ -1,5 +1,8 @@
 # bibliomnomnom Distribution Readiness Guide
 
+> Scope note: this document is deployment/distribution operations only.
+> Product build priorities now live in `docs/PRODUCT-PRIORITIES.md`.
+
 **Current Status:** 77% ready (as of 2026-02-02)
 **Target:** 100% production-ready
 

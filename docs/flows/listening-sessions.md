@@ -2,6 +2,12 @@
 
 Voice-first note capture for readers who want to keep reading while talking through reactions, ideas, and questions.
 
+Current backlog focus for this flow is tracked under pillar epic #166:
+
+1. Security and trust first (`#160` private audio blobs)
+2. Durability and retry (`#159` server-side recoverability)
+3. Capture and UX reliability (`#147`, `#146`, `#145`)
+
 ## Goals
 
 - One-tap recording from book detail.

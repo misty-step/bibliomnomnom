@@ -2,6 +2,16 @@
 
 Mermaid diagrams for complex state machines and data flows in bibliomnomnom.
 
+## Priority Flows (Current)
+
+These are directly tied to active product pillars in `docs/PRODUCT-PRIORITIES.md`.
+
+| Pillar                    | Flow               | File                                             |
+| ------------------------- | ------------------ | ------------------------------------------------ |
+| Core tracking             | Add Book Sheet     | [add-book-sheet.md](./add-book-sheet.md)         |
+| Voice notes + synthesis   | Listening Sessions | [listening-sessions.md](./listening-sessions.md) |
+| Profile + recommendations | Profile Generation | [profile-generation.md](./profile-generation.md) |
+
 ## Documented Flows
 
 ### Complex State Machines (Diagrammed)

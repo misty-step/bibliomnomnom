@@ -4,6 +4,17 @@ A digital garden for voracious readers—a beautiful, private-first book trackin
 
 **Why bibliomnomnom?** Track your reading journey with a privacy-first approach. Unlike Goodreads or StoryGraph, your data stays yours. Built for readers who want a beautiful, intentional way to catalog books, notes, and quotes without algorithms or social pressure.
 
+## Current Product Focus
+
+Primary outcomes:
+
+1. Make read/currently-reading/want-to-read tracking effortless.
+2. Make voice note capture + synthesis secure and reliable.
+3. Deliver insightful reader profiles + strong recommendations from reading states and voice context.
+
+Current prioritized backlog and issue mapping lives in:
+- [docs/PRODUCT-PRIORITIES.md](./docs/PRODUCT-PRIORITIES.md)
+
 ## Prerequisites
 
 - **Node.js** >=20.9.0
@@ -427,5 +438,6 @@ See [DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md) for complete token documentation.
 - **[CLAUDE.md](./CLAUDE.md)** - Patterns, conventions, troubleshooting
 - **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Production deployment guide for Vercel/Convex/Clerk
 - **[DESIGN-SYSTEM.md](./DESIGN-SYSTEM.md)** - Design tokens, colors, typography
+- **[docs/PRODUCT-PRIORITIES.md](./docs/PRODUCT-PRIORITIES.md)** - current product priorities + backlog focus
 - **[docs/adr/](./docs/adr/)** - Architecture Decision Records
 - **[docs/flows/](./docs/flows/)** - User journey diagrams
