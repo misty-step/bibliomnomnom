@@ -21,9 +21,13 @@ import {
 const CAP_DURATION_MS = 30 * 60 * 1000;
 const WARNING_DURATION_MS = 60 * 1000;
 const LIVE_TRANSCRIPT_MAX_CHARS = 4_000;
+const UPLOAD_MAX_ATTEMPTS = 3;
+const UPLOAD_BASE_DELAY_MS = 500;
+const MIN_AUDIO_DURATION_MS = 1_000;
 const EVENT_CAP_WARNING_SHOWN = "cap_warning_shown";
 const EVENT_CAP_REACHED = "cap_reached";
 const EVENT_SESSION_ROLLOVER_STARTED = "session_rollover_started";
+const EVENT_AUDIO_UPLOAD_ATTEMPT_FAILED = "audio_upload_attempt_failed";
 
 type TranscribeResult = {
   transcript: string;
@@ -111,6 +115,33 @@ function playAlertTone(kind: "warning" | "cap") {
   } catch {
     // Best effort only.
   }
+}
+
+async function uploadAudioWithRetry(
+  filename: string,
+  blob: Blob,
+  contentType: string,
+  onAttemptFailed?: (attempt: number, error: Error) => void,
+): Promise<{ url: string }> {
+  let lastError: Error = new Error("Upload failed");
+  for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await upload(filename, blob, {
+        access: "public",
+        contentType,
+        handleUploadUrl: "/api/blob/upload-audio",
+      });
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error("Upload failed");
+      onAttemptFailed?.(attempt, lastError);
+      if (attempt < UPLOAD_MAX_ATTEMPTS) {
+        await new Promise<void>((resolve) =>
+          window.setTimeout(resolve, UPLOAD_BASE_DELAY_MS * attempt),
+        );
+      }
+    }
+  }
+  throw new Error(`Upload failed after ${UPLOAD_MAX_ATTEMPTS} attempts: ${lastError.message}`);
 }
 
 export function useListeningSessionRecorder(bookId: Id<"books">) {
@@ -340,15 +371,22 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       if (!blob.size) {
         throw new Error("Captured audio was empty.");
       }
+      if (durationMs < MIN_AUDIO_DURATION_MS) {
+        throw new Error(
+          `Recording too short (${(durationMs / 1000).toFixed(1)}s). Speak for at least ${MIN_AUDIO_DURATION_MS / 1000} second.`,
+        );
+      }
 
       const contentType =
         normalizeAudioMimeType(blob.type || recorder.mimeType) ?? DEFAULT_AUDIO_MIME_TYPE;
       const extension = extensionForAudioMimeType(contentType);
       const filename = `listening-sessions/${bookId}-${Date.now()}.${extension}`;
-      const uploaded = await upload(filename, blob, {
-        access: "public",
-        contentType,
-        handleUploadUrl: "/api/blob/upload-audio",
+      const uploaded = await uploadAudioWithRetry(filename, blob, contentType, (attempt, error) => {
+        trackSessionEvent(EVENT_AUDIO_UPLOAD_ATTEMPT_FAILED, {
+          attempt,
+          error: error.message,
+          willRetry: attempt < UPLOAD_MAX_ATTEMPTS,
+        });
       });
 
       await markTranscribing({
