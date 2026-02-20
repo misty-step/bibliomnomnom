@@ -8,6 +8,9 @@ import {
   type TranscriptionResponse,
 } from "@/lib/listening-sessions/transcription";
 
+// Allow up to 60s for sequential ElevenLabs (30s) + Deepgram (30s) fallback.
+export const maxDuration = 60;
+
 type TranscribeRequest = {
   audioUrl: string;
 };
