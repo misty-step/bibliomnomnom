@@ -229,19 +229,9 @@ export async function transcribeAudio(
   const providerErrors: string[] = [];
   let transcription: TranscriptionResponse | null = null;
 
-  if (deepgramApiKey) {
-    try {
-      transcription = await transcribeWithDeepgram({
-        apiKey: deepgramApiKey,
-        audioBytes: bytes,
-        mimeType,
-      });
-    } catch (error) {
-      providerErrors.push(`deepgram: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  if (!transcription && elevenLabsApiKey) {
+  // ElevenLabs Scribe v2 is the primary provider (higher accuracy, lower cost).
+  // Deepgram Nova-3 is the fallback.
+  if (elevenLabsApiKey) {
     try {
       transcription = await transcribeWithElevenLabs({
         apiKey: elevenLabsApiKey,
@@ -250,6 +240,18 @@ export async function transcribeAudio(
       });
     } catch (error) {
       providerErrors.push(`elevenlabs: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (!transcription && deepgramApiKey) {
+    try {
+      transcription = await transcribeWithDeepgram({
+        apiKey: deepgramApiKey,
+        audioBytes: bytes,
+        mimeType,
+      });
+    } catch (error) {
+      providerErrors.push(`deepgram: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 

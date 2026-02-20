@@ -154,7 +154,7 @@ describe("listening sessions transcribe route", () => {
     expect(body.error).toBe("Uploaded audio is too large");
   });
 
-  it("falls back to ElevenLabs when Deepgram fails", async () => {
+  it("falls back to Deepgram when ElevenLabs fails", async () => {
     authMock.mockResolvedValueOnce({ userId: "user_123" });
     process.env.DEEPGRAM_API_KEY = "test_deepgram_key";
     process.env.ELEVENLABS_API_KEY = "test_elevenlabs_key";
@@ -174,15 +174,19 @@ describe("listening sessions transcribe route", () => {
         });
       }
 
-      if (url.startsWith("https://api.deepgram.com/v1/listen")) {
-        return new Response("deepgram down", { status: 500 });
+      if (url === "https://api.elevenlabs.io/v1/speech-to-text") {
+        return new Response("elevenlabs down", { status: 500 });
       }
 
-      if (url === "https://api.elevenlabs.io/v1/speech-to-text") {
-        return new Response(JSON.stringify({ text: "hello\n\nworld" }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
+      if (url.startsWith("https://api.deepgram.com/v1/listen")) {
+        return new Response(
+          JSON.stringify({
+            results: {
+              channels: [{ alternatives: [{ transcript: "hello world", confidence: 0.99 }] }],
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
       }
 
       throw new Error(`Unexpected fetch: ${url}`);
@@ -201,8 +205,8 @@ describe("listening sessions transcribe route", () => {
     const body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.provider).toBe("elevenlabs");
-    expect(body.transcript).toBe("hello\nworld");
+    expect(body.provider).toBe("deepgram");
+    expect(body.transcript).toBe("hello world");
     expect(res.headers.get("x-request-id")).toBe("req-transcribe-fallback");
 
     const urls = fetchMock.mock.calls.map(([callInput]) => {
@@ -210,8 +214,8 @@ describe("listening sessions transcribe route", () => {
       if (callInput instanceof URL) return callInput.toString();
       return callInput.url;
     });
-    expect(urls.some((url) => url.startsWith("https://api.deepgram.com/v1/listen"))).toBe(true);
     expect(urls.includes("https://api.elevenlabs.io/v1/speech-to-text")).toBe(true);
+    expect(urls.some((url) => url.startsWith("https://api.deepgram.com/v1/listen"))).toBe(true);
   });
 
   it("returns 402 when subscription access is missing", async () => {
