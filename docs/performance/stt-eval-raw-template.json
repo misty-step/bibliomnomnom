@@ -1,0 +1,27 @@
+{
+  "_comment": "Template for stt-eval.py raw output. Run `python3 scripts/stt-eval.py <audio_file>` to generate actual benchmark data.",
+  "_generated_by": "scripts/stt-eval.py",
+  "schema": {
+    "timestamp": "ISO8601 UTC timestamp",
+    "audio_file": "Path to evaluated audio file",
+    "duration_s": "Audio duration in seconds (estimated from file size)",
+    "iterations": "Number of eval runs per provider",
+    "cost_per_min": {
+      "ElevenLabs Scribe v2": 0.003667,
+      "Deepgram Nova-3": 0.0043,
+      "AssemblyAI Universal-2": 0.010833
+    },
+    "results": {
+      "<provider_name>": [
+        {
+          "iteration": 1,
+          "transcript": "Transcribed text...",
+          "latency": 4.52,
+          "chars": 312
+        }
+      ]
+    },
+    "consensus": "Plurality-vote consensus transcript across all providers"
+  },
+  "note": "AssemblyAI Universal-Streaming rejected. See stt-decision-matrix.md. Script benchmarks Universal-2 batch instead."
+}
