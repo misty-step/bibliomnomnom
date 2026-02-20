@@ -177,6 +177,22 @@ export const checkAccess = query({
   },
 });
 
+/**
+ * Internal access check by userId (no auth context required).
+ * Used by server-side background processing to verify entitlement
+ * before performing paid work (STT, LLM synthesis).
+ */
+export const checkAccessForUser = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .first();
+    return hasAccess(subscription);
+  },
+});
+
 // ============================================================================
 // User-Facing Mutations
 // ============================================================================
