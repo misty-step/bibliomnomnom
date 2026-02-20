@@ -214,8 +214,13 @@ describe("listening sessions transcribe route", () => {
       if (callInput instanceof URL) return callInput.toString();
       return callInput.url;
     });
-    expect(urls.includes("https://api.elevenlabs.io/v1/speech-to-text")).toBe(true);
-    expect(urls.some((url) => url.startsWith("https://api.deepgram.com/v1/listen"))).toBe(true);
+    const elevenLabsIdx = urls.indexOf("https://api.elevenlabs.io/v1/speech-to-text");
+    const deepgramIdx = urls.findIndex((url) =>
+      url.startsWith("https://api.deepgram.com/v1/listen"),
+    );
+    expect(elevenLabsIdx).toBeGreaterThanOrEqual(0);
+    expect(deepgramIdx).toBeGreaterThanOrEqual(0);
+    expect(elevenLabsIdx).toBeLessThan(deepgramIdx);
   });
 
   it("returns 402 when subscription access is missing", async () => {
