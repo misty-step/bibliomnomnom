@@ -1,7 +1,15 @@
-import { mutation, query, type MutationCtx } from "./_generated/server";
+import {
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { requireAuth } from "./auth";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 const synthesisArtifacts = v.object({
   insights: v.array(
@@ -36,6 +44,15 @@ const MAX_SYNTH_ARTIFACT_ITEMS = 6;
 const MAX_SYNTH_CONTEXT_EXPANSIONS = 4;
 const MAX_RECENT_NOTES = 20;
 const RECENT_NOTE_SNIPPET_CHARS = 280;
+const MAX_PROCESSING_RETRIES = 3;
+const DEFAULT_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
+const STUCK_SESSION_BATCH_SIZE = 20;
+
+const processListeningSessionRun = (
+  internal as unknown as {
+    actions: { processListeningSession: { run: unknown } };
+  }
+).actions.processListeningSession.run;
 
 type SessionStatus = Doc<"listeningSessions">["status"];
 type SynthesisArtifacts = Doc<"listeningSessions">["synthesis"];
@@ -108,125 +125,79 @@ async function getOwnedSession(
   return session;
 }
 
-export const listByBook = query({
-  args: { bookId: v.id("books") },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    await getOwnedBook(ctx, userId, args.bookId);
+async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId: Id<"books">) {
+  const currentBook = await getOwnedBook(ctx, userId, bookId);
 
-    return await ctx.db
-      .query("listeningSessions")
-      .withIndex("by_book", (q) => q.eq("bookId", args.bookId))
-      .order("desc")
-      .collect();
-  },
-});
-
-export const get = query({
-  args: { sessionId: v.id("listeningSessions") },
-  handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    return await getOwnedSession(ctx, userId, args.sessionId);
-  },
-});
-
-export const createListeningSessionHandler = async (
-  ctx: MutationCtx,
-  args: {
-    bookId: Id<"books">;
-    capDurationMs?: number;
-    warningDurationMs?: number;
-  },
-) => {
-  const userId = await requireAuth(ctx);
-  await getOwnedBook(ctx, userId, args.bookId);
-
-  const now = Date.now();
-  const capDurationMs = normalizeCapDuration(args.capDurationMs);
-  const warningDurationMs = normalizeWarningDuration(args.warningDurationMs, capDurationMs);
-
-  return await ctx.db.insert("listeningSessions", {
-    userId,
-    bookId: args.bookId,
-    status: "recording",
-    capReached: false,
-    capDurationMs,
-    warningDurationMs,
-    startedAt: now,
-    createdAt: now,
-    updatedAt: now,
+  const mapBookItem = (book: Doc<"books">) => ({
+    title: book.title,
+    author: book.author,
   });
-};
 
-export const create = mutation({
-  args: {
-    bookId: v.id("books"),
-    capDurationMs: v.optional(v.number()),
-    warningDurationMs: v.optional(v.number()),
-  },
-  handler: createListeningSessionHandler,
-});
+  const currentlyReadingDocs = await ctx.db
+    .query("books")
+    .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "currently-reading"))
+    .take(25);
 
-export const markTranscribingHandler = async (
-  ctx: MutationCtx,
-  args: {
-    sessionId: Id<"listeningSessions">;
-    audioUrl: string;
-    durationMs: number;
-    capReached: boolean;
-    transcriptLive?: string;
-  },
-) => {
-  const userId = await requireAuth(ctx);
-  const session = await getOwnedSession(ctx, userId, args.sessionId);
+  const wantToReadDocs = await ctx.db
+    .query("books")
+    .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "want-to-read"))
+    .take(25);
 
-  assertTransition(session.status, "transcribing");
+  const readDocs = await ctx.db
+    .query("books")
+    .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "read"))
+    .take(35);
 
-  const now = Date.now();
-  await ctx.db.patch(session._id, {
-    status: "transcribing",
-    audioUrl: args.audioUrl,
-    durationMs: Math.max(0, Math.floor(args.durationMs)),
-    capReached: args.capReached,
-    transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
-    endedAt: now,
-    updatedAt: now,
-    lastError: undefined,
-  });
-};
+  const currentlyReading = currentlyReadingDocs
+    .filter((book) => book._id !== currentBook._id)
+    .slice(0, 20)
+    .map(mapBookItem);
 
-export const markTranscribing = mutation({
-  args: {
-    sessionId: v.id("listeningSessions"),
-    audioUrl: v.string(),
-    durationMs: v.number(),
-    capReached: v.boolean(),
-    transcriptLive: v.optional(v.string()),
-  },
-  handler: markTranscribingHandler,
-});
+  const wantToRead = wantToReadDocs
+    .filter((book) => book._id !== currentBook._id)
+    .slice(0, 20)
+    .map(mapBookItem);
 
-export const markSynthesizingHandler = async (
-  ctx: MutationCtx,
-  args: { sessionId: Id<"listeningSessions"> },
-) => {
-  const userId = await requireAuth(ctx);
-  const session = await getOwnedSession(ctx, userId, args.sessionId);
-  assertTransition(session.status, "synthesizing");
+  const read = readDocs
+    .filter((book) => book._id !== currentBook._id)
+    .slice(0, 30)
+    .map(mapBookItem);
 
-  await ctx.db.patch(session._id, {
-    status: "synthesizing",
-    updatedAt: Date.now(),
-    lastError: undefined,
-  });
-};
+  const recentNotesDocs = await ctx.db
+    .query("notes")
+    .withIndex("by_user_updatedAt", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(MAX_RECENT_NOTES);
 
-export const markSynthesizing = mutation({
-  args: { sessionId: v.id("listeningSessions") },
-  handler: markSynthesizingHandler,
-});
+  const bookTitleById = new Map<Id<"books">, string>();
+  for (const note of recentNotesDocs) {
+    if (bookTitleById.has(note.bookId)) continue;
+    const book = await ctx.db.get(note.bookId);
+    if (!book || book.userId !== userId) continue;
+    bookTitleById.set(note.bookId, book.title);
+  }
 
-export const completeListeningSessionHandler = async (
+  type RecentSynthesisNote = { bookTitle: string; type: "note" | "quote"; content: string };
+  const recentNotes: RecentSynthesisNote[] = recentNotesDocs.map<RecentSynthesisNote>((note) => ({
+    bookTitle: bookTitleById.get(note.bookId) ?? "Unknown book",
+    type: note.type === "quote" ? "quote" : "note",
+    content: truncate(note.content, RECENT_NOTE_SNIPPET_CHARS),
+  }));
+
+  return {
+    book: {
+      title: currentBook.title,
+      author: currentBook.author,
+      description: currentBook.description,
+    },
+    currentlyReading,
+    wantToRead,
+    read,
+    recentNotes,
+  };
+}
+
+async function completeListeningSessionForUser(
   ctx: MutationCtx,
   args: {
     sessionId: Id<"listeningSessions">;
@@ -234,8 +205,8 @@ export const completeListeningSessionHandler = async (
     transcriptProvider?: string;
     synthesis?: SynthesisArtifacts;
   },
-) => {
-  const userId = await requireAuth(ctx);
+  userId: Id<"users">,
+) {
   const session = await getOwnedSession(ctx, userId, args.sessionId);
   await getOwnedBook(ctx, userId, session.bookId);
 
@@ -377,6 +348,204 @@ export const completeListeningSessionHandler = async (
   });
 
   return { rawNoteId, synthesizedNoteIds };
+}
+
+async function failListeningSessionForUser(
+  ctx: MutationCtx,
+  args: { sessionId: Id<"listeningSessions">; message: string },
+  userId: Id<"users">,
+) {
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+  assertTransition(session.status, "failed");
+
+  await ctx.db.patch(session._id, {
+    status: "failed",
+    lastError: truncate(args.message, 1_000),
+    updatedAt: Date.now(),
+  });
+}
+
+export const listByBook = query({
+  args: { bookId: v.id("books") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    await getOwnedBook(ctx, userId, args.bookId);
+
+    return await ctx.db
+      .query("listeningSessions")
+      .withIndex("by_book", (q) => q.eq("bookId", args.bookId))
+      .order("desc")
+      .collect();
+  },
+});
+
+export const get = query({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    return await getOwnedSession(ctx, userId, args.sessionId);
+  },
+});
+
+export const getForProcessing = internalQuery({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.sessionId);
+  },
+});
+
+export const getSynthesisContextForSession = internalQuery({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new ConvexError("Listening session not found");
+    }
+    return await buildSynthesisContext(ctx, session.userId, session.bookId);
+  },
+});
+
+export const createListeningSessionHandler = async (
+  ctx: MutationCtx,
+  args: {
+    bookId: Id<"books">;
+    capDurationMs?: number;
+    warningDurationMs?: number;
+  },
+) => {
+  const userId = await requireAuth(ctx);
+  await getOwnedBook(ctx, userId, args.bookId);
+
+  const now = Date.now();
+  const capDurationMs = normalizeCapDuration(args.capDurationMs);
+  const warningDurationMs = normalizeWarningDuration(args.warningDurationMs, capDurationMs);
+
+  return await ctx.db.insert("listeningSessions", {
+    userId,
+    bookId: args.bookId,
+    status: "recording",
+    capReached: false,
+    capDurationMs,
+    warningDurationMs,
+    startedAt: now,
+    createdAt: now,
+    updatedAt: now,
+  });
+};
+
+export const create = mutation({
+  args: {
+    bookId: v.id("books"),
+    capDurationMs: v.optional(v.number()),
+    warningDurationMs: v.optional(v.number()),
+  },
+  handler: createListeningSessionHandler,
+});
+
+export const markTranscribingHandler = async (
+  ctx: MutationCtx,
+  args: {
+    sessionId: Id<"listeningSessions">;
+    audioUrl: string;
+    durationMs: number;
+    capReached: boolean;
+    transcriptLive?: string;
+  },
+) => {
+  const userId = await requireAuth(ctx);
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+
+  assertTransition(session.status, "transcribing");
+
+  const now = Date.now();
+  await ctx.db.patch(session._id, {
+    status: "transcribing",
+    audioUrl: args.audioUrl,
+    durationMs: Math.max(0, Math.floor(args.durationMs)),
+    capReached: args.capReached,
+    transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
+    endedAt: now,
+    updatedAt: now,
+    lastError: undefined,
+  });
+};
+
+export const markTranscribing = mutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    audioUrl: v.string(),
+    durationMs: v.number(),
+    capReached: v.boolean(),
+    transcriptLive: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await markTranscribingHandler(ctx, args);
+    await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
+      sessionId: args.sessionId,
+    });
+  },
+});
+
+export const markSynthesizingHandler = async (
+  ctx: MutationCtx,
+  args: { sessionId: Id<"listeningSessions"> },
+) => {
+  const userId = await requireAuth(ctx);
+  const session = await getOwnedSession(ctx, userId, args.sessionId);
+  assertTransition(session.status, "synthesizing");
+
+  await ctx.db.patch(session._id, {
+    status: "synthesizing",
+    updatedAt: Date.now(),
+    lastError: undefined,
+  });
+};
+
+export const markSynthesizing = mutation({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: markSynthesizingHandler,
+});
+
+export const transitionSynthesizingInternal = internalMutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    transcript: v.string(),
+    transcriptProvider: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new ConvexError("Listening session not found");
+    }
+
+    assertTransition(session.status, "synthesizing");
+
+    const cleanedTranscript = args.transcript.trim();
+    if (!cleanedTranscript) {
+      throw new ConvexError("Transcript cannot be empty");
+    }
+
+    await ctx.db.patch(session._id, {
+      status: "synthesizing",
+      transcript: cleanedTranscript,
+      transcriptProvider: args.transcriptProvider.trim() || "unknown",
+      updatedAt: Date.now(),
+      lastError: undefined,
+    });
+  },
+});
+
+export const completeListeningSessionHandler = async (
+  ctx: MutationCtx,
+  args: {
+    sessionId: Id<"listeningSessions">;
+    transcript: string;
+    transcriptProvider?: string;
+    synthesis?: SynthesisArtifacts;
+  },
+) => {
+  const userId = await requireAuth(ctx);
+  return await completeListeningSessionForUser(ctx, args, userId);
 };
 
 export const complete = mutation({
@@ -389,19 +558,28 @@ export const complete = mutation({
   handler: completeListeningSessionHandler,
 });
 
+export const completeInternal = internalMutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    transcript: v.string(),
+    transcriptProvider: v.optional(v.string()),
+    synthesis: v.optional(synthesisArtifacts),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new ConvexError("Listening session not found");
+    }
+    return await completeListeningSessionForUser(ctx, args, session.userId);
+  },
+});
+
 export const failListeningSessionHandler = async (
   ctx: MutationCtx,
   args: { sessionId: Id<"listeningSessions">; message: string },
 ) => {
   const userId = await requireAuth(ctx);
-  const session = await getOwnedSession(ctx, userId, args.sessionId);
-  assertTransition(session.status, "failed");
-
-  await ctx.db.patch(session._id, {
-    status: "failed",
-    lastError: truncate(args.message, 1_000),
-    updatedAt: Date.now(),
-  });
+  await failListeningSessionForUser(ctx, args, userId);
 };
 
 export const fail = mutation({
@@ -412,78 +590,98 @@ export const fail = mutation({
   handler: failListeningSessionHandler,
 });
 
+export const failInternal = internalMutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    message: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new ConvexError("Listening session not found");
+    }
+    await failListeningSessionForUser(ctx, args, session.userId);
+  },
+});
+
+export const incrementRetry = internalMutation({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    if (!session) {
+      throw new ConvexError("Listening session not found");
+    }
+    const now = Date.now();
+    await ctx.db.patch(args.sessionId, {
+      retryCount: (session.retryCount ?? 0) + 1,
+      lastRetryAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+async function listStuckSessionDocs(
+  ctx: { db: QueryCtx["db"] },
+  args: { stuckThresholdMs?: number; maxRetries?: number },
+) {
+  const stuckThresholdMs =
+    typeof args.stuckThresholdMs === "number" && args.stuckThresholdMs > 0
+      ? args.stuckThresholdMs
+      : DEFAULT_STUCK_THRESHOLD_MS;
+  const maxRetries =
+    typeof args.maxRetries === "number" && args.maxRetries > 0
+      ? args.maxRetries
+      : MAX_PROCESSING_RETRIES;
+  const threshold = Date.now() - stuckThresholdMs;
+
+  const candidates = await ctx.db
+    .query("listeningSessions")
+    .filter((q) =>
+      q.and(
+        q.or(q.eq(q.field("status"), "transcribing"), q.eq(q.field("status"), "synthesizing")),
+        q.lt(q.field("updatedAt"), threshold),
+      ),
+    )
+    .collect();
+
+  return candidates
+    .filter((session) => (session.retryCount ?? 0) < maxRetries)
+    .sort((a, b) => a.updatedAt - b.updatedAt)
+    .slice(0, STUCK_SESSION_BATCH_SIZE);
+}
+
+export const listStuckSessions = internalQuery({
+  args: {
+    stuckThresholdMs: v.optional(v.number()),
+    maxRetries: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    return await listStuckSessionDocs(ctx, args);
+  },
+});
+
 export const getSynthesisContext = query({
   args: { bookId: v.id("books") },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    const currentBook = await getOwnedBook(ctx, userId, args.bookId);
+    return await buildSynthesisContext(ctx, userId, args.bookId);
+  },
+});
 
-    const mapBookItem = (book: Doc<"books">) => ({
-      title: book.title,
-      author: book.author,
+export const recoverStuck = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const stuckSessions = await listStuckSessionDocs(ctx, {
+      stuckThresholdMs: DEFAULT_STUCK_THRESHOLD_MS,
+      maxRetries: MAX_PROCESSING_RETRIES,
     });
-
-    const currentlyReadingDocs = await ctx.db
-      .query("books")
-      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "currently-reading"))
-      .take(25);
-
-    const wantToReadDocs = await ctx.db
-      .query("books")
-      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "want-to-read"))
-      .take(25);
-
-    const readDocs = await ctx.db
-      .query("books")
-      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "read"))
-      .take(35);
-
-    const currentlyReading = currentlyReadingDocs
-      .filter((book) => book._id !== currentBook._id)
-      .slice(0, 20)
-      .map(mapBookItem);
-
-    const wantToRead = wantToReadDocs
-      .filter((book) => book._id !== currentBook._id)
-      .slice(0, 20)
-      .map(mapBookItem);
-
-    const read = readDocs
-      .filter((book) => book._id !== currentBook._id)
-      .slice(0, 30)
-      .map(mapBookItem);
-
-    const recentNotesDocs = await ctx.db
-      .query("notes")
-      .withIndex("by_user_updatedAt", (q) => q.eq("userId", userId))
-      .order("desc")
-      .take(MAX_RECENT_NOTES);
-
-    const bookTitleById = new Map<Id<"books">, string>();
-    for (const note of recentNotesDocs) {
-      if (bookTitleById.has(note.bookId)) continue;
-      const book = await ctx.db.get(note.bookId);
-      if (!book || book.userId !== userId) continue;
-      bookTitleById.set(note.bookId, book.title);
+    for (const session of stuckSessions) {
+      await ctx.scheduler.runAfter(0, processListeningSessionRun as any, {
+        sessionId: session._id,
+        attempt: 1,
+      });
     }
-
-    type RecentSynthesisNote = { bookTitle: string; type: "note" | "quote"; content: string };
-    const recentNotes: RecentSynthesisNote[] = recentNotesDocs.map<RecentSynthesisNote>((note) => ({
-      bookTitle: bookTitleById.get(note.bookId) ?? "Unknown book",
-      type: note.type === "quote" ? "quote" : "note",
-      content: truncate(note.content, RECENT_NOTE_SNIPPET_CHARS),
-    }));
-
-    return {
-      book: {
-        title: currentBook.title,
-        author: currentBook.author,
-        description: currentBook.description,
-      },
-      currentlyReading,
-      wantToRead,
-      read,
-      recentNotes,
-    };
+    console.log(`Recovered ${stuckSessions.length} stuck listening sessions`);
+    return { recovered: stuckSessions.length };
   },
 });

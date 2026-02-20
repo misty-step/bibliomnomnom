@@ -63,3 +63,50 @@ export function clampArtifacts(input: SynthesisArtifacts): SynthesisArtifacts {
     })),
   };
 }
+
+export function normalizeArtifacts(raw: unknown): SynthesisArtifacts {
+  if (!raw || typeof raw !== "object") return EMPTY_SYNTHESIS_ARTIFACTS;
+  const candidate = raw as Partial<SynthesisArtifacts>;
+
+  const toStringArray = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+  const mapArray = <T>(value: unknown, mapper: (item: unknown) => T | null): T[] => {
+    if (!Array.isArray(value)) return [];
+    const out: T[] = [];
+    for (const item of value) {
+      const mapped = mapper(item);
+      if (mapped) out.push(mapped);
+    }
+    return out;
+  };
+
+  const insights = mapArray(candidate.insights, (item) => {
+    if (!item || typeof item !== "object") return null;
+    const { title, content } = item as { title?: string; content?: string };
+    if (typeof title !== "string" || typeof content !== "string") return null;
+    return { title, content };
+  });
+
+  const quotes = mapArray(candidate.quotes, (item) => {
+    if (!item || typeof item !== "object") return null;
+    const { text, source } = item as { text?: string; source?: string };
+    if (typeof text !== "string") return null;
+    return { text, source: typeof source === "string" ? source : undefined };
+  });
+
+  const contextExpansions = mapArray(candidate.contextExpansions, (item) => {
+    if (!item || typeof item !== "object") return null;
+    const { title, content } = item as { title?: string; content?: string };
+    if (typeof title !== "string" || typeof content !== "string") return null;
+    return { title, content };
+  });
+
+  return clampArtifacts({
+    insights,
+    openQuestions: toStringArray(candidate.openQuestions),
+    quotes,
+    followUpQuestions: toStringArray(candidate.followUpQuestions),
+    contextExpansions,
+  });
+}

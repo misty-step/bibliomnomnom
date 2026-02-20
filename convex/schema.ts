@@ -100,6 +100,8 @@ export default defineSchema({
       }),
     ),
     lastError: v.optional(v.string()),
+    retryCount: v.optional(v.number()),
+    lastRetryAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
