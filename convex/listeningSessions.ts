@@ -374,6 +374,7 @@ export const listByBook = query({
     return await ctx.db
       .query("listeningSessions")
       .withIndex("by_book", (q) => q.eq("bookId", args.bookId))
+      .filter((q) => q.eq(q.field("userId"), userId))
       .order("desc")
       .collect();
   },
@@ -634,15 +635,19 @@ async function listStuckSessionDocs(
       : MAX_PROCESSING_RETRIES;
   const threshold = Date.now() - stuckThresholdMs;
 
-  const candidates = await ctx.db
+  const transcribing = await ctx.db
     .query("listeningSessions")
-    .filter((q) =>
-      q.and(
-        q.or(q.eq(q.field("status"), "transcribing"), q.eq(q.field("status"), "synthesizing")),
-        q.lt(q.field("updatedAt"), threshold),
-      ),
+    .withIndex("by_status_updatedAt", (q) =>
+      q.eq("status", "transcribing").lt("updatedAt", threshold),
     )
     .collect();
+  const synthesizing = await ctx.db
+    .query("listeningSessions")
+    .withIndex("by_status_updatedAt", (q) =>
+      q.eq("status", "synthesizing").lt("updatedAt", threshold),
+    )
+    .collect();
+  const candidates = [...transcribing, ...synthesizing];
 
   return candidates
     .filter((session) => (session.retryCount ?? 0) < maxRetries)

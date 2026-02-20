@@ -289,7 +289,11 @@ export async function processListeningSessionHandler(
         const parsed = JSON.parse(content) as unknown;
         synthesis = clampArtifacts(normalizeArtifacts(parsed));
         hasSynthesis = true;
-      } catch {
+      } catch (synthError) {
+        console.error(
+          `[processListeningSession] LLM synthesis failed for session ${args.sessionId}:`,
+          synthError instanceof Error ? synthError.message : String(synthError),
+        );
         hasSynthesis = false;
       }
     }
