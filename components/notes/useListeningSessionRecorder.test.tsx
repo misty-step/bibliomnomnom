@@ -71,6 +71,9 @@ function RecorderHarness({ bookId }: { bookId: string }) {
       <button type="button" onClick={() => void recorder.startSession()}>
         start
       </button>
+      <button type="button" onClick={() => void recorder.stopAndProcess(false)}>
+        stop
+      </button>
       <span data-testid="rollover">{recorder.capRolloverReady ? "ready" : "idle"}</span>
       <span data-testid="recording">{recorder.isRecording ? "recording" : "idle"}</span>
       <span data-testid="notice">{recorder.capNotice ?? ""}</span>
@@ -294,5 +297,76 @@ describe("useListeningSessionRecorder", () => {
       "cap_reached",
       expect.objectContaining({ bookId: "book_1" }),
     );
+  });
+
+  it("retries upload on transient failure and completes on second attempt", async () => {
+    uploadMock
+      .mockRejectedValueOnce(new Error("Network error"))
+      .mockResolvedValueOnce({ url: "https://example.com/audio.webm" });
+
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 5_000);
+    });
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(completeSessionMock).toHaveBeenCalledTimes(1));
+    expect(failSessionMock).not.toHaveBeenCalled();
+    expect(captureMock).toHaveBeenCalledWith(
+      "audio_upload_attempt_failed",
+      expect.objectContaining({ bookId: "book_1", attempt: 1, willRetry: true }),
+    );
+  });
+
+  it("fails session when all upload retries are exhausted", async () => {
+    uploadMock.mockRejectedValue(new Error("Storage unavailable"));
+
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 10_000);
+    });
+
+    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(3));
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/upload failed after/i) }),
+      ),
+    );
+    expect(completeSessionMock).not.toHaveBeenCalled();
+    // Terminal attempt must report willRetry: false
+    expect(captureMock).toHaveBeenCalledWith(
+      "audio_upload_attempt_failed",
+      expect.objectContaining({ bookId: "book_1", attempt: 3, willRetry: false }),
+    );
+  });
+
+  it("fails session with clear message when recording is too short", async () => {
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    // Advance only 100ms so durationMs < MIN_AUDIO_DURATION_MS (1000ms)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "stop" }));
+
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/too short/i) }),
+      ),
+    );
+    expect(uploadMock).not.toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
   });
 });
