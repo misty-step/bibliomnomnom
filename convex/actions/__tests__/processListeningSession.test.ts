@@ -61,6 +61,22 @@ describe("processListeningSessionHandler", () => {
     }
   });
 
+  it("fails session when user has no subscription", async () => {
+    const ctx = makeCtx([
+      baseSession({ status: "transcribing", retryCount: 0 }),
+      false, // checkAccessForUser → no subscription
+    ]);
+
+    await processListeningSessionHandler(ctx as any, { sessionId: SESSION_ID }, {});
+
+    expect(ctx.runMutation).toHaveBeenCalledTimes(1);
+    expect(ctx.runMutation.mock.calls[0]?.[1]).toMatchObject({
+      sessionId: SESSION_ID,
+      message: "Subscription required for voice session processing",
+    });
+    expect(ctx.scheduler.runAfter).not.toHaveBeenCalled();
+  });
+
   it("transcribes, synthesizes, then completes", async () => {
     process.env.OPENROUTER_API_KEY = "test-openrouter-key";
 
@@ -70,6 +86,7 @@ describe("processListeningSessionHandler", () => {
         audioUrl: "https://blob.vercel-storage.com/listening-sessions/sample.webm",
         retryCount: 0,
       }),
+      true, // checkAccessForUser
       {
         book: { title: "Dune", author: "Frank Herbert" },
         currentlyReading: [],
@@ -124,6 +141,7 @@ describe("processListeningSessionHandler", () => {
         audioUrl: "https://blob.vercel-storage.com/listening-sessions/sample.webm",
         retryCount: 0,
       }),
+      true, // checkAccessForUser
     ]);
 
     const transcribeAudioFn = vi.fn().mockRejectedValue(new Error("provider outage"));
@@ -151,6 +169,7 @@ describe("processListeningSessionHandler", () => {
         audioUrl: "https://blob.vercel-storage.com/listening-sessions/sample.webm",
         retryCount: 2,
       }),
+      true, // checkAccessForUser
     ]);
 
     const transcribeAudioFn = vi.fn().mockRejectedValue(new Error("still failing"));

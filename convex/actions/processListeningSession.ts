@@ -167,6 +167,17 @@ export async function processListeningSessionHandler(
   if (session.status === "complete" || session.status === "failed") return;
   if (session.status === "recording" || session.status === "review") return;
 
+  const entitled = await ctx.runQuery(internal.subscriptions.checkAccessForUser, {
+    userId: session.userId,
+  });
+  if (!entitled) {
+    await ctx.runMutation(internal.listeningSessions.failInternal, {
+      sessionId: args.sessionId,
+      message: "Subscription required for voice session processing",
+    });
+    return;
+  }
+
   const retryCount = session.retryCount ?? 0;
   if (retryCount >= MAX_RETRIES) {
     await ctx.runMutation(internal.listeningSessions.failInternal, {

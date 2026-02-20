@@ -24,6 +24,22 @@ function cleanTranscript(input: string): string {
     .trim();
 }
 
+const DEFAULT_FETCH_TIMEOUT_MS = 30_000;
+
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit,
+  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function isTrustedAudioHost(hostname: string): boolean {
   return hostname === "blob.vercel-storage.com" || hostname.endsWith(".blob.vercel-storage.com");
 }
@@ -84,7 +100,7 @@ export async function readAudioFromUrl(
     throw new TranscribeHttpError(400, "Untrusted audio host");
   }
 
-  const response = await fetch(audioUrl, { redirect: "error" });
+  const response = await fetchWithTimeout(audioUrl, { redirect: "error" });
   if (!response.ok) {
     throw new Error(`Failed to fetch uploaded audio: ${response.status}`);
   }
@@ -110,14 +126,18 @@ async function transcribeWithDeepgram(params: {
   endpoint.searchParams.set("punctuate", "true");
   endpoint.searchParams.set("smart_format", "true");
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Token ${params.apiKey}`,
-      "Content-Type": params.mimeType,
+  const response = await fetchWithTimeout(
+    endpoint,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Token ${params.apiKey}`,
+        "Content-Type": params.mimeType,
+      },
+      body: params.audioBytes,
     },
-    body: params.audioBytes,
-  });
+    60_000,
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -160,13 +180,17 @@ async function transcribeWithElevenLabs(params: {
   formData.append("file", blob, "session-audio.webm");
   formData.append("model_id", process.env.ELEVENLABS_STT_MODEL || "scribe_v2");
 
-  const response = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
-    method: "POST",
-    headers: {
-      "xi-api-key": params.apiKey,
+  const response = await fetchWithTimeout(
+    "https://api.elevenlabs.io/v1/speech-to-text",
+    {
+      method: "POST",
+      headers: {
+        "xi-api-key": params.apiKey,
+      },
+      body: formData,
     },
-    body: formData,
-  });
+    60_000,
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
