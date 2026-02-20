@@ -33,8 +33,8 @@ Current backlog focus for this flow is tracked under pillar epic #166:
 3. **Transcribe (batch STT)**
    - Route: `app/api/listening-sessions/transcribe/route.ts`
    - Audio bytes are fetched from the blob URL, then sent to:
-     - Deepgram (preferred if `DEEPGRAM_API_KEY` is set; `DEEPGRAM_STT_MODEL` default `nova-3`)
-     - ElevenLabs (fallback if `ELEVENLABS_API_KEY` is set; `ELEVENLABS_STT_MODEL` default `scribe_v2`)
+     - ElevenLabs (primary if `ELEVENLABS_API_KEY` is set; `ELEVENLABS_STT_MODEL` default `scribe_v2`)
+     - Deepgram (fallback if `DEEPGRAM_API_KEY` is set; `DEEPGRAM_STT_MODEL` default `nova-3`)
 
 4. **Synthesize (LLM)**
    - Route: `app/api/listening-sessions/synthesize/route.ts`

@@ -443,7 +443,8 @@ def main():
     keys = load_env(key_names)
 
     if args.record:
-        wav_path = tempfile.mktemp(suffix=".wav", prefix="stt-eval-")
+        with tempfile.NamedTemporaryFile(suffix=".wav", prefix="stt-eval-", delete=False) as tmp:
+            wav_path = tmp.name
         record_audio(args.record, wav_path, device_index=args.device)
     else:
         if not os.path.exists(args.audio_file):

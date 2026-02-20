@@ -25,7 +25,7 @@
 | **API stability**          | Good                     | Excellent (market leader) | Good                                    |
 | **Language support**       | 90+                      | Multiple                  | 6 languages only                        |
 | **Book domain accuracy**   | ⭐⭐⭐⭐⭐               | ⭐⭐⭐⭐                  | ⭐⭐⭐                                  |
-| **Long-form stability**    | ⭐⭐⭐⭐⭐ Optimized     | ⭐⭐⭐⭐                  | ❌ Broken at 4hr max                    |
+| **Long-form stability**    | ⭐⭐⭐⭐⭐ Optimized     | ⭐⭐⭐⭐                  | ❌ Broken at 3-hr cap                   |
 
 ## Decision
 
@@ -84,7 +84,7 @@ Note: AssemblyAI's **Universal-2** (async batch) is a separate product that avoi
 
 ## Failure Handling Policy
 
-```
+```text
 Session uploaded → Attempt ElevenLabs Scribe v2
   ├─ Success → proceed to synthesis
   └─ Failure (5xx, timeout, quota) →
@@ -115,7 +115,7 @@ For 4-hour sessions (MAX_CAP_DURATION_MS):
 
 - Same chunk-and-concatenate approach
 - ElevenLabs and Deepgram both handle individual file sizes well within their limits
-- Monitor cost: 4hr @ $0.22/hr = $0.88 per session — acceptable
+- Monitor cost: 4 hr @ $0.22/hr = $0.88 per session — acceptable
 
 ## Cost Projections
 
