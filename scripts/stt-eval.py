@@ -206,9 +206,10 @@ def call_assemblyai(api_key, wav_path):
 
     transcript_id = submit_resp.json()["id"]
 
-    # Step 3: Poll for completion
+    # Step 3: Poll for completion (10-min timeout to prevent infinite hangs)
     polling_endpoint = f"https://api.assemblyai.com/v2/transcript/{transcript_id}"
-    while True:
+    poll_deadline = start + 600  # 10 minutes
+    while time.monotonic() < poll_deadline:
         poll_resp = requests.get(
             polling_endpoint,
             headers={"authorization": api_key},
@@ -225,6 +226,8 @@ def call_assemblyai(api_key, wav_path):
             latency = time.monotonic() - start
             return None, latency, f"Transcription error: {poll_resp.json().get('error', 'unknown')}"
         time.sleep(3)
+    latency = time.monotonic() - start
+    return None, latency, f"Polling timed out after 600s (last status: {status})"
 
 
 # ---------------------------------------------------------------------------
@@ -328,13 +331,6 @@ def compute_consensus(results):
             best_score, best = score, t
     return best
 
-
-def compute_cost(name, duration_minutes, runs):
-    """Estimate cost based on published per-minute rates."""
-    cpp = COST_PER_MIN.get(name)
-    if cpp is None:
-        return None
-    return cpp * duration_minutes
 
 
 def generate_report(results, consensus, wav_path, duration_s, iterations, timestamp):
@@ -456,8 +452,16 @@ def main():
         wav_path = ensure_wav(args.audio_file)
 
     file_size = os.path.getsize(wav_path)
-    # 16kHz 16-bit mono: bytes / (sample_rate * bytes_per_sample)
-    duration_s = file_size / (16000 * 2)
+    # Use ffprobe for accurate duration; fall back to file-size estimate
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+             "-of", "csv=p=0", wav_path],
+            capture_output=True, text=True, timeout=10,
+        )
+        duration_s = float(probe.stdout.strip())
+    except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
+        duration_s = file_size / (16000 * 2)  # 16kHz 16-bit mono estimate
     print(f"\n  Audio: {wav_path}")
     print(f"  Size: {file_size / 1024:.0f} KB (~{duration_s:.0f}s / {duration_s/60:.1f} min)")
     print(f"\n  Running {args.iterations} iteration(s) per provider...\n")

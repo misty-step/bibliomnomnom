@@ -10,7 +10,7 @@
 | ---------- | ------------------- | -------------------------- | --------- | ------------ |
 | ElevenLabs | Scribe v2           | Batch (file upload)        | 90+       | Unlimited    |
 | Deepgram   | Nova-3              | Batch + Streaming          | Multiple  | Unlimited    |
-| AssemblyAI | Universal-Streaming | Streaming only (WebSocket) | 6         | **3 hours**  |
+| AssemblyAI | Universal-Streaming | Streaming only (WebSocket) | 6         | 3 hours      |
 
 ## Scoring Matrix
 
