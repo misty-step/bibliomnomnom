@@ -6,12 +6,11 @@ import { log, withObservability } from "@/lib/api/withObservability";
 import { OpenRouterApiError, openRouterChatCompletion } from "@/lib/ai/openrouter";
 import { requireListeningSessionEntitlement } from "@/lib/listening-sessions/entitlements";
 import {
-  clampArtifacts,
   EMPTY_SYNTHESIS_ARTIFACTS,
   normalizeArtifacts,
-  type SynthesisArtifacts,
   type SynthesisContext,
 } from "@/lib/listening-sessions/synthesis";
+import { makeFallbackArtifacts } from "@/lib/listening-sessions/fallback-artifacts";
 import { logSessionCostGuardrails } from "@/lib/listening-sessions/cost-guardrails";
 import { estimateCostUsd, getUsageTokens } from "@/lib/listening-sessions/cost-estimation";
 import { getListeningSynthesisConfig } from "@/lib/listening-sessions/synthesisConfig";
@@ -26,41 +25,6 @@ type SynthesizeRequest = {
   bookId: Id<"books">;
   sessionId?: Id<"listeningSessions">;
 };
-
-function makeFallbackArtifacts(transcript: string, context?: SynthesisContext): SynthesisArtifacts {
-  const cleaned = transcript.replace(/\s+/g, " ").trim();
-  const sentences = cleaned
-    .split(/(?<=[.!?])\s+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  const questionSentences = sentences.filter((sentence) => sentence.includes("?"));
-  const quoted = Array.from(cleaned.matchAll(/["“”']([^"“”']{12,200})["“”']/g)).map(
-    (match) => match[1] || "",
-  );
-  const contextHint = context?.book?.title
-    ? `How does this connect to other ideas in "${context.book.title}"?`
-    : "What idea from this session should you revisit next reading block?";
-
-  return clampArtifacts({
-    insights: sentences.slice(0, 3).map((content, index) => ({
-      title: `Session insight ${index + 1}`,
-      content,
-    })),
-    openQuestions: questionSentences.slice(0, 4),
-    quotes: quoted.slice(0, 4).map((text) => ({ text })),
-    followUpQuestions: [contextHint],
-    contextExpansions:
-      context?.book?.title && context.book.author
-        ? [
-            {
-              title: `Context for ${context.book.title}`,
-              content: `Compare this session with themes in other ${context.book.author} works and adjacent books in your reading list.`,
-            },
-          ]
-        : [],
-  });
-}
 
 export const POST = withObservability(async (request: Request) => {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
