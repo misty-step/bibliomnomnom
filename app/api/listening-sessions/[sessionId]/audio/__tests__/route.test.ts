@@ -125,6 +125,76 @@ describe("listening session audio proxy route", () => {
     expect(response.status).toBe(403);
   });
 
+  it("returns 502 when upstream blob fetch fails", async () => {
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/sample.webm",
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(null, { status: 500 })));
+
+    const response = await GET(
+      new Request("https://example.com/api/listening-sessions/session_1/audio"),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(payload.error).toMatch(/fetch/i);
+  });
+
+  it("returns 416 Range Not Satisfiable when upstream reports invalid range", async () => {
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/sample.webm",
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValueOnce(
+        new Response(null, {
+          status: 416,
+          headers: { "content-range": "bytes */4" },
+        }),
+      ),
+    );
+
+    const response = await GET(
+      new Request("https://example.com/api/listening-sessions/session_1/audio", {
+        headers: { range: "bytes=100-200" },
+      }),
+      makeRequestContext("session_1"),
+    );
+
+    expect(response.status).toBe(416);
+    expect(response.headers.get("content-range")).toBe("bytes */4");
+  });
+
+  it("returns 404 when upstream blob returns 404", async () => {
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/deleted.webm",
+    );
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(null, { status: 404 })));
+
+    const response = await GET(
+      new Request("https://example.com/api/listening-sessions/session_1/audio"),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(payload.error).toMatch(/not found/i);
+  });
+
+  it("returns 500 when Convex query throws", async () => {
+    convexQueryMock.mockRejectedValueOnce(new Error("Convex unavailable"));
+
+    const response = await GET(
+      new Request("https://example.com/api/listening-sessions/session_1/audio"),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toMatch(/look up/i);
+  });
+
   it("returns 206 partial content when Range header is forwarded", async () => {
     convexQueryMock.mockResolvedValueOnce(
       "https://blob.vercel-storage.com/listening-sessions/sample.webm",

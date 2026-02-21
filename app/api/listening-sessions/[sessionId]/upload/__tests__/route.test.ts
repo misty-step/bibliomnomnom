@@ -209,6 +209,134 @@ describe("listening session upload route", () => {
     expect(response.status).toBe(400);
   });
 
+  it("returns 400 when sessionId is empty", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/%20/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("  "),
+    );
+
+    expect(response.status).toBe(400);
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when x-duration-ms is not a valid number", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: {
+          "x-content-type": "audio/webm",
+          "Content-Type": "audio/webm",
+          "x-duration-ms": "not-a-number",
+        },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatch(/x-duration-ms/i);
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when x-cap-reached is not a boolean string", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: {
+          "x-content-type": "audio/webm",
+          "Content-Type": "audio/webm",
+          "x-cap-reached": "maybe",
+        },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatch(/x-cap-reached/i);
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when audio body is empty", async () => {
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([]),
+      }),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toMatch(/empty/i);
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
+  it("returns entitlement error when rate limited or insufficient plan", async () => {
+    entitlementMock.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      error: "Too many voice sessions today. Please try again later.",
+    });
+
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(payload.error).toMatch(/too many/i);
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when blob storage put fails", async () => {
+    putMock.mockRejectedValueOnce(new Error("Vercel Blob storage unavailable"));
+
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toMatch(/upload failed/i);
+    expect(convexMutationMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 when pre-flight query throws an unexpected error", async () => {
+    convexQueryMock.mockRejectedValueOnce(new Error("Internal server error"));
+
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_1"),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toMatch(/validate session/i);
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
   it("returns 200 and omits audioUrl on success", async () => {
     const response = await POST(
       new Request("https://example.com/api/listening-sessions/session_1/upload", {
