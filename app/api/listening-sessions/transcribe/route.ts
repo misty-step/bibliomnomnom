@@ -3,18 +3,18 @@ import { NextResponse } from "next/server";
 import { log, withObservability } from "@/lib/api/withObservability";
 import { requireListeningSessionEntitlement } from "@/lib/listening-sessions/entitlements";
 import {
+  isTrustedAudioHost,
   transcribeAudio,
   TranscribeHttpError,
   type TranscriptionResponse,
 } from "@/lib/listening-sessions/transcription";
 
+// Budget: 10s audio fetch + 25s ElevenLabs + 25s Deepgram = 60s worst-case.
+export const maxDuration = 60;
+
 type TranscribeRequest = {
   audioUrl: string;
 };
-
-function isTrustedAudioHost(hostname: string): boolean {
-  return hostname === "blob.vercel-storage.com" || hostname.endsWith(".blob.vercel-storage.com");
-}
 
 export const POST = withObservability(async (request: Request) => {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
@@ -97,8 +97,8 @@ export const POST = withObservability(async (request: Request) => {
   try {
     const transcription: TranscriptionResponse = await transcribeAudio(
       body.audioUrl,
-      deepgramKey,
       elevenLabsKey,
+      deepgramKey,
     );
 
     log("info", "listening_session_transcribed", {

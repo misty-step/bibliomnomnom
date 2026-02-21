@@ -155,28 +155,50 @@ describe("transcribeAudio", () => {
         }),
       } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "dg-key", undefined);
+    const result = await transcribeAudio(TRUSTED_URL, undefined, "dg-key");
     expect(result.transcript).toBe("Hello world");
     expect(result.provider).toBe("deepgram");
     expect(result.confidence).toBe(0.99);
   });
 
-  it("falls back to ElevenLabs when Deepgram fails", async () => {
+  it("falls back to Deepgram when ElevenLabs fails", async () => {
     mockFetch
       .mockResolvedValueOnce(makeResponse()) // readAudioFromUrl
       .mockResolvedValueOnce({
         ok: false,
         status: 503,
         text: async () => "bad",
-      } as unknown as Response) // Deepgram fails
+      } as unknown as Response) // ElevenLabs fails (primary)
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ text: "Elevenlabs result" }),
+        json: async () => ({
+          results: {
+            channels: [{ alternatives: [{ transcript: "Deepgram fallback result" }] }],
+          },
+        }),
       } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "dg-key", "el-key");
-    expect(result.transcript).toBe("Elevenlabs result");
-    expect(result.provider).toBe("elevenlabs");
+    const result = await transcribeAudio(TRUSTED_URL, "el-key", "dg-key");
+    expect(result.transcript).toBe("Deepgram fallback result");
+    expect(result.provider).toBe("deepgram");
+  });
+
+  it("falls back to Deepgram when ElevenLabs times out (AbortError)", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse()) // readAudioFromUrl
+      .mockRejectedValueOnce(new DOMException("The operation was aborted.", "AbortError")) // ElevenLabs timeout
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: {
+            channels: [{ alternatives: [{ transcript: "Deepgram after timeout" }] }],
+          },
+        }),
+      } as unknown as Response);
+
+    const result = await transcribeAudio(TRUSTED_URL, "el-key", "dg-key");
+    expect(result.transcript).toBe("Deepgram after timeout");
+    expect(result.provider).toBe("deepgram");
   });
 
   it("transcribes using ElevenLabs when only that key provided", async () => {
@@ -185,7 +207,7 @@ describe("transcribeAudio", () => {
       json: async () => ({ text: "ElevenLabs only" }),
     } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, undefined, "el-key");
+    const result = await transcribeAudio(TRUSTED_URL, "el-key", undefined);
     expect(result.provider).toBe("elevenlabs");
   });
 
@@ -195,15 +217,15 @@ describe("transcribeAudio", () => {
       .mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => "dg error",
-      } as unknown as Response)
+        text: async () => "el error",
+      } as unknown as Response) // ElevenLabs fails (primary)
       .mockResolvedValueOnce({
         ok: false,
         status: 500,
-        text: async () => "el error",
-      } as unknown as Response);
+        text: async () => "dg error",
+      } as unknown as Response); // Deepgram fails (fallback)
 
-    await expect(transcribeAudio(TRUSTED_URL, "dg-key", "el-key")).rejects.toThrow("deepgram");
+    await expect(transcribeAudio(TRUSTED_URL, "el-key", "dg-key")).rejects.toThrow("elevenlabs");
   });
 
   it("throws when Deepgram returns empty transcript", async () => {
@@ -212,7 +234,7 @@ describe("transcribeAudio", () => {
       json: async () => ({ results: { channels: [{ alternatives: [{ transcript: "   " }] }] } }),
     } as unknown as Response);
 
-    await expect(transcribeAudio(TRUSTED_URL, "dg-key", undefined)).rejects.toThrow(
+    await expect(transcribeAudio(TRUSTED_URL, undefined, "dg-key")).rejects.toThrow(
       "Deepgram returned an empty transcript",
     );
   });
@@ -223,7 +245,7 @@ describe("transcribeAudio", () => {
       json: async () => ({ text: "" }),
     } as unknown as Response);
 
-    await expect(transcribeAudio(TRUSTED_URL, undefined, "el-key")).rejects.toThrow(
+    await expect(transcribeAudio(TRUSTED_URL, "el-key", undefined)).rejects.toThrow(
       "ElevenLabs returned an empty transcript",
     );
   });
@@ -237,7 +259,7 @@ describe("transcribeAudio", () => {
       }),
     } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "dg-key", undefined);
+    const result = await transcribeAudio(TRUSTED_URL, undefined, "dg-key");
     expect(result.transcript).toBe("test");
     // Verify model param was sent in the URL
     const callUrl = String(mockFetch.mock.calls[1]?.[0]);

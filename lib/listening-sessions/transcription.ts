@@ -40,7 +40,7 @@ async function fetchWithTimeout(
   }
 }
 
-function isTrustedAudioHost(hostname: string): boolean {
+export function isTrustedAudioHost(hostname: string): boolean {
   return hostname === "blob.vercel-storage.com" || hostname.endsWith(".blob.vercel-storage.com");
 }
 
@@ -100,7 +100,9 @@ export async function readAudioFromUrl(
     throw new TranscribeHttpError(400, "Untrusted audio host");
   }
 
-  const response = await fetchWithTimeout(audioUrl, { redirect: "error" });
+  // Vercel Blob is same-infra; 10s is generous. Keeps total budget
+  // (10s fetch + 25s ElevenLabs + 25s Deepgram) within 60s maxDuration.
+  const response = await fetchWithTimeout(audioUrl, { redirect: "error" }, 10_000);
   if (!response.ok) {
     throw new Error(`Failed to fetch uploaded audio: ${response.status}`);
   }
@@ -136,7 +138,7 @@ async function transcribeWithDeepgram(params: {
       },
       body: params.audioBytes,
     },
-    60_000,
+    25_000,
   );
 
   if (!response.ok) {
@@ -189,7 +191,7 @@ async function transcribeWithElevenLabs(params: {
       },
       body: formData,
     },
-    60_000,
+    25_000,
   );
 
   if (!response.ok) {
@@ -215,11 +217,11 @@ async function transcribeWithElevenLabs(params: {
 
 export async function transcribeAudio(
   audioUrl: string,
-  deepgramKey: string | undefined,
   elevenLabsKey: string | undefined,
+  deepgramKey: string | undefined,
 ): Promise<TranscriptionResponse> {
-  const deepgramApiKey = deepgramKey?.trim();
   const elevenLabsApiKey = elevenLabsKey?.trim();
+  const deepgramApiKey = deepgramKey?.trim();
   if (!deepgramApiKey && !elevenLabsApiKey) {
     throw new Error("No STT provider is configured. Set DEEPGRAM_API_KEY or ELEVENLABS_API_KEY.");
   }
@@ -229,19 +231,9 @@ export async function transcribeAudio(
   const providerErrors: string[] = [];
   let transcription: TranscriptionResponse | null = null;
 
-  if (deepgramApiKey) {
-    try {
-      transcription = await transcribeWithDeepgram({
-        apiKey: deepgramApiKey,
-        audioBytes: bytes,
-        mimeType,
-      });
-    } catch (error) {
-      providerErrors.push(`deepgram: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  if (!transcription && elevenLabsApiKey) {
+  // ElevenLabs Scribe v2 is the primary provider (higher accuracy, lower cost).
+  // Deepgram Nova-3 is the fallback.
+  if (elevenLabsApiKey) {
     try {
       transcription = await transcribeWithElevenLabs({
         apiKey: elevenLabsApiKey,
@@ -250,6 +242,18 @@ export async function transcribeAudio(
       });
     } catch (error) {
       providerErrors.push(`elevenlabs: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  if (!transcription && deepgramApiKey) {
+    try {
+      transcription = await transcribeWithDeepgram({
+        apiKey: deepgramApiKey,
+        audioBytes: bytes,
+        mimeType,
+      });
+    } catch (error) {
+      providerErrors.push(`deepgram: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
