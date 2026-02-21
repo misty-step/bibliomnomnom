@@ -3,9 +3,12 @@
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
+import { useMutation } from "convex/react";
 import { Star, Headphones } from "lucide-react";
 
+import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { useToast } from "@/hooks/use-toast";
 
 type BookTileProps = {
   book: Doc<"books">;
@@ -13,8 +16,15 @@ type BookTileProps = {
 
 export function BookTile({ book }: BookTileProps) {
   const router = useRouter();
+  const updateStatus = useMutation(api.books.updateStatus);
   const shouldReduce = useReducedMotion();
+  const { toast } = useToast();
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
+  const statusAction = getStatusAction(book.status);
+
+  const hasMeta =
+    typeof book.publishedYear === "number" || Boolean(book.isAudiobook) || Boolean(book.isFavorite);
+  const hasFooter = hasMeta || statusAction;
 
   const isOptimizable = (src: string) => {
     if (src.startsWith("/")) return true;
@@ -44,6 +54,50 @@ export function BookTile({ book }: BookTileProps) {
       navigate();
     }
   };
+
+  const handleStatusActionClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (!statusAction) {
+      return;
+    }
+
+    void updateStatus({
+      id: book._id,
+      status: statusAction.nextStatus,
+    }).catch(() => {
+      toast({
+        title: "Update failed",
+        description: "Could not change status. Please try again.",
+        variant: "destructive",
+      });
+    });
+  };
+
+  const footer = hasFooter ? (
+    <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
+      <div className="flex items-center gap-2">
+        {book.publishedYear ? (
+          <span className="font-mono text-xs text-text-inkSubtle">{book.publishedYear}</span>
+        ) : null}
+        <div className="flex gap-2">
+          {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
+          {book.isFavorite && (
+            <Star className="h-3.5 w-3.5 fill-accent-favorite text-accent-favorite" />
+          )}
+        </div>
+      </div>
+      {statusAction ? (
+        <button
+          type="button"
+          onClick={handleStatusActionClick}
+          onKeyDown={(event) => event.stopPropagation()}
+          className="text-xs font-sans font-medium text-text-inkMuted hover:text-text-ink transition-colors duration-fast"
+        >
+          {statusAction.label}
+        </button>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <motion.article
@@ -99,19 +153,7 @@ export function BookTile({ book }: BookTileProps) {
                   </p>
                 ) : null}
               </div>
-              {(book.publishedYear || book.isAudiobook || book.isFavorite) && (
-                <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
-                  <span className="font-mono text-xs text-text-inkSubtle">
-                    {book.publishedYear ?? ""}
-                  </span>
-                  <div className="flex gap-2">
-                    {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
-                    {book.isFavorite && (
-                      <Star className="h-3.5 w-3.5 fill-accent-favorite text-accent-favorite" />
-                    )}
-                  </div>
-                </div>
-              )}
+              {footer}
             </div>
           </>
         ) : (
@@ -126,17 +168,7 @@ export function BookTile({ book }: BookTileProps) {
                 </p>
               ) : null}
             </div>
-            {(book.publishedYear || book.isAudiobook || book.isFavorite) && (
-              <div className="mt-2 flex w-full items-end justify-between border-t border-line-ghost/50 pt-2">
-                <span className="font-mono text-xs text-text-inkSubtle">{book.publishedYear}</span>
-                <div className="flex gap-2">
-                  {book.isAudiobook && <Headphones className="h-3.5 w-3.5 text-text-inkMuted" />}
-                  {book.isFavorite && (
-                    <Star className="h-3.5 w-3.5 fill-accent-favorite text-accent-favorite" />
-                  )}
-                </div>
-              </div>
-            )}
+            {footer}
           </div>
         )}
       </div>
@@ -150,4 +182,18 @@ export function BookTileSkeleton() {
       <div className="aspect-[2/3] w-full rounded-sm bg-text-ink/5" />
     </div>
   );
+}
+
+function getStatusAction(
+  status: Doc<"books">["status"],
+): { label: string; nextStatus: Doc<"books">["status"] } | null {
+  if (status === "want-to-read") {
+    return { label: "Start Reading", nextStatus: "currently-reading" };
+  }
+
+  if (status === "currently-reading") {
+    return { label: "Mark as Read", nextStatus: "read" };
+  }
+
+  return null;
 }

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { BookTile, BookTileSkeleton } from "./BookTile";
 import { AddBookSheet } from "./AddBookSheet";
@@ -11,9 +10,9 @@ import { cn } from "@/lib/utils";
 import { pluralize } from "@/lib/format";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { WelcomeCard } from "@/components/onboarding/WelcomeCard";
+import { ExportButton } from "@/components/library/ExportButton";
 import { Button } from "@/components/ui/button";
-import { BookOpen, Star, Library, Upload, BookPlus } from "lucide-react";
+import { BookOpen, BookMarked, Star, Library, Upload, BookPlus } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,20 +21,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { FetchMissingCoversButton } from "./FetchMissingCoversButton";
 
-type FilterType = "library" | "to-read" | "favorites";
+type FilterType = "currently-reading" | "read" | "want-to-read" | "favorites";
 
 export function BookGrid() {
   const router = useRouter();
   const allBooks = useAuthedQuery(api.books.list, {});
-  const [activeFilter, setActiveFilter] = useState<FilterType>("library");
+  const [activeFilter, setActiveFilter] = useState<FilterType>("currently-reading");
   const [manualAddOpen, setManualAddOpen] = useState(false);
 
   // Compute counts and filtered books
-  const { counts, libraryBooks, toReadBooks, favoriteBooks } = useMemo(() => {
+  const { counts, readingBooks, readBooks, toReadBooks, favoriteBooks } = useMemo(() => {
     if (!allBooks) {
       return {
-        counts: { library: 0, toRead: 0, favorites: 0 },
-        libraryBooks: { reading: [], finished: [] },
+        counts: { currentlyReading: 0, read: 0, wantToRead: 0, favorites: 0 },
+        readingBooks: [],
+        readBooks: [],
         toReadBooks: [],
         favoriteBooks: [],
       };
@@ -48,11 +48,13 @@ export function BookGrid() {
 
     return {
       counts: {
-        library: reading.length + finished.length,
-        toRead: toRead.length,
+        currentlyReading: reading.length,
+        read: finished.length,
+        wantToRead: toRead.length,
         favorites: favorites.length,
       },
-      libraryBooks: { reading, finished },
+      readingBooks: reading,
+      readBooks: finished,
       toReadBooks: toRead,
       favoriteBooks: favorites,
     };
@@ -63,8 +65,19 @@ export function BookGrid() {
   }
 
   const filters = [
-    { label: "Library", type: "library" as FilterType, count: counts.library, icon: Library },
-    { label: "Queue", type: "to-read" as FilterType, count: counts.toRead, icon: BookOpen },
+    {
+      label: "Currently Reading",
+      type: "currently-reading" as FilterType,
+      count: counts.currentlyReading,
+      icon: BookOpen,
+    },
+    { label: "Read", type: "read" as FilterType, count: counts.read, icon: Library },
+    {
+      label: "Want to Read",
+      type: "want-to-read" as FilterType,
+      count: counts.wantToRead,
+      icon: BookMarked,
+    },
     { label: "Favorites", type: "favorites" as FilterType, count: counts.favorites, icon: Star },
   ];
 
@@ -118,6 +131,7 @@ export function BookGrid() {
           {/* Add Book Dropdown */}
           <div className="flex items-center gap-3">
             <FetchMissingCoversButton hidden={!allBooks || allBooks.length === 0} />
+            <ExportButton />
             <AddBookButton
               onManualAdd={() => setManualAddOpen(true)}
               onImport={() => router.push("/import")}
@@ -127,15 +141,21 @@ export function BookGrid() {
 
         {/* Content */}
         <div className="min-h-[50vh]">
-          {activeFilter === "library" && (
-            <LibraryView
-              readingBooks={libraryBooks.reading}
-              finishedBooks={libraryBooks.finished}
+          {activeFilter === "currently-reading" && (
+            <CurrentlyReadingView
+              books={readingBooks}
               onManualAdd={() => setManualAddOpen(true)}
               onImport={() => router.push("/import")}
             />
           )}
-          {activeFilter === "to-read" && (
+          {activeFilter === "read" && (
+            <ReadView
+              books={readBooks}
+              onManualAdd={() => setManualAddOpen(true)}
+              onImport={() => router.push("/import")}
+            />
+          )}
+          {activeFilter === "want-to-read" && (
             <ToReadView
               books={toReadBooks}
               onManualAdd={() => setManualAddOpen(true)}
@@ -292,47 +312,20 @@ function FinishedBooksTimeline({ books }: { books: Book[] }) {
   );
 }
 
-// Library View - sectioned into Currently Reading and Finished
-function LibraryView({
-  readingBooks,
-  finishedBooks,
+function CurrentlyReadingView({
+  books,
   onManualAdd,
   onImport,
 }: {
-  readingBooks: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
-  finishedBooks: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+  books: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
   onManualAdd: () => void;
   onImport: () => void;
 }) {
-  // Get subscription to detect first-time users
-  const subscription = useQuery(api.subscriptions.get);
-
-  const hasReading = readingBooks && readingBooks.length > 0;
-  const hasFinished = finishedBooks && finishedBooks.length > 0;
-  const isEmpty = !hasReading && !hasFinished;
-
-  // Detect first-time user: subscription created within last 60 seconds
-  // Capture mount time in state to avoid calling Date.now() during render
-  const [mountTime] = useState(() => Date.now());
-  const isFirstTime = subscription?.createdAt && mountTime - subscription.createdAt < 60_000;
-
-  if (isEmpty) {
-    // Show WelcomeCard for first-time users
-    if (isFirstTime && subscription) {
-      return (
-        <WelcomeCard
-          daysRemaining={subscription.daysRemaining ?? 14}
-          onImport={onImport}
-          onAddBook={onManualAdd}
-        />
-      );
-    }
-
-    // Show standard EmptyState for returning users with empty library
+  if (!books || books.length === 0) {
     return (
       <EmptyState
-        title="Your shelves are empty"
-        description="Add books to start tracking your reading journey."
+        title="Nothing in progress"
+        description="Start a book and it'll show up here."
         action={
           <div className="flex items-center gap-4">
             <Button onClick={onManualAdd}>Add a Book</Button>
@@ -348,24 +341,39 @@ function LibraryView({
     );
   }
 
-  return (
-    <div className="space-y-16">
-      {/* Currently Reading Section */}
-      {hasReading && (
-        <section>
-          <SectionHeader>Currently Reading</SectionHeader>
-          <BooksGrid books={readingBooks} />
-        </section>
-      )}
+  return <BooksGrid books={books} />;
+}
 
-      {/* Finished Section - Timeline View */}
-      {hasFinished && (
-        <section>
-          <FinishedBooksTimeline books={finishedBooks} />
-        </section>
-      )}
-    </div>
-  );
+function ReadView({
+  books,
+  onManualAdd,
+  onImport,
+}: {
+  books: ReturnType<typeof useAuthedQuery<typeof api.books.list>>;
+  onManualAdd: () => void;
+  onImport: () => void;
+}) {
+  if (!books || books.length === 0) {
+    return (
+      <EmptyState
+        title="No books read yet"
+        description="Mark a book as read and it'll appear here."
+        action={
+          <div className="flex items-center gap-4">
+            <Button onClick={onManualAdd}>Add a Book</Button>
+            <button
+              onClick={onImport}
+              className="font-sans text-sm text-text-inkMuted hover:text-text-ink transition-colors duration-fast"
+            >
+              or import
+            </button>
+          </div>
+        }
+      />
+    );
+  }
+
+  return <FinishedBooksTimeline books={books} />;
 }
 
 // To Read View
@@ -417,16 +425,6 @@ function FavoritesView({
   }
 
   return <BooksGrid books={books} />;
-}
-
-// Shared Components
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mb-8 flex items-center gap-4">
-      <h2 className="font-display text-2xl font-medium text-text-ink">{children}</h2>
-      <div className="h-px flex-1 bg-line-ghost" />
-    </div>
-  );
 }
 
 function BooksGrid({
