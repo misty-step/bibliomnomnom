@@ -163,17 +163,17 @@ function getUsageTokens(usage: unknown): { promptTokens: number; completionToken
   const completionTokensRaw = asRecord.completion_tokens ?? asRecord.output_tokens;
   const totalTokensRaw = asRecord.total_tokens;
 
-  const promptTokens =
-    typeof promptTokensRaw === "number" && Number.isFinite(promptTokensRaw)
-      ? Math.max(0, Math.floor(promptTokensRaw))
-      : typeof totalTokensRaw === "number" && Number.isFinite(totalTokensRaw)
-        ? Math.max(0, Math.floor(totalTokensRaw))
-        : 0;
-
   const completionTokens =
     typeof completionTokensRaw === "number" && Number.isFinite(completionTokensRaw)
       ? Math.max(0, Math.floor(completionTokensRaw))
       : 0;
+
+  const promptTokens =
+    typeof promptTokensRaw === "number" && Number.isFinite(promptTokensRaw)
+      ? Math.max(0, Math.floor(promptTokensRaw))
+      : typeof totalTokensRaw === "number" && Number.isFinite(totalTokensRaw)
+        ? Math.max(0, Math.floor(totalTokensRaw) - completionTokens)
+        : 0;
 
   return { promptTokens, completionTokens };
 }

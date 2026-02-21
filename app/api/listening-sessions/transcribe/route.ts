@@ -123,18 +123,11 @@ export const POST = withObservability(async (request: Request) => {
       transcription.provider === "deepgram" && Boolean(elevenLabsKey?.trim());
 
     try {
-      const session = await entitlement.convex.query(api.listeningSessions.get, {
+      await entitlement.convex.mutation(api.listeningSessions.recordTranscribeTelemetry, {
         sessionId: body.sessionId,
+        transcribeLatencyMs,
+        transcribeFallbackUsed,
       });
-      if (session && (session.status === "recording" || session.status === "transcribing")) {
-        await entitlement.convex.mutation(api.listeningSessions.markTranscribing, {
-          sessionId: body.sessionId,
-          durationMs: session.durationMs ?? 0,
-          capReached: session.capReached,
-          transcribeLatencyMs,
-          transcribeFallbackUsed,
-        });
-      }
     } catch (error) {
       log("warn", "listening_session_transcribe_telemetry_update_failed", {
         requestId,

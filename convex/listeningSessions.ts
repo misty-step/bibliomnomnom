@@ -491,16 +491,13 @@ export const getDebugStats = internalQuery({
 export const getDailyUserCost = internalQuery({
   args: { userId: v.id("users"), dayStartMs: v.number(), dayEndMs: v.number() },
   handler: async (ctx, { userId, dayStartMs, dayEndMs }) => {
-    const sessions = await ctx.db
+    const inRange = await ctx.db
       .query("listeningSessions")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .withIndex("by_user_updatedAt", (q) => q.eq("userId", userId).gte("updatedAt", dayStartMs))
+      .filter((q) =>
+        q.and(q.lte(q.field("updatedAt"), dayEndMs), q.neq(q.field("estimatedCostUsd"), undefined)),
+      )
       .collect();
-    const inRange = sessions.filter(
-      (session) =>
-        session.updatedAt >= dayStartMs &&
-        session.updatedAt <= dayEndMs &&
-        session.estimatedCostUsd !== undefined,
-    );
     const totalCostUsd = inRange.reduce((sum, session) => sum + (session.estimatedCostUsd ?? 0), 0);
     return {
       totalCostUsd: Math.round(totalCostUsd * 10000) / 10000,
@@ -620,6 +617,25 @@ export const markTranscribing = mutation({
         sessionId: args.sessionId,
       });
     }
+  },
+});
+
+// Telemetry-only mutation: records post-transcription metrics without touching
+// session state fields (status, endedAt, transcriptLive).
+export const recordTranscribeTelemetry = mutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    transcribeLatencyMs: v.number(),
+    transcribeFallbackUsed: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    await ctx.db.patch(session._id, {
+      transcribeLatencyMs: Math.max(0, Math.floor(args.transcribeLatencyMs)),
+      transcribeFallbackUsed: args.transcribeFallbackUsed,
+      updatedAt: Date.now(),
+    });
   },
 });
 
