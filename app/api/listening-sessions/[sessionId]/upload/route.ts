@@ -151,9 +151,45 @@ async function handleUpload(request: Request, context: RouteContext) {
     );
   }
 
+  // Validate session ownership and readiness before consuming blob storage quota.
+  // This prevents orphaned blobs when the sessionId is invalid or not in "recording" state.
+  try {
+    const session = await entitlement.convex.query(api.listeningSessions.get, {
+      sessionId: sessionId as Id<"listeningSessions">,
+    });
+    if (session && session.status !== "recording") {
+      return NextResponse.json(
+        { error: "Session is not ready for upload." },
+        { status: 400, headers: { "x-request-id": requestId } },
+      );
+    }
+  } catch (error) {
+    const classified = classifyMutationError(error);
+    if (classified) {
+      return NextResponse.json(
+        { error: classified.message },
+        { status: classified.status, headers: { "x-request-id": requestId } },
+      );
+    }
+    captureError(error, {
+      tags: { api: "listening-session-upload" },
+      extra: { requestId, sessionId, userId },
+    });
+    return NextResponse.json(
+      { error: "Failed to validate session." },
+      { status: 500, headers: { "x-request-id": requestId } },
+    );
+  }
+
   try {
     const extension = extensionForAudioMimeType(contentType ?? DEFAULT_AUDIO_MIME_TYPE);
     const pathname = `listening-sessions/${sessionId}-${Date.now()}.${extension}`;
+    // NOTE: @vercel/blob v2 only supports access: "public" at the per-blob level.
+    // Audio URLs are kept private by: (1) opaque sessionId+timestamp path, (2) audioUrl
+    // stripped from all client-accessible Convex queries, (3) playback routed through
+    // the auth-gated /api/listening-sessions/[sessionId]/audio proxy. Upgrading to a
+    // Vercel Blob private store would add enforcement-level access control.
+    // See: https://github.com/misty-step/bibliomnomnom/issues/160
     const uploaded = await put(pathname, audioBytes, {
       access: "public",
       contentType: contentType ?? DEFAULT_AUDIO_MIME_TYPE,

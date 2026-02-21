@@ -67,6 +67,8 @@ describe("listening session upload route", () => {
     });
     convexSetAuthMock.mockReset();
     convexQueryMock.mockReset();
+    // Default: session exists and is in "recording" state (ready for upload).
+    convexQueryMock.mockResolvedValue({ status: "recording" });
     convexMutationMock.mockReset();
     putMock.mockReset();
     putMock.mockResolvedValue({
@@ -136,8 +138,10 @@ describe("listening session upload route", () => {
     expect(convexMutationMock).not.toHaveBeenCalled();
   });
 
-  it("returns 404 when session is not found or not owned by user", async () => {
-    convexMutationMock.mockRejectedValueOnce(new Error("Session not found or access denied"));
+  it("returns 404 before blob upload when session is not found or not owned", async () => {
+    convexQueryMock.mockRejectedValueOnce(
+      new Error("Listening session not found or access denied"),
+    );
 
     const response = await POST(
       new Request("https://example.com/api/listening-sessions/session_missing/upload", {
@@ -149,9 +153,29 @@ describe("listening session upload route", () => {
     );
 
     expect(response.status).toBe(404);
+    expect(putMock).not.toHaveBeenCalled();
+    expect(convexMutationMock).not.toHaveBeenCalled();
   });
 
-  it("returns 400 when session transition is invalid", async () => {
+  it("returns 400 before blob upload when session is not in recording state", async () => {
+    convexQueryMock.mockResolvedValueOnce({ status: "transcribing" });
+
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_1/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_1"),
+    );
+
+    expect(response.status).toBe(400);
+    expect(putMock).not.toHaveBeenCalled();
+    expect(convexMutationMock).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when session transition is invalid (race condition after pre-check)", async () => {
+    // Pre-check passes (session was recording), but state changed before mutation completes.
     convexMutationMock.mockRejectedValueOnce(
       new Error("Invalid session transition from complete to transcribing"),
     );
