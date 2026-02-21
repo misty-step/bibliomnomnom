@@ -12,12 +12,14 @@ import {
   type SynthesisArtifacts,
   type SynthesisContext,
 } from "@/lib/listening-sessions/synthesis";
+import { ALERT_THRESHOLDS } from "@/lib/listening-sessions/alertThresholds";
 import { getListeningSynthesisConfig } from "@/lib/listening-sessions/synthesisConfig";
 import { buildListeningSynthesisPrompt } from "@/lib/listening-sessions/synthesisPrompt";
 
 type SynthesizeRequest = {
   transcript: string;
   bookId: Id<"books">;
+  sessionId?: Id<"listeningSessions">;
 };
 
 const MAX_SYNTHESIS_TRANSCRIPT_CHARS = 50_000;
@@ -140,6 +142,76 @@ function makeFallbackArtifacts(transcript: string, context?: SynthesisContext): 
   });
 }
 
+function estimateCostUsd(model: string, promptTokens: number, completionTokens: number): number {
+  const COST_PER_1M: Record<string, { input: number; output: number }> = {
+    "google/gemini": { input: 1.25, output: 10.0 },
+    "anthropic/claude": { input: 15.0, output: 75.0 },
+    "openai/gpt": { input: 10.0, output: 30.0 },
+  };
+  const family = Object.keys(COST_PER_1M).find((key) => model.startsWith(key)) ?? "google/gemini";
+  const rates = COST_PER_1M[family]!;
+  return (promptTokens * rates.input + completionTokens * rates.output) / 1_000_000;
+}
+
+function getUsageTokens(usage: unknown): { promptTokens: number; completionTokens: number } {
+  const asRecord =
+    usage && typeof usage === "object"
+      ? (usage as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+
+  const promptTokensRaw = asRecord.prompt_tokens ?? asRecord.input_tokens;
+  const completionTokensRaw = asRecord.completion_tokens ?? asRecord.output_tokens;
+  const totalTokensRaw = asRecord.total_tokens;
+
+  const promptTokens =
+    typeof promptTokensRaw === "number" && Number.isFinite(promptTokensRaw)
+      ? Math.max(0, Math.floor(promptTokensRaw))
+      : typeof totalTokensRaw === "number" && Number.isFinite(totalTokensRaw)
+        ? Math.max(0, Math.floor(totalTokensRaw))
+        : 0;
+
+  const completionTokens =
+    typeof completionTokensRaw === "number" && Number.isFinite(completionTokensRaw)
+      ? Math.max(0, Math.floor(completionTokensRaw))
+      : 0;
+
+  return { promptTokens, completionTokens };
+}
+
+function logSessionCostGuardrails(params: {
+  sessionId?: Id<"listeningSessions">;
+  estimatedCostUsd: number;
+  model: string;
+}) {
+  const sessionId = params.sessionId ?? "unknown";
+
+  if (params.estimatedCostUsd > ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD) {
+    console.error(
+      JSON.stringify({
+        msg: "listening_session_cost_cap_exceeded",
+        sessionId,
+        estimatedCostUsd: params.estimatedCostUsd,
+        model: params.model,
+        hardCapUsd: ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD,
+        level: "error",
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  } else if (params.estimatedCostUsd > ALERT_THRESHOLDS.SESSION_COST_WARN_USD) {
+    console.warn(
+      JSON.stringify({
+        msg: "listening_session_cost_elevated",
+        sessionId,
+        estimatedCostUsd: params.estimatedCostUsd,
+        model: params.model,
+        warnThresholdUsd: ALERT_THRESHOLDS.SESSION_COST_WARN_USD,
+        level: "warn",
+        timestamp: new Date().toISOString(),
+      }),
+    );
+  }
+}
+
 export const POST = withObservability(async (request: Request) => {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const { userId, getToken } = await auth();
@@ -152,7 +224,11 @@ export const POST = withObservability(async (request: Request) => {
 
   let body: SynthesizeRequest;
   try {
-    const parsed = (await request.json()) as Partial<{ transcript: unknown; bookId: unknown }>;
+    const parsed = (await request.json()) as Partial<{
+      transcript: unknown;
+      bookId: unknown;
+      sessionId: unknown;
+    }>;
     if (!parsed.transcript || typeof parsed.transcript !== "string") {
       return NextResponse.json(
         { error: "transcript is required." },
@@ -165,9 +241,22 @@ export const POST = withObservability(async (request: Request) => {
         { status: 400, headers: { "x-request-id": requestId } },
       );
     }
+    if (
+      parsed.sessionId !== undefined &&
+      (typeof parsed.sessionId !== "string" || !parsed.sessionId.trim())
+    ) {
+      return NextResponse.json(
+        { error: "sessionId must be a non-empty string when provided." },
+        { status: 400, headers: { "x-request-id": requestId } },
+      );
+    }
     body = {
       transcript: parsed.transcript.trim(),
       bookId: parsed.bookId.trim() as Id<"books">,
+      sessionId:
+        typeof parsed.sessionId === "string"
+          ? (parsed.sessionId.trim() as Id<"listeningSessions">)
+          : undefined,
     };
   } catch {
     return NextResponse.json(
@@ -206,6 +295,7 @@ export const POST = withObservability(async (request: Request) => {
     transcriptRaw.length > MAX_SYNTHESIS_TRANSCRIPT_CHARS
       ? transcriptRaw.slice(0, MAX_SYNTHESIS_TRANSCRIPT_CHARS)
       : transcriptRaw;
+  const synthesisStart = Date.now();
 
   let context: SynthesisContext | undefined;
   try {
@@ -220,15 +310,48 @@ export const POST = withObservability(async (request: Request) => {
     });
   }
 
+  const config = getListeningSynthesisConfig();
+  const patchSynthesisTelemetry = async (params: {
+    synthesisLatencyMs: number;
+    synthesisProvider: string;
+    degradedMode: boolean;
+    estimatedCostUsd: number;
+  }) => {
+    if (!body.sessionId) return;
+    try {
+      await entitlement.convex.mutation(api.listeningSessions.markSynthesizing, {
+        sessionId: body.sessionId,
+        synthesisLatencyMs: params.synthesisLatencyMs,
+        synthesisProvider: params.synthesisProvider,
+        degradedMode: params.degradedMode,
+        estimatedCostUsd: params.estimatedCostUsd,
+      });
+    } catch (error) {
+      log("warn", "listening_session_synthesizing_telemetry_update_failed", {
+        requestId,
+        userIdSuffix: userId.slice(-6),
+        sessionId: body.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
   const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!openRouterApiKey) {
+    const fallback = makeFallbackArtifacts(transcript, context);
+    const synthesisLatencyMs = Date.now() - synthesisStart;
+    await patchSynthesisTelemetry({
+      synthesisLatencyMs,
+      synthesisProvider: config.model,
+      degradedMode: true,
+      estimatedCostUsd: 0,
+    });
     return NextResponse.json(
-      { artifacts: makeFallbackArtifacts(transcript, context), source: "fallback" },
+      { artifacts: fallback, source: "fallback", estimatedCostUsd: 0 },
       { headers: { "x-request-id": requestId } },
     );
   }
 
-  const config = getListeningSynthesisConfig();
   try {
     const { content, raw } = await openRouterChatCompletion({
       apiKey: openRouterApiKey,
@@ -272,6 +395,22 @@ export const POST = withObservability(async (request: Request) => {
     const parsed = JSON.parse(content) as unknown;
     const artifacts = normalizeArtifacts(parsed);
     const resolvedModel = raw.model ?? config.model;
+    const { promptTokens, completionTokens } = getUsageTokens(raw.usage);
+    const estimatedCostUsd = estimateCostUsd(resolvedModel, promptTokens, completionTokens);
+    const synthesisLatencyMs = Date.now() - synthesisStart;
+
+    logSessionCostGuardrails({
+      sessionId: body.sessionId,
+      estimatedCostUsd,
+      model: config.model,
+    });
+    await patchSynthesisTelemetry({
+      synthesisLatencyMs,
+      synthesisProvider: resolvedModel,
+      degradedMode: false,
+      estimatedCostUsd,
+    });
+
     log("info", "listening_session_synthesized", {
       requestId,
       userIdSuffix: userId.slice(-6),
@@ -281,27 +420,45 @@ export const POST = withObservability(async (request: Request) => {
       temperature: config.temperature,
       maxTokens: config.maxTokens,
       usage: raw.usage,
+      synthesisLatencyMs,
+      estimatedCostUsd,
       transcriptChars: transcript.length,
       transcriptClamped: transcript.length !== transcriptRaw.length,
       insightCount: artifacts.insights.length,
       quoteCount: artifacts.quotes.length,
     });
     return NextResponse.json(
-      { artifacts, source: "openrouter", model: resolvedModel, requestedModel: config.model },
+      {
+        artifacts,
+        source: "openrouter",
+        model: resolvedModel,
+        requestedModel: config.model,
+        estimatedCostUsd,
+      },
       { headers: { "x-request-id": requestId } },
     );
   } catch (error) {
     const isRateLimited = error instanceof OpenRouterApiError && error.status === 429;
     const fallback = makeFallbackArtifacts(transcript, context);
+    const synthesisLatencyMs = Date.now() - synthesisStart;
+
+    await patchSynthesisTelemetry({
+      synthesisLatencyMs,
+      synthesisProvider: config.model,
+      degradedMode: true,
+      estimatedCostUsd: 0,
+    });
+
     log(isRateLimited ? "warn" : "error", "listening_session_synthesis_fallback", {
       requestId,
       userIdSuffix: userId.slice(-6),
       model: config.model,
       error: error instanceof Error ? error.message : String(error),
       isRateLimited,
+      synthesisLatencyMs,
     });
     return NextResponse.json(
-      { artifacts: fallback, source: "fallback" },
+      { artifacts: fallback, source: "fallback", estimatedCostUsd: 0 },
       { headers: { "x-request-id": requestId } },
     );
   }

@@ -112,22 +112,59 @@ export const POST = withObservability(async (request: Request) => {
   }
 
   try {
+    const transcribeStart = Date.now();
     const transcription: TranscriptionResponse = await transcribeAudio(
       audioUrl,
       elevenLabsKey,
       deepgramKey,
     );
+    const transcribeLatencyMs = Date.now() - transcribeStart;
+    const transcribeFallbackUsed =
+      transcription.provider === "deepgram" && Boolean(elevenLabsKey?.trim());
+
+    try {
+      const session = await entitlement.convex.query(api.listeningSessions.get, {
+        sessionId: body.sessionId,
+      });
+      if (session && (session.status === "recording" || session.status === "transcribing")) {
+        await entitlement.convex.mutation(api.listeningSessions.markTranscribing, {
+          sessionId: body.sessionId,
+          durationMs: session.durationMs ?? 0,
+          capReached: session.capReached,
+          transcribeLatencyMs,
+          transcribeFallbackUsed,
+        });
+      }
+    } catch (error) {
+      log("warn", "listening_session_transcribe_telemetry_update_failed", {
+        requestId,
+        userIdSuffix: userId.slice(-6),
+        sessionId: body.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     log("info", "listening_session_transcribed", {
       requestId,
       userIdSuffix: userId.slice(-6),
       provider: transcription.provider,
+      transcribeLatencyMs,
+      transcribeFallbackUsed,
       transcriptChars: transcription.transcript.length,
     });
 
     return NextResponse.json(transcription, { headers: { "x-request-id": requestId } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Transcription failed";
+    try {
+      await entitlement.convex.mutation(api.listeningSessions.fail, {
+        sessionId: body.sessionId,
+        message,
+        failedStage: "transcribing",
+      });
+    } catch {
+      // no-op
+    }
     log("error", "listening_session_transcription_failed", {
       requestId,
       userIdSuffix: userId.slice(-6),
