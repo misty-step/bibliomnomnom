@@ -27,6 +27,16 @@ describe("estimateCostUsd", () => {
     expect(estimateCostUsd("google/gemini-2.0-flash", 0, 0)).toBe(0);
   });
 
+  it("clamps negative token inputs to non-negative cost", () => {
+    expect(estimateCostUsd("google/gemini-2.0-flash", -100, -50)).toBe(0);
+  });
+
+  it("handles one negative and one positive token input", () => {
+    // Negative prompt + positive completion: net could go negative, must clamp
+    const cost = estimateCostUsd("google/gemini-2.0-flash", -1_000_000, 100);
+    expect(cost).toBeGreaterThanOrEqual(0);
+  });
+
   it("handles realistic small session (1k prompt, 500 completion tokens)", () => {
     // google/gemini: (1000 * 1.25 + 500 * 10) / 1_000_000 = 0.000006250
     const cost = estimateCostUsd("google/gemini-2.0-flash", 1_000, 500);
@@ -89,5 +99,29 @@ describe("getUsageTokens", () => {
     expect(
       getUsageTokens({ prompt_tokens: 300, completion_tokens: 200, total_tokens: 9999 }),
     ).toEqual({ promptTokens: 300, completionTokens: 200 });
+  });
+
+  it("prefers prompt_tokens over input_tokens when both present", () => {
+    // OpenAI-style takes precedence via ?? operator
+    expect(
+      getUsageTokens({ prompt_tokens: 500, input_tokens: 999, completion_tokens: 100 }),
+    ).toEqual({ promptTokens: 500, completionTokens: 100 });
+  });
+
+  it("prefers completion_tokens over output_tokens when both present", () => {
+    expect(
+      getUsageTokens({ prompt_tokens: 100, completion_tokens: 200, output_tokens: 999 }),
+    ).toEqual({ promptTokens: 100, completionTokens: 200 });
+  });
+
+  it("clamps negative token values to zero", () => {
+    expect(getUsageTokens({ prompt_tokens: -100, completion_tokens: -50 })).toEqual({
+      promptTokens: 0,
+      completionTokens: 0,
+    });
+  });
+
+  it("returns zeros for empty object", () => {
+    expect(getUsageTokens({})).toEqual({ promptTokens: 0, completionTokens: 0 });
   });
 });

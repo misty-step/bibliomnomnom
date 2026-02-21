@@ -103,6 +103,24 @@ describe("logSessionCostGuardrails", () => {
     );
   });
 
+  it("does not log when cost is zero", () => {
+    const logFn = vi.fn();
+    logSessionCostGuardrails(
+      { sessionId: "sess-zero", estimatedCostUsd: 0, model: "google/gemini-2.0-flash" },
+      logFn,
+    );
+    expect(logFn).not.toHaveBeenCalled();
+  });
+
+  it("does not log when cost is negative", () => {
+    const logFn = vi.fn();
+    logSessionCostGuardrails(
+      { sessionId: "sess-neg", estimatedCostUsd: -0.5, model: "google/gemini-2.0-flash" },
+      logFn,
+    );
+    expect(logFn).not.toHaveBeenCalled();
+  });
+
   it("logs error (not warn) when cost exceeds both thresholds", () => {
     const logFn = vi.fn();
     // Hard cap > warn threshold by definition; exceeding hard cap should not also log warn
