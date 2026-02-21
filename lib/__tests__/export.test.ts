@@ -1,51 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Doc, Id } from "@/convex/_generated/dataModel";
 import { toCSV, toJSON, toMarkdown, type ExportData } from "@/lib/export";
-
-const fakeBookId = (id: string): Id<"books"> => id as Id<"books">;
-const fakeUserId = (id: string): Id<"users"> => id as Id<"users">;
-const fakeNoteId = (id: string): Id<"notes"> => id as Id<"notes">;
-
-const makeBook = (overrides: Partial<Doc<"books">> = {}): Doc<"books"> => ({
-  _id: fakeBookId("book_1"),
-  _creationTime: 0,
-  userId: fakeUserId("user_1"),
-  title: "Dune",
-  author: "Frank Herbert",
-  description: undefined,
-  isbn: undefined,
-  edition: undefined,
-  publishedYear: undefined,
-  pageCount: undefined,
-  status: "want-to-read",
-  isFavorite: false,
-  isAudiobook: false,
-  privacy: "private",
-  timesRead: 0,
-  dateStarted: undefined,
-  dateFinished: undefined,
-  coverUrl: undefined,
-  apiCoverUrl: undefined,
-  apiId: undefined,
-  apiSource: undefined,
-  createdAt: 0,
-  updatedAt: 0,
-  ...overrides,
-});
-
-const makeNote = (overrides: Partial<Doc<"notes">> = {}): Doc<"notes"> => ({
-  _id: fakeNoteId("note_1"),
-  _creationTime: 0,
-  bookId: fakeBookId("book_1"),
-  userId: fakeUserId("user_1"),
-  type: "note",
-  content: "A note",
-  page: undefined,
-  createdAt: 0,
-  updatedAt: 0,
-  ...overrides,
-});
+import { fakeBookId, fakeNoteId, makeBook, makeNote } from "./fixtures";
 
 const sampleExportData = (): ExportData => {
   const currentlyReading = makeBook({
@@ -138,5 +94,80 @@ describe("export helpers", () => {
     expect(output).toContain("**Notes:**");
     expect(output).toContain("- > In a hole in the ground there lived a hobbit.");
     expect(output).toContain("- A comfort reread.");
+  });
+});
+
+describe("export edge cases", () => {
+  const emptyData: ExportData = {
+    version: "1.0",
+    exportedAt: Date.UTC(2026, 0, 1),
+    books: [],
+    notes: [],
+  };
+
+  it("toJSON handles empty library", () => {
+    const parsed = JSON.parse(toJSON(emptyData)) as ExportData;
+    expect(parsed.books).toHaveLength(0);
+    expect(parsed.notes).toHaveLength(0);
+  });
+
+  it("toCSV produces header-only output for empty library", () => {
+    const output = toCSV(emptyData);
+    const lines = output.split("\n");
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain("Title,Author");
+  });
+
+  it("toMarkdown produces header-only output for empty library", () => {
+    const output = toMarkdown(emptyData);
+    expect(output).toContain("# My Library");
+    expect(output).not.toContain("##");
+  });
+
+  it("toCSV escapes double quotes in title and author", () => {
+    const data: ExportData = {
+      ...emptyData,
+      books: [makeBook({ title: "O'Brien's \"Finest\" Hour", author: 'She Said, "Run!"' })],
+    };
+    const output = toCSV(data);
+    const [, row] = output.split("\n");
+
+    // RFC 4180: double quotes inside quoted fields become ""
+    expect(row).toContain('"O\'Brien\'s ""Finest"" Hour"');
+    expect(row).toContain('"She Said, ""Run!"""');
+  });
+
+  it("toCSV wraps fields with commas in double quotes", () => {
+    const data: ExportData = {
+      ...emptyData,
+      books: [makeBook({ title: "East of Eden, West of Nothing", author: "Steinbeck, John" })],
+    };
+    const output = toCSV(data);
+    const [, row] = output.split("\n");
+
+    // Commas in values are safe inside double-quoted fields
+    expect(row).toContain('"East of Eden, West of Nothing"');
+    expect(row).toContain('"Steinbeck, John"');
+  });
+
+  it("toMarkdown omits Notes section for books without notes", () => {
+    const data: ExportData = {
+      ...emptyData,
+      books: [makeBook({ status: "read", title: "Solo Book" })],
+    };
+    const output = toMarkdown(data);
+    expect(output).toContain("### Solo Book");
+    expect(output).not.toContain("**Notes:**");
+  });
+
+  it("toMarkdown renders reflection notes as plain text (same as notes)", () => {
+    const book = makeBook({ _id: fakeBookId("b_refl"), status: "read", title: "Reflective" });
+    const data: ExportData = {
+      ...emptyData,
+      books: [book],
+      notes: [makeNote({ bookId: book._id, type: "reflection", content: "Deep thought" })],
+    };
+    const output = toMarkdown(data);
+    expect(output).toContain("- Deep thought");
   });
 });
