@@ -47,22 +47,31 @@ export const EMPTY_SYNTHESIS_ARTIFACTS: SynthesisArtifacts = {
   contextExpansions: [],
 };
 
+const MAX_SYNTH_ARTIFACT_ITEMS = 6;
+const MAX_CONTEXT_EXPANSION_ITEMS = 6;
+
 export function clampArtifacts(input: SynthesisArtifacts): SynthesisArtifacts {
   return {
-    insights: input.insights.slice(0, 8).map((insight) => ({
+    insights: input.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS).map((insight) => ({
       title: insight.title.trim().slice(0, 140),
       content: insight.content.trim().slice(0, 1200),
     })),
-    openQuestions: input.openQuestions.slice(0, 8).map((item) => item.trim().slice(0, 320)),
-    quotes: input.quotes.slice(0, 8).map((quote) => ({
+    openQuestions: input.openQuestions
+      .slice(0, MAX_SYNTH_ARTIFACT_ITEMS)
+      .map((item) => item.trim().slice(0, 320)),
+    quotes: input.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS).map((quote) => ({
       text: quote.text.trim().slice(0, 500),
       source: quote.source?.trim().slice(0, 200),
     })),
-    followUpQuestions: input.followUpQuestions.slice(0, 8).map((item) => item.trim().slice(0, 320)),
-    contextExpansions: input.contextExpansions.slice(0, 6).map((item) => ({
-      title: item.title.trim().slice(0, 140),
-      content: item.content.trim().slice(0, 1200),
-    })),
+    followUpQuestions: input.followUpQuestions
+      .slice(0, MAX_SYNTH_ARTIFACT_ITEMS)
+      .map((item) => item.trim().slice(0, 320)),
+    contextExpansions: input.contextExpansions
+      .slice(0, MAX_CONTEXT_EXPANSION_ITEMS)
+      .map((item) => ({
+        title: item.title.trim().slice(0, 140),
+        content: item.content.trim().slice(0, 1200),
+      })),
   };
 }
 

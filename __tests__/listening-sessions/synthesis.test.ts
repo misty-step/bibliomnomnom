@@ -26,10 +26,10 @@ describe("listening sessions synthesis helpers", () => {
     };
 
     const clamped = clampArtifacts(artifacts);
-    expect(clamped.insights).toHaveLength(8);
-    expect(clamped.openQuestions).toHaveLength(8);
-    expect(clamped.quotes).toHaveLength(8);
-    expect(clamped.followUpQuestions).toHaveLength(8);
+    expect(clamped.insights).toHaveLength(6);
+    expect(clamped.openQuestions).toHaveLength(6);
+    expect(clamped.quotes).toHaveLength(6);
+    expect(clamped.followUpQuestions).toHaveLength(6);
     expect(clamped.contextExpansions).toHaveLength(6);
 
     expect(clamped.insights[0]?.title).toBe("Title 0");
@@ -163,10 +163,10 @@ describe("normalizeArtifacts", () => {
       })),
     };
     const result = normalizeArtifacts(raw);
-    expect(result.insights).toHaveLength(8);
-    expect(result.openQuestions).toHaveLength(8);
-    expect(result.quotes).toHaveLength(8);
-    expect(result.followUpQuestions).toHaveLength(8);
+    expect(result.insights).toHaveLength(6);
+    expect(result.openQuestions).toHaveLength(6);
+    expect(result.quotes).toHaveLength(6);
+    expect(result.followUpQuestions).toHaveLength(6);
     expect(result.contextExpansions).toHaveLength(6);
   });
 });
