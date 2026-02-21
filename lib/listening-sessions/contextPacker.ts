@@ -181,6 +181,10 @@ export function packContext(
   const currentBookTitle = normalizeText(input.currentBook.title);
   const currentBookAuthor = normalizeText(input.currentBook.author);
 
+  // Always reserve budget for the current book's title+author — the synthesis
+  // prompt unconditionally emits them, so they must count against the cap.
+  tokensUsed += estimateBookItemTokens({ title: currentBookTitle, author: currentBookAuthor });
+
   let currentBookDescription: string | undefined;
   let descriptionIncluded = false;
   let privacyRedacted = false;

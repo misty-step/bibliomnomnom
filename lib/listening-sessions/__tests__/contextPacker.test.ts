@@ -239,6 +239,27 @@ describe("packContext", () => {
     expect(packed.summary.tokensUsed).toBeLessThanOrEqual(20);
   });
 
+  it("accounts for current book title and author tokens in budget", () => {
+    // "AAAAAAAAAAAAAAA BBBBBBBBBBBBBBB" = 31 chars = ceil(31/4) = 8 tokens for title+author
+    const packed = packContext(
+      makeInput({
+        currentBook: makeCurrentBook({
+          title: "AAAAAAAAAAAAAAA", // 15 chars
+          author: "BBBBBBBBBBBBBBB", // 15 chars
+          description: "some description", // 16 chars = 4 tokens
+          privacy: "public",
+        }),
+        books: [],
+        notes: [],
+      }),
+      { tokenBudget: 8, bookDescMaxChars: 2_000 },
+    );
+
+    // title+author exhaust the full 8-token budget; description must be excluded
+    expect(packed.summary.currentBook.descriptionIncluded).toBe(false);
+    expect(packed.summary.tokensUsed).toBeLessThanOrEqual(8);
+  });
+
   it("reduces oversized book lists to fit budget", () => {
     const books: ContextPackLibraryBook[] = [];
     for (let i = 0; i < 60; i += 1) {
