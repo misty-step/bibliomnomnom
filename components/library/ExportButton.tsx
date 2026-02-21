@@ -12,7 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { toJSON, toCSV, toMarkdown, downloadFile } from "@/lib/export";
+import { toJSON, toCSV, toMarkdown } from "@/lib/export";
+import { downloadFile } from "@/lib/download";
 import { useToast } from "@/hooks/use-toast";
 
 type ExportFormat = "json" | "csv" | "markdown";

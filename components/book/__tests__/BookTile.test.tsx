@@ -3,8 +3,6 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Doc, Id } from "@/convex/_generated/dataModel";
-
 const pushMock = vi.fn();
 const updateStatusMock = vi.fn();
 const toastMock = vi.fn();
@@ -41,36 +39,7 @@ vi.mock("framer-motion", () => ({
 }));
 
 import { BookTile } from "../BookTile";
-
-const fakeBookId = (id: string): Id<"books"> => id as Id<"books">;
-const fakeUserId = (id: string): Id<"users"> => id as Id<"users">;
-
-const makeBook = (overrides: Partial<Doc<"books">> = {}): Doc<"books"> => ({
-  _id: fakeBookId("book_1"),
-  _creationTime: 0,
-  userId: fakeUserId("user_1"),
-  title: "Dune",
-  author: "Frank Herbert",
-  description: undefined,
-  isbn: undefined,
-  edition: undefined,
-  publishedYear: undefined,
-  pageCount: undefined,
-  status: "want-to-read",
-  isFavorite: false,
-  isAudiobook: false,
-  privacy: "private",
-  timesRead: 0,
-  dateStarted: undefined,
-  dateFinished: undefined,
-  coverUrl: undefined,
-  apiCoverUrl: undefined,
-  apiId: undefined,
-  apiSource: undefined,
-  createdAt: 0,
-  updatedAt: 0,
-  ...overrides,
-});
+import { fakeBookId, makeBook } from "@/lib/__tests__/fixtures";
 
 describe("BookTile status actions", () => {
   beforeEach(() => {
