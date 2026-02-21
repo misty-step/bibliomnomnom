@@ -411,8 +411,8 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
         },
       );
 
-      // Note: uploadAudioToServer calls saveAudioUrlAndMarkTranscribing on the server,
-      // which already transitions the session to "transcribing". No separate call needed.
+      // Note: uploadAudioToServer calls markTranscribing on the server,
+      // which transitions the session to "transcribing". No separate call needed.
       const transcription = await requestTranscription(sessionId);
       await markSynthesizing({ sessionId });
 

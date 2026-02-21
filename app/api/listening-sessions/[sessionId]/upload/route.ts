@@ -201,7 +201,7 @@ async function handleUpload(request: Request, context: RouteContext) {
       contentType: contentType ?? DEFAULT_AUDIO_MIME_TYPE,
     });
 
-    await entitlement.convex.mutation(api.listeningSessions.saveAudioUrlAndMarkTranscribing, {
+    await entitlement.convex.mutation(api.listeningSessions.markTranscribing, {
       sessionId: sessionId as Id<"listeningSessions">,
       audioUrl: uploaded.url,
       durationMs,

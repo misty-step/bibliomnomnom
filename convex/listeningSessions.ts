@@ -101,6 +101,11 @@ function truncate(input: string, maxChars: number): string {
   return `${normalized.slice(0, maxChars - 1)}…`;
 }
 
+/**
+ * @security Strips audioUrl before returning session data to clients.
+ * All client-facing queries MUST pass through this projection.
+ * If new sensitive fields are added to the schema, add them here.
+ */
 export function toClientSession(session: Doc<"listeningSessions">) {
   const { audioUrl: _audioUrl, ...safeSession } = session;
   return safeSession;
@@ -421,14 +426,6 @@ export const getForProcessing = internalQuery({
   },
 });
 
-export const getAudioUrlInternal = internalQuery({
-  args: { sessionId: v.id("listeningSessions") },
-  handler: async (ctx, args) => {
-    const session = await ctx.db.get(args.sessionId);
-    return session?.audioUrl ?? null;
-  },
-});
-
 export const getSynthesisContextForSession = internalQuery({
   args: { sessionId: v.id("listeningSessions") },
   handler: async (ctx, args) => {
@@ -516,25 +513,8 @@ export const markTranscribing = mutation({
     durationMs: v.number(),
     capReached: v.boolean(),
     transcriptLive: v.optional(v.string()),
-    // audioUrl kept for backward compat with clients that still send it;
-    // audio persistence is now handled server-side via saveAudioUrlAndMarkTranscribing.
+    // audioUrl set by the server-side upload route; not sent by browser clients.
     audioUrl: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    await markTranscribingHandler(ctx, args);
-    await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
-      sessionId: args.sessionId,
-    });
-  },
-});
-
-export const saveAudioUrlAndMarkTranscribing = mutation({
-  args: {
-    sessionId: v.id("listeningSessions"),
-    audioUrl: v.string(),
-    durationMs: v.number(),
-    capReached: v.boolean(),
-    transcriptLive: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await markTranscribingHandler(ctx, args);
