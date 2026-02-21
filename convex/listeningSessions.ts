@@ -377,7 +377,7 @@ async function completeListeningSessionForUser(
     updatedAt: now,
     lastError: undefined,
   };
-  if (args.estimatedCostUsd !== undefined) {
+  if (args.estimatedCostUsd !== undefined && Number.isFinite(args.estimatedCostUsd)) {
     completePatch.estimatedCostUsd = Math.max(0, args.estimatedCostUsd);
   }
   await ctx.db.patch(session._id, completePatch);
