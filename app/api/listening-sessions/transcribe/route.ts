@@ -9,7 +9,7 @@ import {
   type TranscriptionResponse,
 } from "@/lib/listening-sessions/transcription";
 
-// Allow up to 60s for sequential ElevenLabs (25s) + Deepgram (25s) fallback + overhead.
+// Budget: 10s audio fetch + 25s ElevenLabs + 25s Deepgram = 60s worst-case.
 export const maxDuration = 60;
 
 type TranscribeRequest = {

@@ -183,6 +183,24 @@ describe("transcribeAudio", () => {
     expect(result.provider).toBe("deepgram");
   });
 
+  it("falls back to Deepgram when ElevenLabs times out (AbortError)", async () => {
+    mockFetch
+      .mockResolvedValueOnce(makeResponse()) // readAudioFromUrl
+      .mockRejectedValueOnce(new DOMException("The operation was aborted.", "AbortError")) // ElevenLabs timeout
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          results: {
+            channels: [{ alternatives: [{ transcript: "Deepgram after timeout" }] }],
+          },
+        }),
+      } as unknown as Response);
+
+    const result = await transcribeAudio(TRUSTED_URL, "el-key", "dg-key");
+    expect(result.transcript).toBe("Deepgram after timeout");
+    expect(result.provider).toBe("deepgram");
+  });
+
   it("transcribes using ElevenLabs when only that key provided", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse()).mockResolvedValueOnce({
       ok: true,

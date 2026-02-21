@@ -100,7 +100,9 @@ export async function readAudioFromUrl(
     throw new TranscribeHttpError(400, "Untrusted audio host");
   }
 
-  const response = await fetchWithTimeout(audioUrl, { redirect: "error" });
+  // Vercel Blob is same-infra; 10s is generous. Keeps total budget
+  // (10s fetch + 25s ElevenLabs + 25s Deepgram) within 60s maxDuration.
+  const response = await fetchWithTimeout(audioUrl, { redirect: "error" }, 10_000);
   if (!response.ok) {
     throw new Error(`Failed to fetch uploaded audio: ${response.status}`);
   }
