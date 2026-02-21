@@ -57,3 +57,5 @@ thinktank.log
 .env.production
 thinktank_*
 .sentryclirc
+
+.flywheel/
