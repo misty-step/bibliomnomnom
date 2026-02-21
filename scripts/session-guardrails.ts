@@ -41,6 +41,13 @@ type Session = {
   updatedAt: number;
   durationMs?: number;
   rawNoteId?: Id<"notes">;
+  transcribeLatencyMs?: number;
+  transcribeFallbackUsed?: boolean;
+  synthesisLatencyMs?: number;
+  synthesisProvider?: string;
+  degradedMode?: boolean;
+  estimatedCostUsd?: number;
+  failedStage?: string;
 };
 type DataStore = { users: User[]; books: Book[]; notes: Note[]; sessions: Session[] };
 
@@ -205,6 +212,58 @@ async function checkSynthesisCompleteness() {
   );
 }
 
+async function checkObservabilityFields() {
+  const { ctx, data } = makeCtx();
+  const sessionId = await createListeningSessionHandler(mutationCtx(ctx), { bookId: BOOK_ID });
+  await markTranscribingHandler(mutationCtx(ctx), {
+    sessionId,
+    durationMs: 60_000,
+    capReached: false,
+    transcribeLatencyMs: 1500,
+    transcribeFallbackUsed: true,
+  });
+  const session = data.sessions.find((item) => item._id === sessionId);
+  assert(session?.transcribeLatencyMs === 1500, "transcribeLatencyMs not persisted");
+  assert(session?.transcribeFallbackUsed === true, "transcribeFallbackUsed not persisted");
+}
+
+async function checkFailedStageRecorded() {
+  const { ctx, data } = makeCtx({ sessions: [baseSession("transcribing")] });
+  await failListeningSessionHandler(mutationCtx(ctx), {
+    sessionId: "session_1" as Id<"listeningSessions">,
+    message: "ElevenLabs timeout",
+    failedStage: "transcribing",
+  });
+  const session = data.sessions.find((item) => item._id === "session_1");
+  assert(session?.status === "failed", "Session not marked failed");
+  assert(session?.failedStage === "transcribing", "failedStage not recorded");
+}
+
+async function checkCostEstimateStored() {
+  const { ctx, data } = makeCtx();
+  const sessionId = await createListeningSessionHandler(mutationCtx(ctx), { bookId: BOOK_ID });
+  await markTranscribingHandler(mutationCtx(ctx), {
+    sessionId,
+    durationMs: 60_000,
+    capReached: false,
+  });
+  await markSynthesizingHandler(mutationCtx(ctx), {
+    sessionId,
+    synthesisLatencyMs: 3000,
+    synthesisProvider: "google/gemini-3-pro-preview",
+    degradedMode: false,
+  });
+  await completeListeningSessionHandler(mutationCtx(ctx), {
+    sessionId,
+    transcript: "Test transcript",
+    transcriptProvider: "elevenlabs",
+    estimatedCostUsd: 0.0045,
+  });
+  const session = data.sessions.find((item) => item._id === sessionId);
+  assert(session?.estimatedCostUsd === 0.0045, "estimatedCostUsd not stored");
+  assert(session?.synthesisLatencyMs === 3000, "synthesisLatencyMs not persisted");
+}
+
 async function checkLiveEnvReachability() {
   if (!process.env.CONVEX_URL || !process.env.CONVEX_DEPLOY_KEY) return;
   const response = await fetch(process.env.CONVEX_URL, {
@@ -230,6 +289,9 @@ const checks: Array<[string, () => Promise<void>]> = [
   ["Cap normalization invariants", checkCapNormalization],
   ["State machine transition invariants", checkStateMachineTransitions],
   ["Synthesis completeness", checkSynthesisCompleteness],
+  ["Observability fields persistence", checkObservabilityFields],
+  ["Failed stage recorded", checkFailedStageRecorded],
+  ["Cost estimate stored", checkCostEstimateStored],
 ];
 if (hasLiveEnv) checks.push(["Live env reachability", checkLiveEnvReachability]);
 const results = await Promise.all(checks.map(([name, fn]) => runCheck(name, fn)));

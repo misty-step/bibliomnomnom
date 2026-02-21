@@ -12,6 +12,7 @@ import {
   type SynthesisArtifacts,
 } from "@/lib/listening-sessions/synthesis";
 import { DEFAULT_AUDIO_MIME_TYPE, normalizeAudioMimeType } from "@/lib/listening-sessions/mime";
+import type { PipelineStage } from "@/lib/listening-sessions/pipeline-stages";
 
 const CAP_DURATION_MS = 30 * 60 * 1000;
 const WARNING_DURATION_MS = 60 * 1000;
@@ -28,6 +29,11 @@ type TranscribeResult = {
   transcript: string;
   provider: "deepgram" | "elevenlabs";
   confidence?: number;
+};
+
+type SynthesisResult = {
+  artifacts: SynthesisArtifacts;
+  estimatedCostUsd?: number;
 };
 
 type RecognitionAlternative = {
@@ -275,20 +281,28 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     };
   };
 
-  const requestSynthesis = async (transcript: string): Promise<SynthesisArtifacts> => {
+  const requestSynthesis = async (
+    sessionId: Id<"listeningSessions">,
+    transcript: string,
+  ): Promise<SynthesisResult> => {
     const response = await fetch("/api/listening-sessions/synthesize", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript, bookId }),
+      body: JSON.stringify({ sessionId, transcript, bookId }),
     });
     const payload = (await response.json()) as {
       artifacts?: SynthesisArtifacts;
+      estimatedCostUsd?: number;
       error?: string;
     };
     if (!response.ok) {
       throw new Error(payload.error || "Failed to synthesize session notes.");
     }
-    return payload.artifacts ?? EMPTY_SYNTHESIS_ARTIFACTS;
+    return {
+      artifacts: payload.artifacts ?? EMPTY_SYNTHESIS_ARTIFACTS,
+      estimatedCostUsd:
+        typeof payload.estimatedCostUsd === "number" ? payload.estimatedCostUsd : undefined,
+    };
   };
 
   const startSpeechRecognition = () => {
@@ -353,6 +367,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     setIsProcessing(true);
     clearTiming();
     stopSpeechRecognition();
+    let failedStage: PipelineStage = "recording";
 
     try {
       let blob: Blob;
@@ -395,6 +410,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       const contentType =
         normalizeAudioMimeType(blob.type || recorder.mimeType) ?? DEFAULT_AUDIO_MIME_TYPE;
       const transcriptLive = liveTranscript.slice(0, LIVE_TRANSCRIPT_MAX_CHARS);
+      failedStage = "uploading";
       await uploadAudioToServer(
         sessionId,
         blob,
@@ -413,12 +429,17 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
 
       // Note: uploadAudioToServer calls markTranscribing on the server,
       // which transitions the session to "transcribing". No separate call needed.
+      failedStage = "transcribing";
       const transcription = await requestTranscription(sessionId);
+      failedStage = "synthesizing";
       await markSynthesizing({ sessionId });
 
       let synthesized = EMPTY_SYNTHESIS_ARTIFACTS;
+      let estimatedCostUsd: number | undefined;
       try {
-        synthesized = await requestSynthesis(transcription.transcript);
+        const synthesisResult = await requestSynthesis(sessionId, transcription.transcript);
+        synthesized = synthesisResult.artifacts;
+        estimatedCostUsd = synthesisResult.estimatedCostUsd;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Failed to synthesize transcript.";
         toast({
@@ -428,11 +449,13 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
         });
       }
 
+      failedStage = "completing";
       await completeSession({
         sessionId,
         transcript: transcription.transcript,
         transcriptProvider: transcription.provider,
         synthesis: synthesized,
+        estimatedCostUsd,
       });
 
       setLastTranscript(transcription.transcript);
@@ -461,7 +484,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       const message = error instanceof Error ? error.message : "Listening session failed.";
       setCapRolloverReady(false);
       try {
-        await failSession({ sessionId, message });
+        await failSession({ sessionId, message, failedStage });
       } catch {
         // no-op
       }

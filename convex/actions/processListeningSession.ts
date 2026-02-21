@@ -1,6 +1,7 @@
 "use node";
 
 import { internalAction, type ActionCtx } from "../_generated/server";
+import type { FunctionReference } from "convex/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
@@ -15,99 +16,29 @@ import {
 import { getListeningSynthesisConfig } from "../../lib/listening-sessions/synthesisConfig";
 import { buildListeningSynthesisPrompt } from "../../lib/listening-sessions/synthesisPrompt";
 import { transcribeAudio } from "../../lib/listening-sessions/transcription";
+import { estimateCostUsd, getUsageTokens } from "../../lib/listening-sessions/cost-estimation";
+import {
+  MAX_SYNTHESIS_TRANSCRIPT_CHARS,
+  SYNTHESIS_RESPONSE_SCHEMA,
+} from "../../lib/listening-sessions/synthesisSchema";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000] as const;
-const MAX_SYNTHESIS_TRANSCRIPT_CHARS = 50_000;
+
+type ProcessListeningSessionRunArgs = {
+  sessionId: Id<"listeningSessions">;
+  attempt?: number;
+};
 
 const processListeningSessionRun = (
   internal as unknown as {
-    actions: { processListeningSession: { run: unknown } };
+    actions: {
+      processListeningSession: {
+        run: FunctionReference<"action", "internal", ProcessListeningSessionRunArgs>;
+      };
+    };
   }
 ).actions.processListeningSession.run;
-
-const RESPONSE_SCHEMA = {
-  name: "listening_session_artifacts",
-  strict: true,
-  schema: {
-    type: "object",
-    description:
-      "Artifacts that help a reader remember, think, and act on a spoken reading session. Must be grounded in transcript + provided context.",
-    additionalProperties: false,
-    properties: {
-      insights: {
-        type: "array",
-        description:
-          "High-signal insights grounded in the transcript. Each insight should be specific, non-generic, and oriented toward future recall. Prefer fewer, better insights over many shallow ones.",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            title: { type: "string", description: "A specific, memorable title." },
-            content: {
-              type: "string",
-              description:
-                "2-6 sentences. Include: the claim, why it matters, and a concrete next step or question when possible.",
-            },
-          },
-          required: ["title", "content"],
-        },
-      },
-      openQuestions: {
-        type: "array",
-        description:
-          "Open questions raised by the transcript that you (the reader) would want to answer later. Prefer questions that will change your reading or interpretation.",
-        items: {
-          type: "string",
-          description: "One specific question. Avoid multi-part questions.",
-        },
-      },
-      quotes: {
-        type: "array",
-        description:
-          "Verbatim excerpts pulled from the transcript ONLY. Do not paraphrase. If it's not in the transcript, omit it.",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            text: { type: "string", description: "Verbatim quote from the transcript." },
-            source: {
-              type: "string",
-              description:
-                "Optional location hint if the reader mentioned it (chapter/page/scene). Otherwise omit.",
-            },
-          },
-          required: ["text"],
-        },
-      },
-      followUpQuestions: {
-        type: "array",
-        description:
-          "Prompts for what to pay attention to next time you read (or next session). These should be actionable, not philosophical filler.",
-        items: { type: "string", description: "One concrete follow-up prompt." },
-      },
-      contextExpansions: {
-        type: "array",
-        description:
-          "Helpful contextual expansions: historical, literary, philosophical, or interpretive scaffolding. Prefer 'what to look up' over asserting shaky facts.",
-        items: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            title: { type: "string", description: "A specific topic to explore." },
-            content: {
-              type: "string",
-              description:
-                "2-6 sentences. Provide safe, useful context and suggest a next lookup or comparison in the current book.",
-            },
-          },
-          required: ["title", "content"],
-        },
-      },
-    },
-    required: ["insights", "openQuestions", "quotes", "followUpQuestions", "contextExpansions"],
-  },
-} as const;
 
 type ProcessingCtx = Pick<ActionCtx, "runQuery" | "runMutation" | "scheduler">;
 
@@ -144,7 +75,7 @@ async function retryOrFail(
     return;
   }
 
-  await ctx.scheduler.runAfter(getRetryDelayMs(params.attempt), processListeningSessionRun as any, {
+  await ctx.scheduler.runAfter(getRetryDelayMs(params.attempt), processListeningSessionRun, {
     sessionId: params.sessionId,
     attempt: params.attempt + 1,
   });
@@ -233,6 +164,7 @@ export async function processListeningSessionHandler(
 
     let synthesis: SynthesisArtifacts = EMPTY_SYNTHESIS_ARTIFACTS;
     let hasSynthesis = false;
+    let estimatedCostUsd: number | undefined;
 
     const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
     if (openRouterApiKey) {
@@ -253,7 +185,8 @@ export async function processListeningSessionHandler(
 
       try {
         const config = getListeningSynthesisConfig();
-        const { content } = await openRouterChatCompletionFn({
+        const synthesisStart = Date.now();
+        const { content, raw } = await openRouterChatCompletionFn({
           apiKey: openRouterApiKey,
           timeoutMs: 90_000,
           referer: process.env.NEXT_PUBLIC_APP_URL || "https://bibliomnomnom.app",
@@ -273,7 +206,7 @@ export async function processListeningSessionHandler(
               : undefined,
             response_format: {
               type: "json_schema",
-              json_schema: RESPONSE_SCHEMA,
+              json_schema: SYNTHESIS_RESPONSE_SCHEMA,
             },
             messages: [
               {
@@ -291,6 +224,23 @@ export async function processListeningSessionHandler(
             ],
           },
         });
+        const synthesisLatencyMs = Date.now() - synthesisStart;
+
+        const resolvedModel = raw.model ?? config.model;
+        const { promptTokens, completionTokens } = getUsageTokens(raw.usage);
+        estimatedCostUsd = estimateCostUsd(resolvedModel, promptTokens, completionTokens);
+
+        console.log(
+          JSON.stringify({
+            msg: "background_worker_synthesis_complete",
+            sessionId: args.sessionId,
+            synthesisLatencyMs,
+            model: resolvedModel,
+            promptTokens,
+            completionTokens,
+            estimatedCostUsd,
+          }),
+        );
 
         const parsed = JSON.parse(content) as unknown;
         synthesis = clampArtifacts(normalizeArtifacts(parsed));
@@ -309,6 +259,7 @@ export async function processListeningSessionHandler(
       transcript,
       transcriptProvider: transcriptProvider || undefined,
       synthesis: hasSynthesis ? synthesis : undefined,
+      estimatedCostUsd,
     });
   } catch (error) {
     await retryOrFail(ctx, {

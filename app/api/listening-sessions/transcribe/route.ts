@@ -9,6 +9,7 @@ import {
   TranscribeHttpError,
   type TranscriptionResponse,
 } from "@/lib/listening-sessions/transcription";
+import type { PipelineStage } from "@/lib/listening-sessions/pipeline-stages";
 
 // Budget: 10s audio fetch + 25s ElevenLabs + 25s Deepgram = 60s worst-case.
 export const maxDuration = 60;
@@ -112,22 +113,52 @@ export const POST = withObservability(async (request: Request) => {
   }
 
   try {
+    const transcribeStart = Date.now();
     const transcription: TranscriptionResponse = await transcribeAudio(
       audioUrl,
       elevenLabsKey,
       deepgramKey,
     );
+    const transcribeLatencyMs = Date.now() - transcribeStart;
+    const transcribeFallbackUsed =
+      transcription.provider === "deepgram" && Boolean(elevenLabsKey?.trim());
+
+    try {
+      await entitlement.convex.mutation(api.listeningSessions.recordTranscribeTelemetry, {
+        sessionId: body.sessionId,
+        transcribeLatencyMs,
+        transcribeFallbackUsed,
+      });
+    } catch (error) {
+      log("warn", "listening_session_transcribe_telemetry_update_failed", {
+        requestId,
+        userIdSuffix: userId.slice(-6),
+        sessionId: body.sessionId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     log("info", "listening_session_transcribed", {
       requestId,
       userIdSuffix: userId.slice(-6),
       provider: transcription.provider,
+      transcribeLatencyMs,
+      transcribeFallbackUsed,
       transcriptChars: transcription.transcript.length,
     });
 
     return NextResponse.json(transcription, { headers: { "x-request-id": requestId } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Transcription failed";
+    try {
+      await entitlement.convex.mutation(api.listeningSessions.fail, {
+        sessionId: body.sessionId,
+        message,
+        failedStage: "transcribing" satisfies PipelineStage,
+      });
+    } catch {
+      // no-op
+    }
     log("error", "listening_session_transcription_failed", {
       requestId,
       userIdSuffix: userId.slice(-6),

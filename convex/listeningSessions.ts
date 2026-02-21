@@ -6,6 +6,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import type { FunctionReference } from "convex/server";
 import { requireAuth } from "./auth";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -50,9 +51,18 @@ const MAX_PROCESSING_RETRIES = 3;
 const DEFAULT_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 const STUCK_SESSION_BATCH_SIZE = 20;
 
+type ProcessListeningSessionRunArgs = {
+  sessionId: Id<"listeningSessions">;
+  attempt?: number;
+};
+
 const processListeningSessionRun = (
   internal as unknown as {
-    actions: { processListeningSession: { run: unknown } };
+    actions: {
+      processListeningSession: {
+        run: FunctionReference<"action", "internal", ProcessListeningSessionRunArgs>;
+      };
+    };
   }
 ).actions.processListeningSession.run;
 
@@ -224,6 +234,7 @@ async function completeListeningSessionForUser(
     transcript: string;
     transcriptProvider?: string;
     synthesis?: SynthesisArtifacts;
+    estimatedCostUsd?: number;
   },
   userId: Id<"users">,
 ) {
@@ -355,7 +366,7 @@ async function completeListeningSessionForUser(
     }
   }
 
-  await ctx.db.patch(session._id, {
+  const completePatch: Parameters<typeof ctx.db.patch>[1] = {
     status: "complete",
     transcript: cleanedTranscript,
     transcriptChars: cleanedTranscript.length,
@@ -365,24 +376,37 @@ async function completeListeningSessionForUser(
     synthesis: synth,
     updatedAt: now,
     lastError: undefined,
-  });
+  };
+  if (args.estimatedCostUsd !== undefined && Number.isFinite(args.estimatedCostUsd)) {
+    completePatch.estimatedCostUsd = Math.max(0, args.estimatedCostUsd);
+  }
+  await ctx.db.patch(session._id, completePatch);
 
   return { rawNoteId, synthesizedNoteIds };
 }
 
 async function failListeningSessionForUser(
   ctx: MutationCtx,
-  args: { sessionId: Id<"listeningSessions">; message: string },
+  args: {
+    sessionId: Id<"listeningSessions">;
+    message: string;
+    failedStage?: string;
+  },
   userId: Id<"users">,
 ) {
   const session = await getOwnedSession(ctx, userId, args.sessionId);
   assertTransition(session.status, "failed");
 
-  await ctx.db.patch(session._id, {
+  const failPatch: Parameters<typeof ctx.db.patch>[1] = {
     status: "failed",
     lastError: truncate(args.message, 1_000),
     updatedAt: Date.now(),
-  });
+  };
+  const failedStage = args.failedStage?.trim();
+  if (failedStage) {
+    failPatch.failedStage = truncate(failedStage, 100);
+  }
+  await ctx.db.patch(session._id, failPatch);
 }
 
 export const listByBook = query({
@@ -425,6 +449,84 @@ export const getForProcessing = internalQuery({
   args: { sessionId: v.id("listeningSessions") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.sessionId);
+  },
+});
+
+export const getDebugStats = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const [failedSessions, completedSessions] = await Promise.all([
+      ctx.db
+        .query("listeningSessions")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "failed"))
+        .order("desc")
+        .take(100),
+      ctx.db
+        .query("listeningSessions")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "complete"))
+        .order("desc")
+        .take(200),
+    ]);
+
+    const degradedSessions = completedSessions.filter((s) => s.degradedMode);
+
+    const stageBreakdown: Record<string, number> = {};
+    for (const session of failedSessions) {
+      const stage = session.failedStage ?? "unknown";
+      stageBreakdown[stage] = (stageBreakdown[stage] ?? 0) + 1;
+    }
+
+    const totalFailed = failedSessions.length;
+    const fallbackUsedCount = failedSessions.filter(
+      (session) => session.transcribeFallbackUsed,
+    ).length;
+    const totalEstimatedCost = failedSessions.reduce(
+      (sum, session) => sum + (session.estimatedCostUsd ?? 0),
+      0,
+    );
+
+    return {
+      totalFailed,
+      stageBreakdown,
+      fallbackUsedCount,
+      totalEstimatedCostUsd: Math.round(totalEstimatedCost * 10000) / 10000,
+      // Sessions that completed but in degraded mode (synthesis partial/missing).
+      degradedCompletions: {
+        count: degradedSessions.length,
+        totalEstimatedCostUsd:
+          Math.round(
+            degradedSessions.reduce((sum, s) => sum + (s.estimatedCostUsd ?? 0), 0) * 10000,
+          ) / 10000,
+      },
+      // No user/book identifiers — only operational diagnostics per user.
+      recentFailures: failedSessions.slice(0, 20).map((session) => ({
+        id: session._id,
+        failedStage: session.failedStage ?? "unknown",
+        lastError: session.lastError,
+        retryCount: session.retryCount ?? 0,
+        transcribeFallbackUsed: session.transcribeFallbackUsed ?? false,
+        estimatedCostUsd: session.estimatedCostUsd ?? 0,
+        updatedAt: session.updatedAt,
+      })),
+    };
+  },
+});
+
+export const getDailyUserCost = internalQuery({
+  args: { userId: v.id("users"), dayStartMs: v.number(), dayEndMs: v.number() },
+  handler: async (ctx, { userId, dayStartMs, dayEndMs }) => {
+    const inRange = await ctx.db
+      .query("listeningSessions")
+      .withIndex("by_user_updatedAt", (q) =>
+        q.eq("userId", userId).gte("updatedAt", dayStartMs).lte("updatedAt", dayEndMs),
+      )
+      .filter((q) => q.neq(q.field("estimatedCostUsd"), undefined))
+      .collect();
+    const totalCostUsd = inRange.reduce((sum, session) => sum + (session.estimatedCostUsd ?? 0), 0);
+    return {
+      totalCostUsd: Math.round(totalCostUsd * 10000) / 10000,
+      sessionCount: inRange.length,
+    };
   },
 });
 
@@ -476,6 +578,17 @@ export const create = mutation({
   handler: createListeningSessionHandler,
 });
 
+const markTranscribingArgs = {
+  sessionId: v.id("listeningSessions"),
+  durationMs: v.number(),
+  capReached: v.boolean(),
+  transcriptLive: v.optional(v.string()),
+  // audioUrl set by the server-side upload route; not sent by browser clients.
+  audioUrl: v.optional(v.string()),
+  transcribeLatencyMs: v.optional(v.number()),
+  transcribeFallbackUsed: v.optional(v.boolean()),
+} as const;
+
 export const markTranscribingHandler = async (
   ctx: MutationCtx,
   args: {
@@ -484,10 +597,13 @@ export const markTranscribingHandler = async (
     capReached: boolean;
     transcriptLive?: string;
     audioUrl?: string;
+    transcribeLatencyMs?: number;
+    transcribeFallbackUsed?: boolean;
   },
 ) => {
   const userId = await requireAuth(ctx);
   const session = await getOwnedSession(ctx, userId, args.sessionId);
+  const shouldScheduleProcessing = session.status !== "transcribing";
 
   assertTransition(session.status, "transcribing");
 
@@ -506,45 +622,102 @@ export const markTranscribingHandler = async (
   if (args.audioUrl !== undefined) {
     patch.audioUrl = args.audioUrl;
   }
+  if (args.transcribeLatencyMs !== undefined) {
+    patch.transcribeLatencyMs = Math.max(0, Math.floor(args.transcribeLatencyMs));
+  }
+  if (args.transcribeFallbackUsed !== undefined) {
+    patch.transcribeFallbackUsed = args.transcribeFallbackUsed;
+  }
   await ctx.db.patch(session._id, patch);
+  return shouldScheduleProcessing;
 };
 
 export const markTranscribing = mutation({
+  args: markTranscribingArgs,
+  handler: async (ctx, args) => {
+    const shouldScheduleProcessing = await markTranscribingHandler(ctx, args);
+    if (shouldScheduleProcessing) {
+      await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun, {
+        sessionId: args.sessionId,
+      });
+    }
+  },
+});
+
+// Telemetry-only mutation: records post-transcription metrics without touching
+// session state fields (status, endedAt, transcriptLive).
+export const recordTranscribeTelemetry = mutation({
   args: {
     sessionId: v.id("listeningSessions"),
-    durationMs: v.number(),
-    capReached: v.boolean(),
-    transcriptLive: v.optional(v.string()),
-    // audioUrl set by the server-side upload route; not sent by browser clients.
-    audioUrl: v.optional(v.string()),
+    transcribeLatencyMs: v.number(),
+    transcribeFallbackUsed: v.boolean(),
   },
   handler: async (ctx, args) => {
-    await markTranscribingHandler(ctx, args);
-    await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
-      sessionId: args.sessionId,
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    await ctx.db.patch(session._id, {
+      transcribeLatencyMs: Math.max(0, Math.floor(args.transcribeLatencyMs)),
+      transcribeFallbackUsed: args.transcribeFallbackUsed,
+      updatedAt: Date.now(),
     });
   },
 });
 
+const markSynthesizingArgs = {
+  sessionId: v.id("listeningSessions"),
+  synthesisLatencyMs: v.optional(v.number()),
+  synthesisProvider: v.optional(v.string()),
+  degradedMode: v.optional(v.boolean()),
+  estimatedCostUsd: v.optional(v.number()),
+} as const;
+
 export const markSynthesizingHandler = async (
   ctx: MutationCtx,
-  args: { sessionId: Id<"listeningSessions"> },
+  args: {
+    sessionId: Id<"listeningSessions">;
+    synthesisLatencyMs?: number;
+    synthesisProvider?: string;
+    degradedMode?: boolean;
+    estimatedCostUsd?: number;
+  },
 ) => {
   const userId = await requireAuth(ctx);
   const session = await getOwnedSession(ctx, userId, args.sessionId);
   assertTransition(session.status, "synthesizing");
 
-  await ctx.db.patch(session._id, {
+  const patch: Parameters<typeof ctx.db.patch>[1] = {
     status: "synthesizing",
     updatedAt: Date.now(),
     lastError: undefined,
-  });
+  };
+  if (args.synthesisLatencyMs !== undefined) {
+    patch.synthesisLatencyMs = Math.max(0, Math.floor(args.synthesisLatencyMs));
+  }
+  const synthesisProvider = args.synthesisProvider?.trim();
+  if (synthesisProvider) {
+    patch.synthesisProvider = synthesisProvider;
+  }
+  if (args.degradedMode !== undefined) {
+    patch.degradedMode = args.degradedMode;
+  }
+  if (args.estimatedCostUsd !== undefined) {
+    patch.estimatedCostUsd = Math.max(0, args.estimatedCostUsd);
+  }
+  await ctx.db.patch(session._id, patch);
 };
 
 export const markSynthesizing = mutation({
-  args: { sessionId: v.id("listeningSessions") },
+  args: markSynthesizingArgs,
   handler: markSynthesizingHandler,
 });
+
+const completeListeningSessionArgs = {
+  sessionId: v.id("listeningSessions"),
+  transcript: v.string(),
+  transcriptProvider: v.optional(v.string()),
+  synthesis: v.optional(synthesisArtifacts),
+  estimatedCostUsd: v.optional(v.number()),
+} as const;
 
 export const transitionSynthesizingInternal = internalMutation({
   args: {
@@ -582,6 +755,7 @@ export const completeListeningSessionHandler = async (
     transcript: string;
     transcriptProvider?: string;
     synthesis?: SynthesisArtifacts;
+    estimatedCostUsd?: number;
   },
 ) => {
   const userId = await requireAuth(ctx);
@@ -589,22 +763,12 @@ export const completeListeningSessionHandler = async (
 };
 
 export const complete = mutation({
-  args: {
-    sessionId: v.id("listeningSessions"),
-    transcript: v.string(),
-    transcriptProvider: v.optional(v.string()),
-    synthesis: v.optional(synthesisArtifacts),
-  },
+  args: completeListeningSessionArgs,
   handler: completeListeningSessionHandler,
 });
 
 export const completeInternal = internalMutation({
-  args: {
-    sessionId: v.id("listeningSessions"),
-    transcript: v.string(),
-    transcriptProvider: v.optional(v.string()),
-    synthesis: v.optional(synthesisArtifacts),
-  },
+  args: completeListeningSessionArgs,
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) {
@@ -614,27 +778,27 @@ export const completeInternal = internalMutation({
   },
 });
 
+const failListeningSessionArgs = {
+  sessionId: v.id("listeningSessions"),
+  message: v.string(),
+  failedStage: v.optional(v.string()),
+} as const;
+
 export const failListeningSessionHandler = async (
   ctx: MutationCtx,
-  args: { sessionId: Id<"listeningSessions">; message: string },
+  args: { sessionId: Id<"listeningSessions">; message: string; failedStage?: string },
 ) => {
   const userId = await requireAuth(ctx);
   await failListeningSessionForUser(ctx, args, userId);
 };
 
 export const fail = mutation({
-  args: {
-    sessionId: v.id("listeningSessions"),
-    message: v.string(),
-  },
+  args: failListeningSessionArgs,
   handler: failListeningSessionHandler,
 });
 
 export const failInternal = internalMutation({
-  args: {
-    sessionId: v.id("listeningSessions"),
-    message: v.string(),
-  },
+  args: failListeningSessionArgs,
   handler: async (ctx, args) => {
     const session = await ctx.db.get(args.sessionId);
     if (!session) {
@@ -720,7 +884,7 @@ export const recoverStuck = internalMutation({
       maxRetries: MAX_PROCESSING_RETRIES,
     });
     for (const session of stuckSessions) {
-      await ctx.scheduler.runAfter(0, processListeningSessionRun as any, {
+      await ctx.scheduler.runAfter(0, processListeningSessionRun, {
         sessionId: session._id,
         attempt: 1,
       });

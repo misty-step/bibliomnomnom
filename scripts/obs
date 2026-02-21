@@ -37,6 +37,7 @@ ${YELLOW}Usage:${NC}
   obs alerts                          List alert rules
   obs status                          Full status overview
   obs resolve <ID>                    Resolve a Sentry issue
+  obs session-stats [--limit N]       Listening session error breakdown
 
 ${YELLOW}Examples:${NC}
   obs issues --limit 5                Show 5 most recent issues
@@ -238,6 +239,49 @@ cmd_resolve() {
     echo -e "${GREEN}✓${NC} Issue resolved"
 }
 
+# Listening session error breakdown
+cmd_session_stats() {
+    check_sentry_token
+    local limit=50
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --limit) limit="$2"; shift 2 ;;
+            *) shift ;;
+        esac
+    done
+
+    echo -e "${BLUE}→${NC} Fetching listening session error breakdown (limit: $limit)"
+
+    # Query Sentry for issues from listening-session API routes
+    local response
+    response=$(curl -sS "https://sentry.io/api/0/projects/${SENTRY_ORG}/${SENTRY_PROJECT}/issues/?query=is:unresolved+url%3A%2A%2Fapi%2Flistening-sessions%2F%2A&limit=${limit}" \
+        -H"Authorization: Bearer ${SENTRY_AUTH_TOKEN}" 2>/dev/null)
+
+    local total
+    total=$(echo "$response" | jq 'length' 2>/dev/null || echo "0")
+
+    if [[ "$total" -eq 0 ]]; then
+        echo -e "${GREEN}✓${NC} No unresolved listening-session errors"
+        return
+    fi
+
+    echo -e "${YELLOW}Errors${NC} ($total unresolved):"
+    echo "$response" | jq -r '.[] | "\(.count)\t\(.shortId)\t\(.title | .[0:70])"' | \
+        awk -F'\t' 'BEGIN {printf "%-6s %-14s %s\n", "COUNT", "ID", "TITLE"; print "---"} {printf "%-6s %-14s %s\n", $1, $2, $3}'
+
+    echo
+    # Stage breakdown: group by title prefix (transcribing/synthesizing)
+    echo -e "${YELLOW}Stage breakdown:${NC}"
+    echo "$response" | jq -r '
+        ["transcribing", "synthesizing", "upload", "audio"] as $stages |
+        . as $issues |
+        $stages[] | . as $stage |
+        ($issues | map(select(.title | ascii_downcase | contains($stage))) | length) as $count |
+        "\($count)\t\($stage)"
+    ' | awk -F'\t' '{printf "  %-20s %s issues\n", $2, $1}'
+}
+
 # Full status overview
 cmd_status() {
     echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
@@ -271,6 +315,7 @@ case "${1:-}" in
     logs) shift; cmd_logs "$@" ;;
     alerts) shift; cmd_alerts "$@" ;;
     resolve) shift; cmd_resolve "$@" ;;
+    session-stats) shift; cmd_session_stats "$@" ;;
     status) cmd_status ;;
     -h|--help|help) usage ;;
     "") usage ;;
