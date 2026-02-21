@@ -12,7 +12,8 @@ import {
   type SynthesisArtifacts,
   type SynthesisContext,
 } from "@/lib/listening-sessions/synthesis";
-import { ALERT_THRESHOLDS } from "@/lib/listening-sessions/alertThresholds";
+import { ALERT_THRESHOLDS } from "@/lib/listening-sessions/alert-thresholds";
+import { estimateCostUsd, getUsageTokens } from "@/lib/listening-sessions/cost-estimation";
 import { getListeningSynthesisConfig } from "@/lib/listening-sessions/synthesisConfig";
 import { buildListeningSynthesisPrompt } from "@/lib/listening-sessions/synthesisPrompt";
 
@@ -142,42 +143,6 @@ function makeFallbackArtifacts(transcript: string, context?: SynthesisContext): 
   });
 }
 
-function estimateCostUsd(model: string, promptTokens: number, completionTokens: number): number {
-  const COST_PER_1M: Record<string, { input: number; output: number }> = {
-    "google/gemini": { input: 1.25, output: 10.0 },
-    "anthropic/claude": { input: 15.0, output: 75.0 },
-    "openai/gpt": { input: 10.0, output: 30.0 },
-  };
-  const family = Object.keys(COST_PER_1M).find((key) => model.startsWith(key)) ?? "google/gemini";
-  const rates = COST_PER_1M[family]!;
-  return (promptTokens * rates.input + completionTokens * rates.output) / 1_000_000;
-}
-
-function getUsageTokens(usage: unknown): { promptTokens: number; completionTokens: number } {
-  const asRecord =
-    usage && typeof usage === "object"
-      ? (usage as Record<string, unknown>)
-      : ({} as Record<string, unknown>);
-
-  const promptTokensRaw = asRecord.prompt_tokens ?? asRecord.input_tokens;
-  const completionTokensRaw = asRecord.completion_tokens ?? asRecord.output_tokens;
-  const totalTokensRaw = asRecord.total_tokens;
-
-  const completionTokens =
-    typeof completionTokensRaw === "number" && Number.isFinite(completionTokensRaw)
-      ? Math.max(0, Math.floor(completionTokensRaw))
-      : 0;
-
-  const promptTokens =
-    typeof promptTokensRaw === "number" && Number.isFinite(promptTokensRaw)
-      ? Math.max(0, Math.floor(promptTokensRaw))
-      : typeof totalTokensRaw === "number" && Number.isFinite(totalTokensRaw)
-        ? Math.max(0, Math.floor(totalTokensRaw) - completionTokens)
-        : 0;
-
-  return { promptTokens, completionTokens };
-}
-
 function logSessionCostGuardrails(params: {
   sessionId?: Id<"listeningSessions">;
   estimatedCostUsd: number;
@@ -186,29 +151,19 @@ function logSessionCostGuardrails(params: {
   const sessionId = params.sessionId ?? "unknown";
 
   if (params.estimatedCostUsd > ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD) {
-    console.error(
-      JSON.stringify({
-        msg: "listening_session_cost_cap_exceeded",
-        sessionId,
-        estimatedCostUsd: params.estimatedCostUsd,
-        model: params.model,
-        hardCapUsd: ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD,
-        level: "error",
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    log("error", "listening_session_cost_cap_exceeded", {
+      sessionId,
+      estimatedCostUsd: params.estimatedCostUsd,
+      model: params.model,
+      hardCapUsd: ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD,
+    });
   } else if (params.estimatedCostUsd > ALERT_THRESHOLDS.SESSION_COST_WARN_USD) {
-    console.warn(
-      JSON.stringify({
-        msg: "listening_session_cost_elevated",
-        sessionId,
-        estimatedCostUsd: params.estimatedCostUsd,
-        model: params.model,
-        warnThresholdUsd: ALERT_THRESHOLDS.SESSION_COST_WARN_USD,
-        level: "warn",
-        timestamp: new Date().toISOString(),
-      }),
-    );
+    log("warn", "listening_session_cost_elevated", {
+      sessionId,
+      estimatedCostUsd: params.estimatedCostUsd,
+      model: params.model,
+      warnThresholdUsd: ALERT_THRESHOLDS.SESSION_COST_WARN_USD,
+    });
   }
 }
 

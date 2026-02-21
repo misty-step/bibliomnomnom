@@ -443,10 +443,11 @@ export const getForProcessing = internalQuery({
 });
 
 export const getDebugStats = internalQuery({
-  handler: async (ctx) => {
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
     const failedSessions = await ctx.db
       .query("listeningSessions")
-      .withIndex("by_status_updatedAt", (q) => q.eq("status", "failed"))
+      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "failed"))
       .order("desc")
       .take(100);
 
@@ -472,10 +473,9 @@ export const getDebugStats = internalQuery({
       fallbackUsedCount,
       degradedModeCount,
       totalEstimatedCostUsd: Math.round(totalEstimatedCost * 10000) / 10000,
+      // No user/book identifiers — only operational diagnostics per user.
       recentFailures: failedSessions.slice(0, 20).map((session) => ({
         id: session._id,
-        userId: session.userId,
-        bookId: session.bookId,
         failedStage: session.failedStage ?? "unknown",
         lastError: session.lastError,
         retryCount: session.retryCount ?? 0,
