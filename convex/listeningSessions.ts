@@ -101,7 +101,7 @@ function truncate(input: string, maxChars: number): string {
   return `${normalized.slice(0, maxChars - 1)}…`;
 }
 
-function toClientSession(session: Doc<"listeningSessions">) {
+export function toClientSession(session: Doc<"listeningSessions">) {
   const { audioUrl: _audioUrl, ...safeSession } = session;
   return safeSession;
 }
@@ -484,6 +484,7 @@ export const markTranscribingHandler = async (
     durationMs: number;
     capReached: boolean;
     transcriptLive?: string;
+    audioUrl?: string;
   },
 ) => {
   const userId = await requireAuth(ctx);
@@ -492,7 +493,7 @@ export const markTranscribingHandler = async (
   assertTransition(session.status, "transcribing");
 
   const now = Date.now();
-  await ctx.db.patch(session._id, {
+  const patch: Parameters<typeof ctx.db.patch>[1] = {
     status: "transcribing",
     durationMs: Math.max(0, Math.floor(args.durationMs)),
     capReached: args.capReached,
@@ -500,7 +501,13 @@ export const markTranscribingHandler = async (
     endedAt: now,
     updatedAt: now,
     lastError: undefined,
-  });
+  };
+  // Only set audioUrl when explicitly provided — avoids clobbering existing value
+  // on the backward-compat markTranscribing path where clients don't send it.
+  if (args.audioUrl !== undefined) {
+    patch.audioUrl = args.audioUrl;
+  }
+  await ctx.db.patch(session._id, patch);
 };
 
 export const markTranscribing = mutation({
@@ -530,22 +537,7 @@ export const saveAudioUrlAndMarkTranscribing = mutation({
     transcriptLive: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await requireAuth(ctx);
-    const session = await getOwnedSession(ctx, userId, args.sessionId);
-    assertTransition(session.status, "transcribing");
-
-    const now = Date.now();
-    await ctx.db.patch(session._id, {
-      status: "transcribing",
-      audioUrl: args.audioUrl,
-      durationMs: Math.max(0, Math.floor(args.durationMs)),
-      capReached: args.capReached,
-      transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
-      endedAt: now,
-      updatedAt: now,
-      lastError: undefined,
-    });
-
+    await markTranscribingHandler(ctx, args);
     await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
       sessionId: args.sessionId,
     });

@@ -114,6 +114,17 @@ describe("listening session audio proxy route", () => {
     expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
   });
 
+  it("returns 403 when audio URL host is not trusted", async () => {
+    convexQueryMock.mockResolvedValueOnce("https://evil.example.com/listening-sessions/audio.webm");
+
+    const response = await GET(
+      new Request("https://example.com/api/listening-sessions/session_1/audio"),
+      makeRequestContext("session_1"),
+    );
+
+    expect(response.status).toBe(403);
+  });
+
   it("returns 206 partial content when Range header is forwarded", async () => {
     convexQueryMock.mockResolvedValueOnce(
       "https://blob.vercel-storage.com/listening-sessions/sample.webm",
