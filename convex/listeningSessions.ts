@@ -509,6 +509,9 @@ export const markTranscribing = mutation({
     durationMs: v.number(),
     capReached: v.boolean(),
     transcriptLive: v.optional(v.string()),
+    // audioUrl kept for backward compat with clients that still send it;
+    // audio persistence is now handled server-side via saveAudioUrlAndMarkTranscribing.
+    audioUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await markTranscribingHandler(ctx, args);

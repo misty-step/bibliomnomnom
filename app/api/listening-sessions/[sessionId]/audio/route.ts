@@ -91,12 +91,24 @@ async function handleAudioProxy(request: Request, context: RouteContext) {
     );
   }
 
-  const blobResponse = await fetch(audioUrl, { redirect: "error" });
+  // Forward Range header so browsers can seek without downloading the full file.
+  const rangeHeader = request.headers.get("range");
+  const blobFetchHeaders: HeadersInit = {};
+  if (rangeHeader) blobFetchHeaders["range"] = rangeHeader;
+
+  const blobResponse = await fetch(audioUrl, { redirect: "error", headers: blobFetchHeaders });
   if (blobResponse.status === 404) {
     return NextResponse.json(
       { error: "Audio not found" },
       { status: 404, headers: { "x-request-id": requestId } },
     );
+  }
+  if (blobResponse.status === 416) {
+    // Range Not Satisfiable — forward to client so browser can recover.
+    const contentRange = blobResponse.headers.get("content-range");
+    const rangeHeaders = new Headers({ "x-request-id": requestId });
+    if (contentRange) rangeHeaders.set("content-range", contentRange);
+    return new Response(null, { status: 416, headers: rangeHeaders });
   }
   if (!blobResponse.ok || !blobResponse.body) {
     log("warn", "listening_session_audio_proxy_failed_fetch", {
@@ -113,13 +125,17 @@ async function handleAudioProxy(request: Request, context: RouteContext) {
   const headers = new Headers();
   const contentType = blobResponse.headers.get("content-type");
   const contentLength = blobResponse.headers.get("content-length");
+  const contentRange = blobResponse.headers.get("content-range");
+  const acceptRanges = blobResponse.headers.get("accept-ranges");
   if (contentType) headers.set("content-type", contentType);
   if (contentLength) headers.set("content-length", contentLength);
+  if (contentRange) headers.set("content-range", contentRange);
+  if (acceptRanges) headers.set("accept-ranges", acceptRanges);
   headers.set("cache-control", "private, max-age=300");
   headers.set("x-request-id", requestId);
 
   return new Response(blobResponse.body, {
-    status: 200,
+    status: blobResponse.status, // 200 for full content, 206 for partial
     headers,
   });
 }

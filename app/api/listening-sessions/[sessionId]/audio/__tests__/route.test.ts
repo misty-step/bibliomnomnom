@@ -95,6 +95,7 @@ describe("listening session audio proxy route", () => {
           headers: {
             "content-type": "audio/webm",
             "content-length": "4",
+            "accept-ranges": "bytes",
           },
         }),
       ),
@@ -109,6 +110,39 @@ describe("listening session audio proxy route", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("audio/webm");
     expect(response.headers.get("cache-control")).toBe("private, max-age=300");
+    expect(response.headers.get("accept-ranges")).toBe("bytes");
     expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
+  });
+
+  it("returns 206 partial content when Range header is forwarded", async () => {
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/sample.webm",
+    );
+    const fetchSpy = vi.fn().mockResolvedValueOnce(
+      new Response(new Uint8Array([2, 3]), {
+        status: 206,
+        headers: {
+          "content-type": "audio/webm",
+          "content-range": "bytes 1-2/4",
+          "accept-ranges": "bytes",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const response = await GET(
+      new Request("https://example.com/api/listening-sessions/session_1/audio", {
+        headers: { range: "bytes=1-2" },
+      }),
+      makeRequestContext("session_1"),
+    );
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get("content-range")).toBe("bytes 1-2/4");
+    // Verify Range header was forwarded to blob storage
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ headers: { range: "bytes=1-2" } }),
+    );
   });
 });
