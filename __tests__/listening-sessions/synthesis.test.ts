@@ -151,6 +151,19 @@ describe("normalizeArtifacts", () => {
     expect(result.contextExpansions[0]?.title).toBe("Valid");
   });
 
+  it("fills missing fields with empty arrays for partial objects", () => {
+    const result = normalizeArtifacts({
+      insights: [{ title: "One", content: "One body" }],
+    });
+    expect(result).toEqual({
+      insights: [{ title: "One", content: "One body" }],
+      openQuestions: [],
+      quotes: [],
+      followUpQuestions: [],
+      contextExpansions: [],
+    });
+  });
+
   it("delegates to clampArtifacts (respects limits)", () => {
     const raw = {
       insights: Array.from({ length: 20 }, (_, i) => ({ title: `T${i}`, content: `C${i}` })),
