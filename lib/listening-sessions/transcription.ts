@@ -40,7 +40,7 @@ async function fetchWithTimeout(
   }
 }
 
-function isTrustedAudioHost(hostname: string): boolean {
+export function isTrustedAudioHost(hostname: string): boolean {
   return hostname === "blob.vercel-storage.com" || hostname.endsWith(".blob.vercel-storage.com");
 }
 
@@ -136,7 +136,7 @@ async function transcribeWithDeepgram(params: {
       },
       body: params.audioBytes,
     },
-    60_000,
+    25_000,
   );
 
   if (!response.ok) {
@@ -189,7 +189,7 @@ async function transcribeWithElevenLabs(params: {
       },
       body: formData,
     },
-    60_000,
+    25_000,
   );
 
   if (!response.ok) {
@@ -215,11 +215,11 @@ async function transcribeWithElevenLabs(params: {
 
 export async function transcribeAudio(
   audioUrl: string,
-  deepgramKey: string | undefined,
   elevenLabsKey: string | undefined,
+  deepgramKey: string | undefined,
 ): Promise<TranscriptionResponse> {
-  const deepgramApiKey = deepgramKey?.trim();
   const elevenLabsApiKey = elevenLabsKey?.trim();
+  const deepgramApiKey = deepgramKey?.trim();
   if (!deepgramApiKey && !elevenLabsApiKey) {
     throw new Error("No STT provider is configured. Set DEEPGRAM_API_KEY or ELEVENLABS_API_KEY.");
   }
