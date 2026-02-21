@@ -1,6 +1,7 @@
 "use node";
 
 import { internalAction, type ActionCtx } from "../_generated/server";
+import type { FunctionReference } from "convex/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { v } from "convex/values";
@@ -21,9 +22,18 @@ const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000] as const;
 const MAX_SYNTHESIS_TRANSCRIPT_CHARS = 50_000;
 
+type ProcessListeningSessionRunArgs = {
+  sessionId: Id<"listeningSessions">;
+  attempt?: number;
+};
+
 const processListeningSessionRun = (
   internal as unknown as {
-    actions: { processListeningSession: { run: unknown } };
+    actions: {
+      processListeningSession: {
+        run: FunctionReference<"action", "internal", ProcessListeningSessionRunArgs>;
+      };
+    };
   }
 ).actions.processListeningSession.run;
 
@@ -145,7 +155,7 @@ async function retryOrFail(
     return;
   }
 
-  await ctx.scheduler.runAfter(getRetryDelayMs(params.attempt), processListeningSessionRun as any, {
+  await ctx.scheduler.runAfter(getRetryDelayMs(params.attempt), processListeningSessionRun, {
     sessionId: params.sessionId,
     attempt: params.attempt + 1,
   });

@@ -6,6 +6,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
+import type { FunctionReference } from "convex/server";
 import { requireAuth } from "./auth";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -50,9 +51,18 @@ const MAX_PROCESSING_RETRIES = 3;
 const DEFAULT_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 const STUCK_SESSION_BATCH_SIZE = 20;
 
+type ProcessListeningSessionRunArgs = {
+  sessionId: Id<"listeningSessions">;
+  attempt?: number;
+};
+
 const processListeningSessionRun = (
   internal as unknown as {
-    actions: { processListeningSession: { run: unknown } };
+    actions: {
+      processListeningSession: {
+        run: FunctionReference<"action", "internal", ProcessListeningSessionRunArgs>;
+      };
+    };
   }
 ).actions.processListeningSession.run;
 
@@ -627,7 +637,7 @@ export const markTranscribing = mutation({
   handler: async (ctx, args) => {
     const shouldScheduleProcessing = await markTranscribingHandler(ctx, args);
     if (shouldScheduleProcessing) {
-      await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
+      await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun, {
         sessionId: args.sessionId,
       });
     }
@@ -874,7 +884,7 @@ export const recoverStuck = internalMutation({
       maxRetries: MAX_PROCESSING_RETRIES,
     });
     for (const session of stuckSessions) {
-      await ctx.scheduler.runAfter(0, processListeningSessionRun as any, {
+      await ctx.scheduler.runAfter(0, processListeningSessionRun, {
         sessionId: session._id,
         attempt: 1,
       });
