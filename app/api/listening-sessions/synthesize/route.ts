@@ -295,7 +295,7 @@ export const POST = withObservability(async (request: Request) => {
   if (!openRouterApiKey) {
     const fallback = makeFallbackArtifacts(transcript, context);
     const synthesisLatencyMs = Date.now() - synthesisStart;
-    await patchSynthesisTelemetry({
+    void patchSynthesisTelemetry({
       synthesisLatencyMs,
       synthesisProvider: config.model,
       degradedMode: true,
@@ -357,9 +357,9 @@ export const POST = withObservability(async (request: Request) => {
     logSessionCostGuardrails({
       sessionId: body.sessionId,
       estimatedCostUsd,
-      model: config.model,
+      model: resolvedModel,
     });
-    await patchSynthesisTelemetry({
+    void patchSynthesisTelemetry({
       synthesisLatencyMs,
       synthesisProvider: resolvedModel,
       degradedMode: false,
@@ -397,7 +397,7 @@ export const POST = withObservability(async (request: Request) => {
     const fallback = makeFallbackArtifacts(transcript, context);
     const synthesisLatencyMs = Date.now() - synthesisStart;
 
-    await patchSynthesisTelemetry({
+    void patchSynthesisTelemetry({
       synthesisLatencyMs,
       synthesisProvider: config.model,
       degradedMode: true,

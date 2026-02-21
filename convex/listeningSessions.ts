@@ -517,10 +517,10 @@ export const getDailyUserCost = internalQuery({
   handler: async (ctx, { userId, dayStartMs, dayEndMs }) => {
     const inRange = await ctx.db
       .query("listeningSessions")
-      .withIndex("by_user_updatedAt", (q) => q.eq("userId", userId).gte("updatedAt", dayStartMs))
-      .filter((q) =>
-        q.and(q.lte(q.field("updatedAt"), dayEndMs), q.neq(q.field("estimatedCostUsd"), undefined)),
+      .withIndex("by_user_updatedAt", (q) =>
+        q.eq("userId", userId).gte("updatedAt", dayStartMs).lte("updatedAt", dayEndMs),
       )
+      .filter((q) => q.neq(q.field("estimatedCostUsd"), undefined))
       .collect();
     const totalCostUsd = inRange.reduce((sum, session) => sum + (session.estimatedCostUsd ?? 0), 0);
     return {
