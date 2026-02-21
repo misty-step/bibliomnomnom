@@ -30,7 +30,7 @@ describe("listening sessions synthesis helpers", () => {
     expect(clamped.openQuestions).toHaveLength(6);
     expect(clamped.quotes).toHaveLength(6);
     expect(clamped.followUpQuestions).toHaveLength(6);
-    expect(clamped.contextExpansions).toHaveLength(6);
+    expect(clamped.contextExpansions).toHaveLength(4);
 
     expect(clamped.insights[0]?.title).toBe("Title 0");
     expect(clamped.insights[0]?.content).toBe("Content 0");
@@ -167,6 +167,6 @@ describe("normalizeArtifacts", () => {
     expect(result.openQuestions).toHaveLength(6);
     expect(result.quotes).toHaveLength(6);
     expect(result.followUpQuestions).toHaveLength(6);
-    expect(result.contextExpansions).toHaveLength(6);
+    expect(result.contextExpansions).toHaveLength(4);
   });
 });

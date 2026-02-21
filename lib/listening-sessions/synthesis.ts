@@ -48,7 +48,7 @@ export const EMPTY_SYNTHESIS_ARTIFACTS: SynthesisArtifacts = {
 };
 
 const MAX_SYNTH_ARTIFACT_ITEMS = 6;
-const MAX_CONTEXT_EXPANSION_ITEMS = 6;
+const MAX_CONTEXT_EXPANSION_ITEMS = 4; // matches MAX_SYNTH_CONTEXT_EXPANSIONS in convex/listeningSessions.ts
 
 export function clampArtifacts(input: SynthesisArtifacts): SynthesisArtifacts {
   return {

@@ -190,10 +190,18 @@ async function checkStateMachineTransitions() {
 }
 
 async function checkSynthesisCompleteness() {
-  const keys = Object.keys(EMPTY_SYNTHESIS_ARTIFACTS).sort().join(",");
+  const expectedKeys = [
+    "contextExpansions",
+    "followUpQuestions",
+    "insights",
+    "openQuestions",
+    "quotes",
+  ].sort();
+  const actualKeys = Object.keys(EMPTY_SYNTHESIS_ARTIFACTS).sort();
   assert(
-    keys === "contextExpansions,followUpQuestions,insights,openQuestions,quotes",
-    "EMPTY_SYNTHESIS_ARTIFACTS keys changed",
+    actualKeys.length === expectedKeys.length &&
+      actualKeys.every((key, index) => key === expectedKeys[index]),
+    `EMPTY_SYNTHESIS_ARTIFACTS keys changed. Expected: [${expectedKeys.join(", ")}], Got: [${actualKeys.join(", ")}]`,
   );
 }
 
