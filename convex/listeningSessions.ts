@@ -445,11 +445,20 @@ export const getForProcessing = internalQuery({
 export const getDebugStats = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, { userId }) => {
-    const failedSessions = await ctx.db
-      .query("listeningSessions")
-      .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "failed"))
-      .order("desc")
-      .take(100);
+    const [failedSessions, completedSessions] = await Promise.all([
+      ctx.db
+        .query("listeningSessions")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "failed"))
+        .order("desc")
+        .take(100),
+      ctx.db
+        .query("listeningSessions")
+        .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "complete"))
+        .order("desc")
+        .take(200),
+    ]);
+
+    const degradedSessions = completedSessions.filter((s) => s.degradedMode);
 
     const stageBreakdown: Record<string, number> = {};
     for (const session of failedSessions) {
@@ -461,7 +470,6 @@ export const getDebugStats = internalQuery({
     const fallbackUsedCount = failedSessions.filter(
       (session) => session.transcribeFallbackUsed,
     ).length;
-    const degradedModeCount = failedSessions.filter((session) => session.degradedMode).length;
     const totalEstimatedCost = failedSessions.reduce(
       (sum, session) => sum + (session.estimatedCostUsd ?? 0),
       0,
@@ -471,8 +479,15 @@ export const getDebugStats = internalQuery({
       totalFailed,
       stageBreakdown,
       fallbackUsedCount,
-      degradedModeCount,
       totalEstimatedCostUsd: Math.round(totalEstimatedCost * 10000) / 10000,
+      // Sessions that completed but in degraded mode (synthesis partial/missing).
+      degradedCompletions: {
+        count: degradedSessions.length,
+        totalEstimatedCostUsd:
+          Math.round(
+            degradedSessions.reduce((sum, s) => sum + (s.estimatedCostUsd ?? 0), 0) * 10000,
+          ) / 10000,
+      },
       // No user/book identifiers — only operational diagnostics per user.
       recentFailures: failedSessions.slice(0, 20).map((session) => ({
         id: session._id,
@@ -480,7 +495,6 @@ export const getDebugStats = internalQuery({
         lastError: session.lastError,
         retryCount: session.retryCount ?? 0,
         transcribeFallbackUsed: session.transcribeFallbackUsed ?? false,
-        degradedMode: session.degradedMode ?? false,
         estimatedCostUsd: session.estimatedCostUsd ?? 0,
         updatedAt: session.updatedAt,
       })),

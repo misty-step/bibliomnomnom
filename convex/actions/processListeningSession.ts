@@ -15,6 +15,7 @@ import {
 import { getListeningSynthesisConfig } from "../../lib/listening-sessions/synthesisConfig";
 import { buildListeningSynthesisPrompt } from "../../lib/listening-sessions/synthesisPrompt";
 import { transcribeAudio } from "../../lib/listening-sessions/transcription";
+import { estimateCostUsd, getUsageTokens } from "../../lib/listening-sessions/cost-estimation";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS_MS = [30_000, 60_000, 120_000] as const;
@@ -233,6 +234,7 @@ export async function processListeningSessionHandler(
 
     let synthesis: SynthesisArtifacts = EMPTY_SYNTHESIS_ARTIFACTS;
     let hasSynthesis = false;
+    let estimatedCostUsd: number | undefined;
 
     const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
     if (openRouterApiKey) {
@@ -253,7 +255,8 @@ export async function processListeningSessionHandler(
 
       try {
         const config = getListeningSynthesisConfig();
-        const { content } = await openRouterChatCompletionFn({
+        const synthesisStart = Date.now();
+        const { content, raw } = await openRouterChatCompletionFn({
           apiKey: openRouterApiKey,
           timeoutMs: 90_000,
           referer: process.env.NEXT_PUBLIC_APP_URL || "https://bibliomnomnom.app",
@@ -291,6 +294,23 @@ export async function processListeningSessionHandler(
             ],
           },
         });
+        const synthesisLatencyMs = Date.now() - synthesisStart;
+
+        const resolvedModel = raw.model ?? config.model;
+        const { promptTokens, completionTokens } = getUsageTokens(raw.usage);
+        estimatedCostUsd = estimateCostUsd(resolvedModel, promptTokens, completionTokens);
+
+        console.log(
+          JSON.stringify({
+            msg: "background_worker_synthesis_complete",
+            sessionId: args.sessionId,
+            synthesisLatencyMs,
+            model: resolvedModel,
+            promptTokens,
+            completionTokens,
+            estimatedCostUsd,
+          }),
+        );
 
         const parsed = JSON.parse(content) as unknown;
         synthesis = clampArtifacts(normalizeArtifacts(parsed));
@@ -309,6 +329,7 @@ export async function processListeningSessionHandler(
       transcript,
       transcriptProvider: transcriptProvider || undefined,
       synthesis: hasSynthesis ? synthesis : undefined,
+      estimatedCostUsd,
     });
   } catch (error) {
     await retryOrFail(ctx, {
