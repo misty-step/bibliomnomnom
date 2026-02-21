@@ -42,6 +42,7 @@ function makeNote(id: string, overrides: Partial<ContextPackNoteInput> = {}): Co
     id,
     bookId: "book-current",
     bookTitle: "Current Book",
+    bookPrivacy: "public",
     type: "note",
     content: `note content ${id}`,
     updatedAt: BASE_TIME,
@@ -237,6 +238,54 @@ describe("packContext", () => {
     expect(packed.recentNotes).toHaveLength(1);
     expect(packed.recentNotes[0]?.content.length).toBeLessThan(longContent.length);
     expect(packed.summary.tokensUsed).toBeLessThanOrEqual(20);
+  });
+
+  it("excludes notes from private non-current books", () => {
+    const notes = [
+      makeNote("private-other", {
+        bookId: "book-other",
+        bookTitle: "Private Other Book",
+        bookPrivacy: "private",
+        content: "sensitive note from private book",
+        updatedAt: BASE_TIME + 1_000,
+      }),
+      makeNote("public-other", {
+        bookId: "book-public",
+        bookTitle: "Public Other Book",
+        bookPrivacy: "public",
+        content: "note from public book",
+        updatedAt: BASE_TIME + 500,
+      }),
+      makeNote("current", {
+        bookId: "book-current",
+        bookTitle: "Current Book",
+        bookPrivacy: "private",
+        content: "note from current book (included even if private)",
+        updatedAt: BASE_TIME,
+      }),
+    ];
+
+    const packed = packContext(makeInput({ notes }), { tokenBudget: 2_000 });
+
+    const bookTitles = packed.recentNotes.map((n) => n.bookTitle);
+    expect(bookTitles).not.toContain("Private Other Book");
+    expect(bookTitles).toContain("Public Other Book");
+    expect(bookTitles).toContain("Current Book");
+    expect(packed.summary.privacyRedactions).toBeGreaterThanOrEqual(1);
+  });
+
+  it("excludes private library books from AI context", () => {
+    const books: ContextPackLibraryBook[] = [
+      makeLibraryBook("pub", "currently-reading", { privacy: "public" }),
+      makeLibraryBook("priv", "currently-reading", { privacy: "private" }),
+    ];
+
+    const packed = packContext(makeInput({ books }), { tokenBudget: 2_000 });
+
+    const titles = packed.currentlyReading.map((b) => b.title);
+    expect(titles).toContain("Title pub");
+    expect(titles).not.toContain("Title priv");
+    expect(packed.summary.privacyRedactions).toBeGreaterThanOrEqual(1);
   });
 
   it("accounts for current book title and author tokens in budget", () => {

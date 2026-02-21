@@ -197,6 +197,7 @@ async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId:
     id: note._id,
     bookId: note.bookId,
     bookTitle: bookTitleById.get(note.bookId) ?? "Unknown book",
+    bookPrivacy: bookPrivacyById.get(note.bookId) ?? "private",
     type: (note.type === "quote" ? "quote" : "note") as "note" | "quote",
     content: note.content,
     updatedAt: note.updatedAt,

@@ -12,6 +12,7 @@ export type ContextPackNoteInput = {
   id: string;
   bookId: string;
   bookTitle: string;
+  bookPrivacy: "public" | "private";
   type: "note" | "quote";
   content: string;
   updatedAt: number;
@@ -232,6 +233,10 @@ export function packContext(
 
   for (const status of BOOK_STATUS_ORDER) {
     for (const book of booksByStatus[status]) {
+      if (book.privacy === "private") {
+        privacyRedactions += 1;
+        continue;
+      }
       const title = normalizeText(book.title);
       const author = normalizeText(book.author);
       const tokensForBook = estimateBookItemTokens({ title, author });
@@ -275,8 +280,15 @@ export function packContext(
     for (const note of rankedNotes) {
       if (note.content.length === 0) continue;
 
-      const bookCount = notesPerBook.get(note.bookId) ?? 0;
+      // Exclude notes from private books that aren't the current book.
+      // Notes from the current book are always in-scope (the user opened a session for it).
       const isCurrentBookNote = note.bookId === input.currentBook.id;
+      if (!isCurrentBookNote && note.bookPrivacy === "private") {
+        privacyRedactions += 1;
+        continue;
+      }
+
+      const bookCount = notesPerBook.get(note.bookId) ?? 0;
       const limit = isCurrentBookNote ? maxNotesFromCurrentBook : maxNotesPerOtherBook;
       if (bookCount >= limit) continue;
 
