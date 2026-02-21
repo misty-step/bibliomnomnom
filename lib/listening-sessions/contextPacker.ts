@@ -122,31 +122,22 @@ function formatNoteForTokenEstimate(note: {
   return `[${note.bookTitle}] (${note.type}) ${note.content}`;
 }
 
+// Direct calculation: estimateTokens is ceil(len/4), so we can compute the
+// max content chars algebraically instead of iterating. If this is ever swapped
+// to a real tokenizer, replace with binary search.
 function fitNoteContentToBudget(
   note: { bookTitle: string; type: "note" | "quote"; content: string },
   remainingTokens: number,
 ): string | null {
   if (remainingTokens <= 0) return null;
   const prefix = `[${note.bookTitle}] (${note.type}) `;
-  if (estimateTokens(prefix) > remainingTokens) return null;
+  const prefixTokens = estimateTokens(prefix);
+  if (prefixTokens >= remainingTokens) return null;
 
-  const maxCharsByRemainingBudget = Math.max(1, remainingTokens * 4 - prefix.length);
-  const absoluteMaxChars = Math.min(note.content.length, maxCharsByRemainingBudget);
+  const maxContentChars = Math.min(note.content.length, (remainingTokens - prefixTokens) * 4);
+  if (maxContentChars <= 0) return null;
 
-  for (let chars = absoluteMaxChars; chars >= 1; chars -= 1) {
-    const candidateContent = truncateChars(note.content, chars);
-    if (!candidateContent) continue;
-    const candidateTokens = estimateTokens(
-      formatNoteForTokenEstimate({
-        bookTitle: note.bookTitle,
-        type: note.type,
-        content: candidateContent,
-      }),
-    );
-    if (candidateTokens <= remainingTokens) return candidateContent;
-  }
-
-  return null;
+  return truncateChars(note.content, maxContentChars);
 }
 
 /**

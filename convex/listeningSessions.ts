@@ -10,7 +10,7 @@ import { requireAuth } from "./auth";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { packContext } from "../lib/listening-sessions/contextPacker";
+import { packContext, type ContextPackLibraryBook } from "../lib/listening-sessions/contextPacker";
 
 const synthesisArtifacts = v.object({
   insights: v.array(
@@ -44,7 +44,6 @@ const MAX_SYNTH_NOTES = 12;
 const MAX_SYNTH_ARTIFACT_ITEMS = 6;
 const MAX_SYNTH_CONTEXT_EXPANSIONS = 4;
 const MAX_RECENT_NOTES = 20;
-const RECENT_NOTE_SNIPPET_CHARS = 280;
 const MAX_PROCESSING_RETRIES = 3;
 const DEFAULT_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 const STUCK_SESSION_BATCH_SIZE = 20;
@@ -144,37 +143,22 @@ async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId:
     .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "read"))
     .take(50);
 
+  const toPackerBooks = (docs: Doc<"books">[], status: ContextPackLibraryBook["status"]) =>
+    docs
+      .filter((b) => b._id !== currentBook._id)
+      .map((b) => ({
+        id: b._id,
+        title: b.title,
+        author: b.author,
+        status,
+        updatedAt: b.updatedAt,
+        privacy: b.privacy,
+      }));
+
   const allLibraryBooks = [
-    ...currentlyReadingDocs
-      .filter((b) => b._id !== currentBook._id)
-      .map((b) => ({
-        id: b._id,
-        title: b.title,
-        author: b.author,
-        status: "currently-reading" as const,
-        updatedAt: b.updatedAt,
-        privacy: b.privacy,
-      })),
-    ...wantToReadDocs
-      .filter((b) => b._id !== currentBook._id)
-      .map((b) => ({
-        id: b._id,
-        title: b.title,
-        author: b.author,
-        status: "want-to-read" as const,
-        updatedAt: b.updatedAt,
-        privacy: b.privacy,
-      })),
-    ...readDocs
-      .filter((b) => b._id !== currentBook._id)
-      .map((b) => ({
-        id: b._id,
-        title: b.title,
-        author: b.author,
-        status: "read" as const,
-        updatedAt: b.updatedAt,
-        privacy: b.privacy,
-      })),
+    ...toPackerBooks(currentlyReadingDocs, "currently-reading"),
+    ...toPackerBooks(wantToReadDocs, "want-to-read"),
+    ...toPackerBooks(readDocs, "read"),
   ];
 
   const recentNotesDocs = await ctx.db
