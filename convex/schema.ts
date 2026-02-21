@@ -102,6 +102,13 @@ export default defineSchema({
     lastError: v.optional(v.string()),
     retryCount: v.optional(v.number()),
     lastRetryAt: v.optional(v.number()),
+    transcribeLatencyMs: v.optional(v.number()),
+    synthesisLatencyMs: v.optional(v.number()),
+    transcribeFallbackUsed: v.optional(v.boolean()),
+    synthesisProvider: v.optional(v.string()),
+    degradedMode: v.optional(v.boolean()),
+    estimatedCostUsd: v.optional(v.number()),
+    failedStage: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
