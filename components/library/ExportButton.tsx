@@ -18,7 +18,9 @@ import { useToast } from "@/hooks/use-toast";
 type ExportFormat = "json" | "csv" | "markdown";
 
 export function ExportButton() {
-  const exportData = useQuery(api.books.exportAllData);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Only fetch export data when the menu is open (lazy — avoids loading on every library visit)
+  const exportData = useQuery(api.books.exportAllData, isMenuOpen ? {} : "skip");
   const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
@@ -50,9 +52,9 @@ export function ExportButton() {
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="secondary" size="sm" disabled={isExporting || !exportData}>
+        <Button variant="secondary" size="sm" disabled={isExporting || (isMenuOpen && !exportData)}>
           {isExporting ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (

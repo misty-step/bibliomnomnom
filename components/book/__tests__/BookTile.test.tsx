@@ -7,6 +7,7 @@ import type { Doc, Id } from "@/convex/_generated/dataModel";
 
 const pushMock = vi.fn();
 const updateStatusMock = vi.fn();
+const toastMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock }),
@@ -14,6 +15,10 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("convex/react", () => ({
   useMutation: () => updateStatusMock,
+}));
+
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: toastMock }),
 }));
 
 vi.mock("framer-motion", () => ({
@@ -71,6 +76,7 @@ describe("BookTile status actions", () => {
   beforeEach(() => {
     pushMock.mockReset();
     updateStatusMock.mockReset();
+    toastMock.mockReset();
   });
 
   it('shows "Start Reading" for want-to-read books', () => {
@@ -104,6 +110,39 @@ describe("BookTile status actions", () => {
       id: book._id,
       status: "currently-reading",
     });
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("shows destructive toast when updateStatus mutation fails", async () => {
+    const user = userEvent.setup();
+    updateStatusMock.mockRejectedValue(new Error("network error"));
+    const book = makeBook({ status: "want-to-read" });
+
+    render(<BookTile book={book} />);
+    await user.click(screen.getByRole("button", { name: "Start Reading" }));
+
+    // Wait for the rejected promise to settle and toast to be called
+    await vi.waitFor(() => {
+      expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+    });
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate when keyboard event fires on action button", async () => {
+    const user = userEvent.setup();
+    updateStatusMock.mockResolvedValue(undefined);
+    const book = makeBook({ status: "want-to-read" });
+
+    render(<BookTile book={book} />);
+    const actionButton = screen.getByRole("button", { name: "Start Reading" });
+
+    // Keyboard events on the action button must not bubble up to the card's
+    // keydown handler (which triggers navigation)
+    await user.keyboard("[Tab]"); // focus into the component
+    actionButton.focus();
+    await user.keyboard("[Space]");
+
+    // Navigation should NOT have fired — stopPropagation prevents card nav
     expect(pushMock).not.toHaveBeenCalled();
   });
 });
