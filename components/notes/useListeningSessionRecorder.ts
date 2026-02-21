@@ -12,6 +12,7 @@ import {
   type SynthesisArtifacts,
 } from "@/lib/listening-sessions/synthesis";
 import { DEFAULT_AUDIO_MIME_TYPE, normalizeAudioMimeType } from "@/lib/listening-sessions/mime";
+import type { PipelineStage } from "@/lib/listening-sessions/pipeline-stages";
 
 const CAP_DURATION_MS = 30 * 60 * 1000;
 const WARNING_DURATION_MS = 60 * 1000;
@@ -366,7 +367,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     setIsProcessing(true);
     clearTiming();
     stopSpeechRecognition();
-    let failedStage = "recording";
+    let failedStage: PipelineStage = "recording";
 
     try {
       let blob: Blob;

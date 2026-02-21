@@ -17,7 +17,8 @@ export function estimateCostUsd(
 ): number {
   const family = Object.keys(COST_PER_1M).find((key) => model.startsWith(key)) ?? "google/gemini";
   const rates = COST_PER_1M[family]!;
-  return (promptTokens * rates.input + completionTokens * rates.output) / 1_000_000;
+  const cost = (promptTokens * rates.input + completionTokens * rates.output) / 1_000_000;
+  return Math.max(0, cost);
 }
 
 /**

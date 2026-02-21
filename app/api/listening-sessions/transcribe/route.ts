@@ -9,6 +9,7 @@ import {
   TranscribeHttpError,
   type TranscriptionResponse,
 } from "@/lib/listening-sessions/transcription";
+import type { PipelineStage } from "@/lib/listening-sessions/pipeline-stages";
 
 // Budget: 10s audio fetch + 25s ElevenLabs + 25s Deepgram = 60s worst-case.
 export const maxDuration = 60;
@@ -153,7 +154,7 @@ export const POST = withObservability(async (request: Request) => {
       await entitlement.convex.mutation(api.listeningSessions.fail, {
         sessionId: body.sessionId,
         message,
-        failedStage: "transcribing",
+        failedStage: "transcribing" satisfies PipelineStage,
       });
     } catch {
       // no-op
