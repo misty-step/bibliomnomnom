@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { api } from "@/convex/_generated/api";
+import type { Id } from "@/convex/_generated/dataModel";
 import { log, withObservability } from "@/lib/api/withObservability";
 import { requireListeningSessionEntitlement } from "@/lib/listening-sessions/entitlements";
 import {
-  isTrustedAudioHost,
   transcribeAudio,
   TranscribeHttpError,
   type TranscriptionResponse,
@@ -13,7 +14,7 @@ import {
 export const maxDuration = 60;
 
 type TranscribeRequest = {
-  audioUrl: string;
+  sessionId: Id<"listeningSessions">;
 };
 
 export const POST = withObservability(async (request: Request) => {
@@ -28,14 +29,29 @@ export const POST = withObservability(async (request: Request) => {
 
   let body: TranscribeRequest;
   try {
-    const parsed = (await request.json()) as Partial<TranscribeRequest>;
-    if (!parsed.audioUrl || typeof parsed.audioUrl !== "string") {
+    const parsed = (await request.json()) as Partial<{
+      sessionId: unknown;
+      audioUrl: unknown;
+    }>;
+    if (typeof parsed !== "object" || parsed === null) {
       return NextResponse.json(
-        { error: "audioUrl is required." },
+        { error: "sessionId is required." },
         { status: 400, headers: { "x-request-id": requestId } },
       );
     }
-    body = { audioUrl: parsed.audioUrl };
+    if ("audioUrl" in parsed) {
+      return NextResponse.json(
+        { error: "audioUrl is no longer accepted. Use sessionId." },
+        { status: 400, headers: { "x-request-id": requestId } },
+      );
+    }
+    if (!parsed.sessionId || typeof parsed.sessionId !== "string") {
+      return NextResponse.json(
+        { error: "sessionId is required." },
+        { status: 400, headers: { "x-request-id": requestId } },
+      );
+    }
+    body = { sessionId: parsed.sessionId as Id<"listeningSessions"> };
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON body." },
@@ -72,31 +88,32 @@ export const POST = withObservability(async (request: Request) => {
     );
   }
 
-  let parsedAudioUrl: URL;
+  let audioUrl: string | null = null;
   try {
-    parsedAudioUrl = new URL(body.audioUrl);
-  } catch {
+    audioUrl = await entitlement.convex.query(api.listeningSessions.getAudioUrlForOwner, {
+      sessionId: body.sessionId,
+    });
+  } catch (error) {
+    log("error", "listening_session_audio_lookup_failed", {
+      requestId,
+      userIdSuffix: userId.slice(-6),
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
-      { error: "Invalid audio URL" },
-      { status: 400, headers: { "x-request-id": requestId } },
+      { error: "Failed to resolve session audio." },
+      { status: 500, headers: { "x-request-id": requestId } },
     );
   }
-  if (!["http:", "https:"].includes(parsedAudioUrl.protocol)) {
+  if (!audioUrl) {
     return NextResponse.json(
-      { error: "Invalid audio URL" },
-      { status: 400, headers: { "x-request-id": requestId } },
-    );
-  }
-  if (!isTrustedAudioHost(parsedAudioUrl.hostname)) {
-    return NextResponse.json(
-      { error: "Untrusted audio host" },
-      { status: 400, headers: { "x-request-id": requestId } },
+      { error: "Audio not found" },
+      { status: 404, headers: { "x-request-id": requestId } },
     );
   }
 
   try {
     const transcription: TranscriptionResponse = await transcribeAudio(
-      body.audioUrl,
+      audioUrl,
       elevenLabsKey,
       deepgramKey,
     );

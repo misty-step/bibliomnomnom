@@ -6,6 +6,7 @@ import {
   failListeningSessionHandler,
   markSynthesizingHandler,
   markTranscribingHandler,
+  toClientSession,
 } from "../../convex/listeningSessions";
 import * as authModule from "../../convex/auth";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -264,7 +265,6 @@ describe("listening session state machine handlers", () => {
     await expect(
       markTranscribingHandler(mutationCtx(transcribeDenied.ctx), {
         sessionId: SESSION_ID,
-        audioUrl: "https://blob/audio.webm",
         durationMs: 1000,
         capReached: false,
       }),
@@ -279,7 +279,6 @@ describe("listening session state machine handlers", () => {
 
     await markTranscribingHandler(mutationCtx(ctx), {
       sessionId: SESSION_ID,
-      audioUrl: "https://blob/audio.webm",
       durationMs: 18_765.9,
       capReached: false,
       transcriptLive: "a   b",
@@ -290,7 +289,6 @@ describe("listening session state machine handlers", () => {
     expect(session.durationMs).toBe(18_765);
     expect(patchCalls[0]?.doc).toMatchObject({
       status: "transcribing",
-      audioUrl: "https://blob/audio.webm",
       durationMs: 18_765,
       transcriptLive: "a b",
     });
@@ -303,7 +301,6 @@ describe("listening session state machine handlers", () => {
     await expect(
       markTranscribingHandler(mutationCtx(rejected.ctx), {
         sessionId: SESSION_ID,
-        audioUrl: "https://blob/audio.webm",
         durationMs: 1000,
         capReached: true,
       }),
@@ -319,7 +316,6 @@ describe("listening session state machine handlers", () => {
 
     await markTranscribingHandler(mutationCtx(ctx), {
       sessionId: SESSION_ID,
-      audioUrl: "https://blob/audio.webm",
       durationMs: 1000,
       capReached: false,
       transcriptLive: "x".repeat(4_001),
@@ -578,5 +574,29 @@ describe("listening session state machine handlers", () => {
         message: "boom",
       }),
     ).rejects.toThrow("Invalid session transition from complete to failed");
+  });
+});
+
+describe("toClientSession", () => {
+  it("strips audioUrl so it is never exposed to clients", () => {
+    const session = buildSession({
+      audioUrl: "https://blob.vercel-storage.com/listening-sessions/session_1/audio.webm",
+    });
+    const result = toClientSession(session as never);
+    expect(result).not.toHaveProperty("audioUrl");
+  });
+
+  it("preserves all other session fields", () => {
+    const session = buildSession({ status: "transcribing", durationMs: 12_000, capReached: true });
+    const result = toClientSession(session as never);
+    expect(result.status).toBe("transcribing");
+    expect(result.durationMs).toBe(12_000);
+    expect(result.capReached).toBe(true);
+  });
+
+  it("does not expose audioUrl even when session has no audioUrl set", () => {
+    const session = buildSession();
+    const result = toClientSession(session as never);
+    expect("audioUrl" in result).toBe(false);
   });
 });

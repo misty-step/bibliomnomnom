@@ -101,6 +101,16 @@ function truncate(input: string, maxChars: number): string {
   return `${normalized.slice(0, maxChars - 1)}…`;
 }
 
+/**
+ * @security Strips audioUrl before returning session data to clients.
+ * All client-facing queries MUST pass through this projection.
+ * If new sensitive fields are added to the schema, add them here.
+ */
+export function toClientSession(session: Doc<"listeningSessions">) {
+  const { audioUrl: _audioUrl, ...safeSession } = session;
+  return safeSession;
+}
+
 async function getOwnedBook(
   ctx: Parameters<typeof requireAuth>[0],
   userId: Id<"users">,
@@ -379,12 +389,14 @@ export const listByBook = query({
     const userId = await requireAuth(ctx);
     await getOwnedBook(ctx, userId, args.bookId);
 
-    return await ctx.db
+    const sessions = await ctx.db
       .query("listeningSessions")
       .withIndex("by_book", (q) => q.eq("bookId", args.bookId))
       .filter((q) => q.eq(q.field("userId"), userId))
       .order("desc")
       .collect();
+
+    return sessions.map(toClientSession);
   },
 });
 
@@ -392,7 +404,18 @@ export const get = query({
   args: { sessionId: v.id("listeningSessions") },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    return await getOwnedSession(ctx, userId, args.sessionId);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    return toClientSession(session);
+  },
+});
+
+export const getAudioUrlForOwner = query({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== userId) return null;
+    return session.audioUrl ?? null;
   },
 });
 
@@ -455,10 +478,10 @@ export const markTranscribingHandler = async (
   ctx: MutationCtx,
   args: {
     sessionId: Id<"listeningSessions">;
-    audioUrl: string;
     durationMs: number;
     capReached: boolean;
     transcriptLive?: string;
+    audioUrl?: string;
   },
 ) => {
   const userId = await requireAuth(ctx);
@@ -467,25 +490,31 @@ export const markTranscribingHandler = async (
   assertTransition(session.status, "transcribing");
 
   const now = Date.now();
-  await ctx.db.patch(session._id, {
+  const patch: Parameters<typeof ctx.db.patch>[1] = {
     status: "transcribing",
-    audioUrl: args.audioUrl,
     durationMs: Math.max(0, Math.floor(args.durationMs)),
     capReached: args.capReached,
     transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
     endedAt: now,
     updatedAt: now,
     lastError: undefined,
-  });
+  };
+  // Only set audioUrl when explicitly provided — avoids clobbering existing value
+  // on the backward-compat markTranscribing path where clients don't send it.
+  if (args.audioUrl !== undefined) {
+    patch.audioUrl = args.audioUrl;
+  }
+  await ctx.db.patch(session._id, patch);
 };
 
 export const markTranscribing = mutation({
   args: {
     sessionId: v.id("listeningSessions"),
-    audioUrl: v.string(),
     durationMs: v.number(),
     capReached: v.boolean(),
     transcriptLive: v.optional(v.string()),
+    // audioUrl set by the server-side upload route; not sent by browser clients.
+    audioUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await markTranscribingHandler(ctx, args);
