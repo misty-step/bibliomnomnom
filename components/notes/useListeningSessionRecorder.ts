@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useMutation } from "convex/react";
-import { upload } from "@vercel/blob/client";
 import type { Id } from "@/convex/_generated/dataModel";
 import { api } from "@/convex/_generated/api";
 import { usePostHog } from "posthog-js/react";
@@ -12,11 +11,7 @@ import {
   EMPTY_SYNTHESIS_ARTIFACTS,
   type SynthesisArtifacts,
 } from "@/lib/listening-sessions/synthesis";
-import {
-  DEFAULT_AUDIO_MIME_TYPE,
-  extensionForAudioMimeType,
-  normalizeAudioMimeType,
-} from "@/lib/listening-sessions/mime";
+import { DEFAULT_AUDIO_MIME_TYPE, normalizeAudioMimeType } from "@/lib/listening-sessions/mime";
 
 const CAP_DURATION_MS = 30 * 60 * 1000;
 const WARNING_DURATION_MS = 60 * 1000;
@@ -120,20 +115,35 @@ function playAlertTone(kind: "warning" | "cap") {
 // Each retry hits the upload-audio API route which enforces a 30/day rate limit.
 // With 3 attempts max, worst case is 3x rate limit consumption per session.
 // At typical usage (1-5 sessions/day) this leaves ample headroom.
-async function uploadAudioWithRetry(
-  filename: string,
+async function uploadAudioToServer(
+  sessionId: Id<"listeningSessions">,
   blob: Blob,
   contentType: string,
+  durationMs: number,
+  capReached: boolean,
+  transcriptLive: string,
   onAttemptFailed?: (attempt: number, error: Error) => void,
-): Promise<{ url: string }> {
+): Promise<void> {
   let lastError: Error = new Error("Upload failed");
   for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt++) {
     try {
-      return await upload(filename, blob, {
-        access: "public",
-        contentType,
-        handleUploadUrl: "/api/blob/upload-audio",
+      const response = await fetch(`/api/listening-sessions/${sessionId}/upload`, {
+        method: "POST",
+        headers: {
+          "Content-Type": contentType,
+          "x-content-type": contentType,
+          "x-duration-ms": String(durationMs),
+          "x-cap-reached": String(capReached),
+          ...(transcriptLive ? { "x-transcript-live": transcriptLive } : {}),
+        },
+        body: blob,
       });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || "Audio upload failed.");
+      }
+      return;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error("Upload failed");
       onAttemptFailed?.(attempt, lastError);
@@ -152,7 +162,6 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
   const { toast } = useToast();
   const posthog = usePostHog();
   const createSession = useMutation(api.listeningSessions.create);
-  const markTranscribing = useMutation(api.listeningSessions.markTranscribing);
   const markSynthesizing = useMutation(api.listeningSessions.markSynthesizing);
   const completeSession = useMutation(api.listeningSessions.complete);
   const failSession = useMutation(api.listeningSessions.fail);
@@ -244,11 +253,13 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     setLiveTranscript("");
   };
 
-  const requestTranscription = async (audioUrl: string): Promise<TranscribeResult> => {
+  const requestTranscription = async (
+    sessionId: Id<"listeningSessions">,
+  ): Promise<TranscribeResult> => {
     const response = await fetch("/api/listening-sessions/transcribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioUrl }),
+      body: JSON.stringify({ sessionId }),
     });
     const payload = (await response.json()) as Partial<TranscribeResult> & { error?: string };
     if (!response.ok) {
@@ -383,25 +394,26 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
 
       const contentType =
         normalizeAudioMimeType(blob.type || recorder.mimeType) ?? DEFAULT_AUDIO_MIME_TYPE;
-      const extension = extensionForAudioMimeType(contentType);
-      const filename = `listening-sessions/${bookId}-${Date.now()}.${extension}`;
-      const uploaded = await uploadAudioWithRetry(filename, blob, contentType, (attempt, error) => {
-        trackSessionEvent(EVENT_AUDIO_UPLOAD_ATTEMPT_FAILED, {
-          attempt,
-          error: error.message,
-          willRetry: attempt < UPLOAD_MAX_ATTEMPTS,
-        });
-      });
-
-      await markTranscribing({
+      const transcriptLive = liveTranscript.slice(0, LIVE_TRANSCRIPT_MAX_CHARS);
+      await uploadAudioToServer(
         sessionId,
-        audioUrl: uploaded.url,
+        blob,
+        contentType,
         durationMs,
         capReached,
-        transcriptLive: liveTranscript.slice(0, LIVE_TRANSCRIPT_MAX_CHARS) || undefined,
-      });
+        transcriptLive,
+        (attempt, error) => {
+          trackSessionEvent(EVENT_AUDIO_UPLOAD_ATTEMPT_FAILED, {
+            attempt,
+            error: error.message,
+            willRetry: attempt < UPLOAD_MAX_ATTEMPTS,
+          });
+        },
+      );
 
-      const transcription = await requestTranscription(uploaded.url);
+      // Note: uploadAudioToServer calls saveAudioUrlAndMarkTranscribing on the server,
+      // which already transitions the session to "transcribing". No separate call needed.
+      const transcription = await requestTranscription(sessionId);
       await markSynthesizing({ sessionId });
 
       let synthesized = EMPTY_SYNTHESIS_ARTIFACTS;

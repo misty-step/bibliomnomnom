@@ -8,7 +8,6 @@ const markSynthesizingMock = vi.fn();
 const completeSessionMock = vi.fn();
 const failSessionMock = vi.fn();
 const mutationDispatcherMock = vi.fn();
-const uploadMock = vi.fn();
 const toastMock = vi.fn();
 const captureMock = vi.fn();
 const fetchMock = vi.fn();
@@ -16,10 +15,6 @@ const getUserMediaMock = vi.fn();
 
 vi.mock("convex/react", () => ({
   useMutation: () => mutationDispatcherMock,
-}));
-
-vi.mock("@vercel/blob/client", () => ({
-  upload: (...args: unknown[]) => uploadMock(...args),
 }));
 
 vi.mock("@/lib/hooks/useAuthedQuery", () => ({
@@ -92,7 +87,6 @@ describe("useListeningSessionRecorder", () => {
     completeSessionMock.mockReset();
     failSessionMock.mockReset();
     mutationDispatcherMock.mockReset();
-    uploadMock.mockReset();
     toastMock.mockReset();
     captureMock.mockReset();
     fetchMock.mockReset();
@@ -100,7 +94,7 @@ describe("useListeningSessionRecorder", () => {
 
     mutationDispatcherMock.mockImplementation((args: Record<string, unknown>) => {
       if ("bookId" in args) return createSessionMock(args);
-      if ("audioUrl" in args) return markTranscribingMock(args);
+      if ("durationMs" in args) return markTranscribingMock(args);
       if ("transcript" in args) return completeSessionMock(args);
       if ("message" in args) return failSessionMock(args);
       return markSynthesizingMock(args);
@@ -111,10 +105,15 @@ describe("useListeningSessionRecorder", () => {
     markSynthesizingMock.mockResolvedValue(undefined);
     completeSessionMock.mockResolvedValue(undefined);
     failSessionMock.mockResolvedValue(undefined);
-    uploadMock.mockResolvedValue({ url: "https://example.com/audio.webm" });
 
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        return {
+          ok: true,
+          json: async () => ({ ok: true }),
+        } as Response;
+      }
       if (url.includes("/api/listening-sessions/transcribe")) {
         return {
           ok: true,
@@ -231,6 +230,12 @@ describe("useListeningSessionRecorder", () => {
   it("keeps rollover disabled when capped processing fails", async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        return {
+          ok: true,
+          json: async () => ({ ok: true }),
+        } as Response;
+      }
       if (url.includes("/api/listening-sessions/transcribe")) {
         return {
           ok: false,
@@ -300,9 +305,44 @@ describe("useListeningSessionRecorder", () => {
   });
 
   it("retries upload on transient failure and completes on second attempt", async () => {
-    uploadMock
-      .mockRejectedValueOnce(new Error("Network error"))
-      .mockResolvedValueOnce({ url: "https://example.com/audio.webm" });
+    let uploadAttempts = 0;
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        uploadAttempts += 1;
+        if (uploadAttempts === 1) {
+          return {
+            ok: false,
+            json: async () => ({ error: "Network error" }),
+          } as Response;
+        }
+        return {
+          ok: true,
+          json: async () => ({ ok: true }),
+        } as Response;
+      }
+      if (url.includes("/api/listening-sessions/transcribe")) {
+        return {
+          ok: true,
+          json: async () => ({ transcript: "hello transcript", provider: "deepgram" }),
+        } as Response;
+      }
+      if (url.includes("/api/listening-sessions/synthesize")) {
+        return {
+          ok: true,
+          json: async () => ({
+            artifacts: {
+              insights: [],
+              openQuestions: [],
+              quotes: [],
+              followUpQuestions: [],
+              contextExpansions: [],
+            },
+          }),
+        } as Response;
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
 
     render(<RecorderHarness bookId="book_1" />);
 
@@ -313,7 +353,13 @@ describe("useListeningSessionRecorder", () => {
       await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 5_000);
     });
 
-    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => {
+      const uploadCalls = fetchMock.mock.calls.filter(([input]) => {
+        const url = String(input);
+        return url.includes("/api/listening-sessions/") && url.includes("/upload");
+      });
+      expect(uploadCalls).toHaveLength(2);
+    });
     await waitFor(() => expect(completeSessionMock).toHaveBeenCalledTimes(1));
     expect(failSessionMock).not.toHaveBeenCalled();
     expect(captureMock).toHaveBeenCalledWith(
@@ -323,7 +369,16 @@ describe("useListeningSessionRecorder", () => {
   });
 
   it("fails session when all upload retries are exhausted", async () => {
-    uploadMock.mockRejectedValue(new Error("Storage unavailable"));
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        return {
+          ok: false,
+          json: async () => ({ error: "Storage unavailable" }),
+        } as Response;
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
 
     render(<RecorderHarness bookId="book_1" />);
 
@@ -334,7 +389,13 @@ describe("useListeningSessionRecorder", () => {
       await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 10_000);
     });
 
-    await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => {
+      const uploadCalls = fetchMock.mock.calls.filter(([input]) => {
+        const url = String(input);
+        return url.includes("/api/listening-sessions/") && url.includes("/upload");
+      });
+      expect(uploadCalls).toHaveLength(3);
+    });
     await waitFor(() =>
       expect(failSessionMock).toHaveBeenCalledWith(
         expect.objectContaining({ message: expect.stringMatching(/upload failed after/i) }),
@@ -366,7 +427,11 @@ describe("useListeningSessionRecorder", () => {
         expect.objectContaining({ message: expect.stringMatching(/too short/i) }),
       ),
     );
-    expect(uploadMock).not.toHaveBeenCalled();
+    const uploadCalls = fetchMock.mock.calls.filter(([input]) => {
+      const url = String(input);
+      return url.includes("/api/listening-sessions/") && url.includes("/upload");
+    });
+    expect(uploadCalls).toHaveLength(0);
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
   });
 });
