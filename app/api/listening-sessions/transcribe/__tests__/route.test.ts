@@ -25,6 +25,7 @@ const entitlementMock = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/listening-sessions/entitlements", () => ({
   requireListeningSessionEntitlement: entitlementMock,
 }));
+const convexQueryMock = vi.hoisted(() => vi.fn());
 
 const originalDeepgramKey = process.env.DEEPGRAM_API_KEY;
 const originalElevenLabsKey = process.env.ELEVENLABS_API_KEY;
@@ -37,7 +38,7 @@ describe("listening sessions transcribe route", () => {
       new Request("https://example.com/api/listening-sessions/transcribe", {
         method: "POST",
         headers: { "x-request-id": "req-transcribe-1", "Content-Type": "application/json" },
-        body: JSON.stringify({ audioUrl: "https://example.com/audio.webm" }),
+        body: JSON.stringify({ sessionId: "session_1" }),
       }),
     );
 
@@ -65,7 +66,7 @@ describe("listening sessions transcribe route", () => {
     expect(res.headers.get("x-request-id")).toBe("req-transcribe-invalid-json");
   });
 
-  it("returns 400 when audioUrl is missing", async () => {
+  it("returns 400 when sessionId is missing", async () => {
     authMock.mockResolvedValueOnce({ userId: "user_123" });
 
     const res = await POST(
@@ -81,12 +82,38 @@ describe("listening sessions transcribe route", () => {
     const body = await res.json();
 
     expect(res.status).toBe(400);
-    expect(body.error).toBe("audioUrl is required.");
+    expect(body.error).toBe("sessionId is required.");
     expect(res.headers.get("x-request-id")).toBe("req-transcribe-missing-audio");
+  });
+
+  it("returns 400 when request uses legacy audioUrl field", async () => {
+    authMock.mockResolvedValueOnce({ userId: "user_123" });
+    entitlementMock.mockResolvedValueOnce({ ok: true, convex: { query: convexQueryMock } });
+
+    const res = await POST(
+      new Request("https://example.com/api/listening-sessions/transcribe", {
+        method: "POST",
+        headers: {
+          "x-request-id": "req-transcribe-legacy-field",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          audioUrl: "https://blob.vercel-storage.com/listening-sessions/legacy.webm",
+        }),
+      }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/sessionId/i);
   });
 
   it("returns 500 when no STT provider is configured", async () => {
     authMock.mockResolvedValueOnce({ userId: "user_123" });
+    entitlementMock.mockResolvedValueOnce({ ok: true, convex: { query: convexQueryMock } });
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/audio.webm",
+    );
     delete process.env.DEEPGRAM_API_KEY;
     delete process.env.ELEVENLABS_API_KEY;
 
@@ -94,7 +121,7 @@ describe("listening sessions transcribe route", () => {
       new Request("https://example.com/api/listening-sessions/transcribe", {
         method: "POST",
         headers: { "x-request-id": "req-transcribe-2", "Content-Type": "application/json" },
-        body: JSON.stringify({ audioUrl: "https://example.com/audio.webm" }),
+        body: JSON.stringify({ sessionId: "session_1" }),
       }),
     );
     const body = await res.json();
@@ -103,28 +130,32 @@ describe("listening sessions transcribe route", () => {
     expect(body.error).toMatch("No STT provider");
   });
 
-  it("returns 400 when audioUrl host is not trusted", async () => {
+  it("returns 404 when no audio is available for session", async () => {
     authMock.mockResolvedValueOnce({ userId: "user_123" });
     process.env.DEEPGRAM_API_KEY = "test_deepgram_key";
-    entitlementMock.mockResolvedValueOnce({ ok: true, convex: {} });
+    entitlementMock.mockResolvedValueOnce({ ok: true, convex: { query: convexQueryMock } });
+    convexQueryMock.mockResolvedValueOnce(null);
 
     const res = await POST(
       new Request("https://example.com/api/listening-sessions/transcribe", {
         method: "POST",
         headers: { "x-request-id": "req-transcribe-3", "Content-Type": "application/json" },
-        body: JSON.stringify({ audioUrl: "https://example.com/audio.webm" }),
+        body: JSON.stringify({ sessionId: "session_missing" }),
       }),
     );
     const body = await res.json();
 
-    expect(res.status).toBe(400);
-    expect(body.error).toBe("Untrusted audio host");
+    expect(res.status).toBe(404);
+    expect(body.error).toBe("Audio not found");
   });
 
   it("returns 413 when uploaded audio exceeds max size", async () => {
     authMock.mockResolvedValueOnce({ userId: "user_123" });
     process.env.DEEPGRAM_API_KEY = "test_deepgram_key";
-    entitlementMock.mockResolvedValueOnce({ ok: true, convex: {} });
+    entitlementMock.mockResolvedValueOnce({ ok: true, convex: { query: convexQueryMock } });
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/big.webm",
+    );
 
     vi.stubGlobal(
       "fetch",
@@ -143,9 +174,7 @@ describe("listening sessions transcribe route", () => {
       new Request("https://example.com/api/listening-sessions/transcribe", {
         method: "POST",
         headers: { "x-request-id": "req-transcribe-4", "Content-Type": "application/json" },
-        body: JSON.stringify({
-          audioUrl: "https://blob.vercel-storage.com/listening-sessions/big.webm",
-        }),
+        body: JSON.stringify({ sessionId: "session_big" }),
       }),
     );
     const body = await res.json();
@@ -158,7 +187,10 @@ describe("listening sessions transcribe route", () => {
     authMock.mockResolvedValueOnce({ userId: "user_123" });
     process.env.DEEPGRAM_API_KEY = "test_deepgram_key";
     process.env.ELEVENLABS_API_KEY = "test_elevenlabs_key";
-    entitlementMock.mockResolvedValueOnce({ ok: true, convex: {} });
+    entitlementMock.mockResolvedValueOnce({ ok: true, convex: { query: convexQueryMock } });
+    convexQueryMock.mockResolvedValueOnce(
+      "https://blob.vercel-storage.com/listening-sessions/sample.webm",
+    );
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url =
@@ -197,9 +229,7 @@ describe("listening sessions transcribe route", () => {
       new Request("https://example.com/api/listening-sessions/transcribe", {
         method: "POST",
         headers: { "x-request-id": "req-transcribe-fallback", "Content-Type": "application/json" },
-        body: JSON.stringify({
-          audioUrl: "https://blob.vercel-storage.com/listening-sessions/sample.webm",
-        }),
+        body: JSON.stringify({ sessionId: "session_fallback" }),
       }),
     );
     const body = await res.json();
@@ -236,9 +266,7 @@ describe("listening sessions transcribe route", () => {
       new Request("https://example.com/api/listening-sessions/transcribe", {
         method: "POST",
         headers: { "x-request-id": "req-transcribe-no-access", "Content-Type": "application/json" },
-        body: JSON.stringify({
-          audioUrl: "https://blob.vercel-storage.com/listening-sessions/sample.webm",
-        }),
+        body: JSON.stringify({ sessionId: "session_denied" }),
       }),
     );
     const body = await res.json();
@@ -261,6 +289,7 @@ describe("listening sessions transcribe route", () => {
     }
 
     entitlementMock.mockReset();
+    convexQueryMock.mockReset();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
