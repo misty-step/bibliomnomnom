@@ -12,7 +12,7 @@ import {
   type SynthesisArtifacts,
   type SynthesisContext,
 } from "@/lib/listening-sessions/synthesis";
-import { ALERT_THRESHOLDS } from "@/lib/listening-sessions/alert-thresholds";
+import { logSessionCostGuardrails } from "@/lib/listening-sessions/cost-guardrails";
 import { estimateCostUsd, getUsageTokens } from "@/lib/listening-sessions/cost-estimation";
 import { getListeningSynthesisConfig } from "@/lib/listening-sessions/synthesisConfig";
 import { buildListeningSynthesisPrompt } from "@/lib/listening-sessions/synthesisPrompt";
@@ -141,30 +141,6 @@ function makeFallbackArtifacts(transcript: string, context?: SynthesisContext): 
           ]
         : [],
   });
-}
-
-function logSessionCostGuardrails(params: {
-  sessionId?: Id<"listeningSessions">;
-  estimatedCostUsd: number;
-  model: string;
-}) {
-  const sessionId = params.sessionId ?? "unknown";
-
-  if (params.estimatedCostUsd > ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD) {
-    log("error", "listening_session_cost_cap_exceeded", {
-      sessionId,
-      estimatedCostUsd: params.estimatedCostUsd,
-      model: params.model,
-      hardCapUsd: ALERT_THRESHOLDS.SESSION_COST_HARD_CAP_USD,
-    });
-  } else if (params.estimatedCostUsd > ALERT_THRESHOLDS.SESSION_COST_WARN_USD) {
-    log("warn", "listening_session_cost_elevated", {
-      sessionId,
-      estimatedCostUsd: params.estimatedCostUsd,
-      model: params.model,
-      warnThresholdUsd: ALERT_THRESHOLDS.SESSION_COST_WARN_USD,
-    });
-  }
 }
 
 export const POST = withObservability(async (request: Request) => {
@@ -354,11 +330,10 @@ export const POST = withObservability(async (request: Request) => {
     const estimatedCostUsd = estimateCostUsd(resolvedModel, promptTokens, completionTokens);
     const synthesisLatencyMs = Date.now() - synthesisStart;
 
-    logSessionCostGuardrails({
-      sessionId: body.sessionId,
-      estimatedCostUsd,
-      model: resolvedModel,
-    });
+    logSessionCostGuardrails(
+      { sessionId: body.sessionId, estimatedCostUsd, model: resolvedModel },
+      log,
+    );
     void patchSynthesisTelemetry({
       synthesisLatencyMs,
       synthesisProvider: resolvedModel,
