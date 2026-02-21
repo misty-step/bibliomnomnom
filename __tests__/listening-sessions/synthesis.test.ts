@@ -26,11 +26,11 @@ describe("listening sessions synthesis helpers", () => {
     };
 
     const clamped = clampArtifacts(artifacts);
-    expect(clamped.insights).toHaveLength(8);
-    expect(clamped.openQuestions).toHaveLength(8);
-    expect(clamped.quotes).toHaveLength(8);
-    expect(clamped.followUpQuestions).toHaveLength(8);
-    expect(clamped.contextExpansions).toHaveLength(6);
+    expect(clamped.insights).toHaveLength(6);
+    expect(clamped.openQuestions).toHaveLength(6);
+    expect(clamped.quotes).toHaveLength(6);
+    expect(clamped.followUpQuestions).toHaveLength(6);
+    expect(clamped.contextExpansions).toHaveLength(4);
 
     expect(clamped.insights[0]?.title).toBe("Title 0");
     expect(clamped.insights[0]?.content).toBe("Content 0");
@@ -151,6 +151,19 @@ describe("normalizeArtifacts", () => {
     expect(result.contextExpansions[0]?.title).toBe("Valid");
   });
 
+  it("fills missing fields with empty arrays for partial objects", () => {
+    const result = normalizeArtifacts({
+      insights: [{ title: "One", content: "One body" }],
+    });
+    expect(result).toEqual({
+      insights: [{ title: "One", content: "One body" }],
+      openQuestions: [],
+      quotes: [],
+      followUpQuestions: [],
+      contextExpansions: [],
+    });
+  });
+
   it("delegates to clampArtifacts (respects limits)", () => {
     const raw = {
       insights: Array.from({ length: 20 }, (_, i) => ({ title: `T${i}`, content: `C${i}` })),
@@ -163,10 +176,10 @@ describe("normalizeArtifacts", () => {
       })),
     };
     const result = normalizeArtifacts(raw);
-    expect(result.insights).toHaveLength(8);
-    expect(result.openQuestions).toHaveLength(8);
-    expect(result.quotes).toHaveLength(8);
-    expect(result.followUpQuestions).toHaveLength(8);
-    expect(result.contextExpansions).toHaveLength(6);
+    expect(result.insights).toHaveLength(6);
+    expect(result.openQuestions).toHaveLength(6);
+    expect(result.quotes).toHaveLength(6);
+    expect(result.followUpQuestions).toHaveLength(6);
+    expect(result.contextExpansions).toHaveLength(4);
   });
 });

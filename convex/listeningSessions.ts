@@ -11,6 +11,10 @@ import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { packContext, type ContextPackLibraryBook } from "../lib/listening-sessions/contextPacker";
+import {
+  MAX_SYNTH_ARTIFACT_ITEMS,
+  MAX_CONTEXT_EXPANSION_ITEMS,
+} from "../lib/listening-sessions/synthesis";
 
 const synthesisArtifacts = v.object({
   insights: v.array(
@@ -41,8 +45,6 @@ const MAX_CAP_DURATION_MS = 4 * 60 * 60 * 1000;
 const DEFAULT_WARNING_DURATION_MS = 60 * 1000;
 const MIN_WARNING_DURATION_MS = 15 * 1000;
 const MAX_SYNTH_NOTES = 12;
-const MAX_SYNTH_ARTIFACT_ITEMS = 6;
-const MAX_SYNTH_CONTEXT_EXPANSIONS = 4;
 const MAX_RECENT_NOTES = 20;
 const MAX_PROCESSING_RETRIES = 3;
 const DEFAULT_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
@@ -319,7 +321,7 @@ async function completeListeningSessionForUser(
 
     if (synth.contextExpansions.length > 0) {
       lines.push("### Context expansions", "");
-      for (const expansion of synth.contextExpansions.slice(0, MAX_SYNTH_CONTEXT_EXPANSIONS)) {
+      for (const expansion of synth.contextExpansions.slice(0, MAX_CONTEXT_EXPANSION_ITEMS)) {
         lines.push(`#### ${expansion.title}`, "", expansion.content.trim(), "");
       }
     }

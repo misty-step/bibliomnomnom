@@ -575,6 +575,172 @@ describe("listening session state machine handlers", () => {
       }),
     ).rejects.toThrow("Invalid session transition from complete to failed");
   });
+
+  it("handles 30-minute simulated session (cap reached path)", async () => {
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ capDurationMs: 30 * 60 * 1000, status: "recording" })],
+    });
+
+    await markTranscribingHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      durationMs: 30 * 60 * 1000,
+      capReached: true,
+    });
+
+    expect(data.sessions[0]).toMatchObject({
+      status: "transcribing",
+      capReached: true,
+      durationMs: 30 * 60 * 1000,
+    });
+  });
+
+  it("handles 90-minute multi-rollover (3 consecutive sessions)", async () => {
+    const sessionIds = [1, 2, 3].map((n) => `session_${n}` as unknown as Id<"listeningSessions">);
+    const sessions = sessionIds.map((sessionId) => ({
+      ...buildSession({ status: "recording", capDurationMs: 30 * 60 * 1000 }),
+      _id: sessionId,
+    }));
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions,
+    });
+
+    for (const [index, sessionId] of sessionIds.entries()) {
+      await markTranscribingHandler(mutationCtx(ctx), {
+        sessionId,
+        durationMs: 30 * 60 * 1000,
+        capReached: true,
+      });
+
+      const result = await completeListeningSessionHandler(mutationCtx(ctx), {
+        sessionId,
+        transcript: `Final transcript rollover ${index + 1}`,
+        transcriptProvider: "deepgram",
+      });
+
+      const session = data.sessions.find((candidate) => candidate._id === sessionId);
+      expect(session).toBeTruthy();
+      expect(session?.status).toBe("complete");
+      expect(result.rawNoteId.startsWith("note_")).toBe(true);
+    }
+
+    expect(data.sessions.every((session) => session.status === "complete")).toBe(true);
+    const finalSession = data.sessions.find((session) => session._id === sessionIds[2]);
+    expect(finalSession?.rawNoteId).toBeTruthy();
+    expect(finalSession?.rawNoteId?.startsWith("note_")).toBe(true);
+  });
+
+  it("normalizes sub-minimum cap duration to 60s", async () => {
+    const { ctx, data } = makeCtx({ books: [buildBook()] });
+
+    await createListeningSessionHandler(mutationCtx(ctx), {
+      bookId: BOOK_ID,
+      capDurationMs: 500,
+    });
+
+    expect(data.sessions[0]?.capDurationMs).toBe(60_000);
+  });
+
+  it("normalizes above-maximum cap duration to 4 hours", async () => {
+    const { ctx, data } = makeCtx({ books: [buildBook()] });
+
+    await createListeningSessionHandler(mutationCtx(ctx), {
+      bookId: BOOK_ID,
+      capDurationMs: 999_999_999,
+    });
+
+    expect(data.sessions[0]?.capDurationMs).toBe(4 * 60 * 60 * 1000);
+  });
+
+  it("warning cannot exceed cap minus 5s", async () => {
+    const { ctx, data } = makeCtx({ books: [buildBook()] });
+
+    await createListeningSessionHandler(mutationCtx(ctx), {
+      bookId: BOOK_ID,
+      capDurationMs: 120_000,
+      warningDurationMs: 200_000,
+    });
+
+    expect(data.sessions[0]?.warningDurationMs).toBe(115_000);
+  });
+
+  it("warning minimum floor is 15s", async () => {
+    const { ctx, data } = makeCtx({ books: [buildBook()] });
+
+    await createListeningSessionHandler(mutationCtx(ctx), {
+      bookId: BOOK_ID,
+      capDurationMs: 30_000,
+      warningDurationMs: 1_000,
+    });
+
+    expect(data.sessions[0]?.warningDurationMs).toBe(15_000);
+  });
+});
+
+describe("cap rollover semantics", () => {
+  beforeEach(() => {
+    vi.spyOn(authModule, "requireAuth").mockResolvedValue(userId);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("markTranscribing with capReached=true sets capReached flag", async () => {
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ status: "recording" })],
+    });
+
+    await markTranscribingHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      durationMs: 42_000,
+      capReached: true,
+    });
+
+    expect(data.sessions[0]?.capReached).toBe(true);
+  });
+
+  it("session with capReached=true can still complete successfully", async () => {
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ status: "recording" })],
+    });
+
+    await markTranscribingHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      durationMs: 30 * 60 * 1000,
+      capReached: true,
+    });
+
+    await completeListeningSessionHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      transcript: "Capped but complete transcript",
+      transcriptProvider: "deepgram",
+    });
+
+    expect(data.sessions[0]).toMatchObject({
+      status: "complete",
+      capReached: true,
+    });
+  });
+
+  it("capReached=false session has capReached false after markTranscribing", async () => {
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ status: "recording", capReached: true })],
+    });
+
+    await markTranscribingHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      durationMs: 10_000,
+      capReached: false,
+    });
+
+    expect(data.sessions[0]?.capReached).toBe(false);
+  });
 });
 
 describe("toClientSession", () => {
