@@ -335,4 +335,66 @@ describe("packContext", () => {
     expect(packed.summary.booksIncluded.wantToRead).toBe(packed.wantToRead.length);
     expect(packed.summary.booksIncluded.read).toBe(packed.read.length);
   });
+
+  it("handles zero token budget gracefully (title+author always counted)", () => {
+    const packed = packContext(
+      makeInput({
+        currentBook: makeCurrentBook({ description: "should be excluded" }),
+        books: [makeLibraryBook("b1", "read")],
+        notes: [makeNote("n1", { updatedAt: BASE_TIME + 1_000 })],
+      }),
+      { tokenBudget: 0 },
+    );
+
+    // tokensUsed includes title+author which exceeds zero budget
+    expect(packed.summary.tokenBudget).toBe(0);
+    expect(packed.book.description).toBeUndefined();
+    expect(packed.currentlyReading).toEqual([]);
+    expect(packed.wantToRead).toEqual([]);
+    expect(packed.read).toEqual([]);
+    expect(packed.recentNotes).toEqual([]);
+  });
+
+  it("skips notes with whitespace-only content", () => {
+    const notes = [
+      makeNote("ws", { content: "   \n\t  ", updatedAt: BASE_TIME + 1_000 }),
+      makeNote("real", { content: "actual content", updatedAt: BASE_TIME }),
+    ];
+
+    const packed = packContext(makeInput({ notes }), { tokenBudget: 2_000 });
+
+    // Whitespace-only note normalizes to empty string, gets skipped
+    expect(packed.recentNotes).toHaveLength(1);
+    expect(packed.recentNotes[0]?.content).toBe("actual content");
+  });
+
+  it("includes current-book notes even when current book is private", () => {
+    const notes = [
+      makeNote("mine", {
+        bookId: "book-current",
+        bookTitle: "Current Book",
+        bookPrivacy: "private",
+        content: "my private note",
+        updatedAt: BASE_TIME + 1_000,
+      }),
+      makeNote("other-private", {
+        bookId: "book-other",
+        bookTitle: "Other Private",
+        bookPrivacy: "private",
+        content: "excluded",
+        updatedAt: BASE_TIME,
+      }),
+    ];
+
+    const packed = packContext(
+      makeInput({
+        currentBook: makeCurrentBook({ privacy: "private" }),
+        notes,
+      }),
+      { tokenBudget: 2_000 },
+    );
+
+    expect(packed.recentNotes).toHaveLength(1);
+    expect(packed.recentNotes[0]?.bookTitle).toBe("Current Book");
+  });
 });
