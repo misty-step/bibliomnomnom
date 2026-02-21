@@ -8,6 +8,7 @@ import { Star, Headphones } from "lucide-react";
 
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { useToast } from "@/hooks/use-toast";
 
 type BookTileProps = {
   book: Doc<"books">;
@@ -17,6 +18,7 @@ export function BookTile({ book }: BookTileProps) {
   const router = useRouter();
   const updateStatus = useMutation(api.books.updateStatus);
   const shouldReduce = useReducedMotion();
+  const { toast } = useToast();
   const coverSrc = book.coverUrl ?? book.apiCoverUrl;
   const statusAction = getStatusAction(book.status);
 
@@ -62,7 +64,13 @@ export function BookTile({ book }: BookTileProps) {
     void updateStatus({
       id: book._id,
       status: statusAction.nextStatus,
-    }).catch(() => undefined);
+    }).catch(() => {
+      toast({
+        title: "Update failed",
+        description: "Could not change status. Please try again.",
+        variant: "destructive",
+      });
+    });
   };
 
   const footer = hasFooter ? (

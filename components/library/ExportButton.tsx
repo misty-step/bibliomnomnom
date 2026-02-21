@@ -29,15 +29,18 @@ export function ExportButton() {
 
     setIsExporting(true);
     try {
-      const [date] = new Date().toISOString().split("T");
-      const fileDate = date ?? "export";
+      // Stamp exportedAt at actual download time (not query evaluation time)
+      const now = Date.now();
+      const d = new Date(now);
+      const fileDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dataAtExport = { ...exportData, exportedAt: now };
 
       if (format === "json") {
-        downloadFile(toJSON(exportData), `bibliomnomnom-${fileDate}.json`, "application/json");
+        downloadFile(toJSON(dataAtExport), `bibliomnomnom-${fileDate}.json`, "application/json");
       } else if (format === "csv") {
-        downloadFile(toCSV(exportData), `bibliomnomnom-${fileDate}.csv`, "text/csv");
+        downloadFile(toCSV(dataAtExport), `bibliomnomnom-${fileDate}.csv`, "text/csv");
       } else {
-        downloadFile(toMarkdown(exportData), `bibliomnomnom-${fileDate}.md`, "text/markdown");
+        downloadFile(toMarkdown(dataAtExport), `bibliomnomnom-${fileDate}.md`, "text/markdown");
       }
     } catch {
       toast({ title: "Export failed", description: "Please try again.", variant: "destructive" });

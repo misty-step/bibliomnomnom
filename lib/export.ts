@@ -19,8 +19,11 @@ const CSV_HEADERS = [
 ];
 
 function formatDateYmd(timestamp: number): string {
-  const [formatted] = new Date(timestamp).toISOString().split("T");
-  return formatted ?? "";
+  const d = new Date(timestamp);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function escapeCsv(value: string): string {
