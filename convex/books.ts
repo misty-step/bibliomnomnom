@@ -65,6 +65,22 @@ export const list = query({
   },
 });
 
+export const exportAllData = query({
+  handler: async (ctx) => {
+    const userId = await requireAuth(ctx);
+    const books = await ctx.db
+      .query("books")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const notes = await ctx.db
+      .query("notes")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    return { version: "1.0", exportedAt: Date.now(), books, notes };
+  },
+});
+
 export const get = query({
   args: { id: v.id("books") },
   handler: async (ctx, args) => {
