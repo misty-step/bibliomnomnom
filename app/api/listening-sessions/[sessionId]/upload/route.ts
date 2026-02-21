@@ -157,7 +157,13 @@ async function handleUpload(request: Request, context: RouteContext) {
     const session = await entitlement.convex.query(api.listeningSessions.get, {
       sessionId: sessionId as Id<"listeningSessions">,
     });
-    if (session && session.status !== "recording") {
+    if (!session) {
+      return NextResponse.json(
+        { error: "Listening session not found." },
+        { status: 404, headers: { "x-request-id": requestId } },
+      );
+    }
+    if (session.status !== "recording") {
       return NextResponse.json(
         { error: "Session is not ready for upload." },
         { status: 400, headers: { "x-request-id": requestId } },

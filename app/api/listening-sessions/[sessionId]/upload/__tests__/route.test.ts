@@ -138,6 +138,23 @@ describe("listening session upload route", () => {
     expect(convexMutationMock).not.toHaveBeenCalled();
   });
 
+  it("returns 404 before blob upload when query returns null (session does not exist)", async () => {
+    convexQueryMock.mockResolvedValueOnce(null);
+
+    const response = await POST(
+      new Request("https://example.com/api/listening-sessions/session_missing/upload", {
+        method: "POST",
+        headers: { "x-content-type": "audio/webm", "Content-Type": "audio/webm" },
+        body: new Uint8Array([1, 2, 3]),
+      }),
+      makeRequestContext("session_missing"),
+    );
+
+    expect(response.status).toBe(404);
+    expect(putMock).not.toHaveBeenCalled();
+    expect(convexMutationMock).not.toHaveBeenCalled();
+  });
+
   it("returns 404 before blob upload when session is not found or not owned", async () => {
     convexQueryMock.mockRejectedValueOnce(
       new Error("Listening session not found or access denied"),
