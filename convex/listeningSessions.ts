@@ -101,6 +101,11 @@ function truncate(input: string, maxChars: number): string {
   return `${normalized.slice(0, maxChars - 1)}…`;
 }
 
+function toClientSession(session: Doc<"listeningSessions">) {
+  const { audioUrl: _audioUrl, ...safeSession } = session;
+  return safeSession;
+}
+
 async function getOwnedBook(
   ctx: Parameters<typeof requireAuth>[0],
   userId: Id<"users">,
@@ -379,12 +384,14 @@ export const listByBook = query({
     const userId = await requireAuth(ctx);
     await getOwnedBook(ctx, userId, args.bookId);
 
-    return await ctx.db
+    const sessions = await ctx.db
       .query("listeningSessions")
       .withIndex("by_book", (q) => q.eq("bookId", args.bookId))
       .filter((q) => q.eq(q.field("userId"), userId))
       .order("desc")
       .collect();
+
+    return sessions.map(toClientSession);
   },
 });
 
@@ -392,7 +399,18 @@ export const get = query({
   args: { sessionId: v.id("listeningSessions") },
   handler: async (ctx, args) => {
     const userId = await requireAuth(ctx);
-    return await getOwnedSession(ctx, userId, args.sessionId);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    return toClientSession(session);
+  },
+});
+
+export const getAudioUrlForOwner = query({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== userId) return null;
+    return session.audioUrl ?? null;
   },
 });
 
@@ -400,6 +418,14 @@ export const getForProcessing = internalQuery({
   args: { sessionId: v.id("listeningSessions") },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.sessionId);
+  },
+});
+
+export const getAudioUrlInternal = internalQuery({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: async (ctx, args) => {
+    const session = await ctx.db.get(args.sessionId);
+    return session?.audioUrl ?? null;
   },
 });
 
@@ -455,7 +481,6 @@ export const markTranscribingHandler = async (
   ctx: MutationCtx,
   args: {
     sessionId: Id<"listeningSessions">;
-    audioUrl: string;
     durationMs: number;
     capReached: boolean;
     transcriptLive?: string;
@@ -469,7 +494,6 @@ export const markTranscribingHandler = async (
   const now = Date.now();
   await ctx.db.patch(session._id, {
     status: "transcribing",
-    audioUrl: args.audioUrl,
     durationMs: Math.max(0, Math.floor(args.durationMs)),
     capReached: args.capReached,
     transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
@@ -482,13 +506,43 @@ export const markTranscribingHandler = async (
 export const markTranscribing = mutation({
   args: {
     sessionId: v.id("listeningSessions"),
-    audioUrl: v.string(),
     durationMs: v.number(),
     capReached: v.boolean(),
     transcriptLive: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await markTranscribingHandler(ctx, args);
+    await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
+      sessionId: args.sessionId,
+    });
+  },
+});
+
+export const saveAudioUrlAndMarkTranscribing = mutation({
+  args: {
+    sessionId: v.id("listeningSessions"),
+    audioUrl: v.string(),
+    durationMs: v.number(),
+    capReached: v.boolean(),
+    transcriptLive: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await requireAuth(ctx);
+    const session = await getOwnedSession(ctx, userId, args.sessionId);
+    assertTransition(session.status, "transcribing");
+
+    const now = Date.now();
+    await ctx.db.patch(session._id, {
+      status: "transcribing",
+      audioUrl: args.audioUrl,
+      durationMs: Math.max(0, Math.floor(args.durationMs)),
+      capReached: args.capReached,
+      transcriptLive: args.transcriptLive ? truncate(args.transcriptLive, 4_000) : undefined,
+      endedAt: now,
+      updatedAt: now,
+      lastError: undefined,
+    });
+
     await ctx.scheduler.runAfter(5 * 60 * 1000, processListeningSessionRun as any, {
       sessionId: args.sessionId,
     });
