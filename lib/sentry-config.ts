@@ -135,8 +135,7 @@ export function scrubPii(event: ErrorEvent): ErrorEvent | null {
 export const baseConfig = {
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   environment: process.env.VERCEL_ENV || process.env.NODE_ENV,
-  // MVP: Higher sample rates while traffic is low, reduce as scale increases
-  tracesSampleRate: 1.0,
+  tracesSampleRate: 0.1,
   sendDefaultPii: false,
   enabled: process.env.NODE_ENV === "production" || !!process.env.NEXT_PUBLIC_SENTRY_DSN,
   beforeSend: scrubPii,
