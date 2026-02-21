@@ -10,6 +10,7 @@ import { requireAuth } from "./auth";
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
+import { packContext, type ContextPackLibraryBook } from "../lib/listening-sessions/contextPacker";
 
 const synthesisArtifacts = v.object({
   insights: v.array(
@@ -43,7 +44,6 @@ const MAX_SYNTH_NOTES = 12;
 const MAX_SYNTH_ARTIFACT_ITEMS = 6;
 const MAX_SYNTH_CONTEXT_EXPANSIONS = 4;
 const MAX_RECENT_NOTES = 20;
-const RECENT_NOTE_SNIPPET_CHARS = 280;
 const MAX_PROCESSING_RETRIES = 3;
 const DEFAULT_STUCK_THRESHOLD_MS = 10 * 60 * 1000;
 const STUCK_SESSION_BATCH_SIZE = 20;
@@ -128,40 +128,38 @@ async function getOwnedSession(
 async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId: Id<"books">) {
   const currentBook = await getOwnedBook(ctx, userId, bookId);
 
-  const mapBookItem = (book: Doc<"books">) => ({
-    title: book.title,
-    author: book.author,
-  });
-
   const currentlyReadingDocs = await ctx.db
     .query("books")
     .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "currently-reading"))
-    .take(25);
+    .take(50);
 
   const wantToReadDocs = await ctx.db
     .query("books")
     .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "want-to-read"))
-    .take(25);
+    .take(50);
 
   const readDocs = await ctx.db
     .query("books")
     .withIndex("by_user_status", (q) => q.eq("userId", userId).eq("status", "read"))
-    .take(35);
+    .take(50);
 
-  const currentlyReading = currentlyReadingDocs
-    .filter((book) => book._id !== currentBook._id)
-    .slice(0, 20)
-    .map(mapBookItem);
+  const toPackerBooks = (docs: Doc<"books">[], status: ContextPackLibraryBook["status"]) =>
+    docs
+      .filter((b) => b._id !== currentBook._id)
+      .map((b) => ({
+        id: b._id,
+        title: b.title,
+        author: b.author,
+        status,
+        updatedAt: b.updatedAt,
+        privacy: b.privacy,
+      }));
 
-  const wantToRead = wantToReadDocs
-    .filter((book) => book._id !== currentBook._id)
-    .slice(0, 20)
-    .map(mapBookItem);
-
-  const read = readDocs
-    .filter((book) => book._id !== currentBook._id)
-    .slice(0, 30)
-    .map(mapBookItem);
+  const allLibraryBooks = [
+    ...toPackerBooks(currentlyReadingDocs, "currently-reading"),
+    ...toPackerBooks(wantToReadDocs, "want-to-read"),
+    ...toPackerBooks(readDocs, "read"),
+  ];
 
   const recentNotesDocs = await ctx.db
     .query("notes")
@@ -170,30 +168,40 @@ async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId:
     .take(MAX_RECENT_NOTES);
 
   const bookTitleById = new Map<Id<"books">, string>();
+  const bookPrivacyById = new Map<Id<"books">, "public" | "private">();
   for (const note of recentNotesDocs) {
     if (bookTitleById.has(note.bookId)) continue;
     const book = await ctx.db.get(note.bookId);
     if (!book || book.userId !== userId) continue;
     bookTitleById.set(note.bookId, book.title);
+    bookPrivacyById.set(note.bookId, book.privacy);
   }
 
-  type RecentSynthesisNote = { bookTitle: string; type: "note" | "quote"; content: string };
-  const recentNotes: RecentSynthesisNote[] = recentNotesDocs.map<RecentSynthesisNote>((note) => ({
+  const allNotes = recentNotesDocs.map((note) => ({
+    id: note._id,
+    bookId: note.bookId,
     bookTitle: bookTitleById.get(note.bookId) ?? "Unknown book",
-    type: note.type === "quote" ? "quote" : "note",
-    content: truncate(note.content, RECENT_NOTE_SNIPPET_CHARS),
+    bookPrivacy: bookPrivacyById.get(note.bookId) ?? "private",
+    type: (note.type === "quote" ? "quote" : "note") as "note" | "quote",
+    content: note.content,
+    updatedAt: note.updatedAt,
   }));
 
-  return {
-    book: {
+  const pack = packContext({
+    currentBook: {
+      id: currentBook._id,
       title: currentBook.title,
       author: currentBook.author,
       description: currentBook.description,
+      privacy: currentBook.privacy,
     },
-    currentlyReading,
-    wantToRead,
-    read,
-    recentNotes,
+    books: allLibraryBooks,
+    notes: allNotes,
+  });
+
+  return {
+    ...pack,
+    packSummary: pack.summary,
   };
 }
 

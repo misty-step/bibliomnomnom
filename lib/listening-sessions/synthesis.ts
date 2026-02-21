@@ -35,6 +35,8 @@ export type SynthesisContext = {
     type: "note" | "quote";
     content: string;
   }>;
+  /** Deterministic summary of what was included in this context pack (for debugging). */
+  packSummary?: import("./contextPacker").ContextPackSummary;
 };
 
 export const EMPTY_SYNTHESIS_ARTIFACTS: SynthesisArtifacts = {

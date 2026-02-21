@@ -241,6 +241,12 @@ export async function processListeningSessionHandler(
         context = await ctx.runQuery(internal.listeningSessions.getSynthesisContextForSession, {
           sessionId: args.sessionId,
         });
+        if (context?.packSummary) {
+          console.log(
+            `[processListeningSession] context pack for session ${args.sessionId}:`,
+            JSON.stringify(context.packSummary),
+          );
+        }
       } catch {
         context = undefined;
       }
