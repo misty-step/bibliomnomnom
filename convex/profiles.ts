@@ -340,6 +340,62 @@ export const getUserForProfile = internalQuery({
   },
 });
 
+const MAX_VOICE_NOTE_ARTIFACTS = 50;
+const MAX_VOICE_NOTE_BOOKS = 20;
+
+/**
+ * Fetch recent voice-note synthesis artifacts for a user, grouped by book.
+ * Returns per-book summaries so the profile LLM prompt can cite specific reactions.
+ */
+export const getVoiceNoteSummariesForProfile = internalQuery({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    // Fetch recent artifacts across all sessions for this user
+    const artifacts = await ctx.db
+      .query("listeningSessionArtifacts")
+      .withIndex("by_user_session", (q) => q.eq("userId", args.userId))
+      .order("desc")
+      .take(MAX_VOICE_NOTE_ARTIFACTS);
+
+    if (artifacts.length === 0) return [];
+
+    // Group by bookId, collecting unique bookIds
+    const byBook = new Map<
+      string,
+      {
+        bookId: (typeof artifacts)[number]["bookId"];
+        items: typeof artifacts;
+      }
+    >();
+    for (const artifact of artifacts) {
+      const key = artifact.bookId;
+      if (!byBook.has(key)) {
+        byBook.set(key, { bookId: artifact.bookId, items: [] });
+      }
+      byBook.get(key)!.items.push(artifact);
+    }
+
+    // Resolve book titles/authors (cap at MAX_VOICE_NOTE_BOOKS)
+    const entries = Array.from(byBook.values()).slice(0, MAX_VOICE_NOTE_BOOKS);
+    const summaries = await Promise.all(
+      entries.map(async ({ bookId, items }) => {
+        const book = await ctx.db.get(bookId);
+        return {
+          bookTitle: book?.title ?? "Unknown",
+          bookAuthor: book?.author ?? "Unknown",
+          artifacts: items.map((a) => ({
+            kind: a.kind,
+            title: a.title,
+            content: a.content,
+          })),
+        };
+      }),
+    );
+
+    return summaries;
+  },
+});
+
 // --- Mutations ---
 
 /**
