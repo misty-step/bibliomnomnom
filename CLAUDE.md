@@ -1,553 +1,159 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## What This Is
 
-## Project Overview
-
-**bibliomnomnom** is a private-first book tracking application for voracious readers. Built with Next.js 16, React 19, Convex (backend), and Clerk (authentication). The architecture follows a "Convex-First with Actions" pattern where Convex is the single source of truth, providing real-time updates, type safety, and clean module boundaries.
+**bibliomnomnom** — private-first book tracking for voracious readers. Track reading, capture notes via text/audio/photo, import from Goodreads/CSV, share public reader profiles. Built on Next.js 16, React 19, Convex, Clerk, Stripe.
 
 ## Essential Commands
 
-### Development
-
 ```bash
-# Start full dev environment (Next.js + Convex + Stripe webhook listener)
-bun run dev
-
-# Start without Stripe listener (if running on different port)
-bun run dev:no-stripe
-
-# Start Convex dev server (for live backend logs/updates)
-bun run convex:dev
-
-# Push Convex schema changes (one-time sync)
-bun run convex:push
-
-# Build for production
-bun run build
-
-# Start production server
-bun run start
-
-# Lint
-bun run lint
+bun run dev              # Next.js + Convex + Stripe listener
+bun run dev:no-stripe    # Without Stripe listener
+bun run build            # Production build (convex deploy → next build)
+bun run build:local      # Next.js build only (CI)
+bun run lint             # ESLint
+bun run typecheck        # tsc --noEmit
+bun run test             # Vitest
+bun run test:coverage    # Vitest with coverage
+bun run validate         # lint + typecheck + test:coverage + build (full gate)
+bun run validate:fast    # lint + typecheck + test (no build)
+bun run convex:push      # Sync schema to dev deployment
+bun run e2e              # Playwright E2E tests
+bun run session-guardrails # Listening session cost/safety checks
 ```
 
-### Package Manager Enforcement
+**bun only** — npm/yarn/pnpm blocked via preinstall hook.
 
-- **MUST use bun** - enforced via preinstall hook and `packageManager`
-- npm/yarn/pnpm are blocked
-- bun >=1.2.17 required
+## Architecture
 
-## Architecture Overview
+Convex-first with actions pattern. Convex is single source of truth for all data.
 
-### Core Principles (from DESIGN.md)
+| Layer | Role | Location |
+|-------|------|----------|
+| **Auth** | Clerk JWT → `requireAuth(ctx)` | `convex/auth.ts` |
+| **Data** | Queries (read), Mutations (write), Actions (external) | `convex/*.ts` |
+| **API Routes** | Webhooks, file upload, listening sessions, OCR | `app/api/` |
+| **UI** | React components, Convex hooks for data | `components/`, `app/` |
+| **Observability** | Sentry errors, pino logs, PostHog analytics | See `docs/OBSERVABILITY.md` |
 
-1. **Convex as Single Source of Truth** - All data operations flow through Convex for consistency and real-time updates
-2. **Queries for Reads, Mutations for Writes, Actions for External** - Clear separation based on operation type
-3. **Row-Level Security in Queries** - Privacy enforced at query level via ownership checks
-4. **Optimistic Updates** - Instant UI feedback with eventual consistency
-5. **Deep Modules** - Simple interfaces hiding complex implementation
+**Core modules:** books, notes, imports, listening sessions, subscriptions, profiles, users
 
-### 5 Core Modules
+**Key invariants:**
+- All mutations validate ownership via `requireAuth()` + userId check
+- Books default to `private`; `public` books expose sanitized fields only
+- Status changes auto-set dates (`dateStarted`, `dateFinished`, `timesRead`)
+- Notes ownership validated via book relationship, not direct user check
 
-**Module 1: Authentication & User Management** (`convex/auth.ts`, `convex/users.ts`)
+For detailed architecture, see [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md).
 
-- Hides Clerk JWT validation complexity behind `requireAuth()` and `getAuthOrNull()`
-- Webhook handler syncs Clerk users to Convex database
-- Public interface: Simple auth helpers that return user ID or null
-
-**Module 2: Books Data Layer** (`convex/books.ts`)
-
-- Hides database queries, privacy filtering, ownership validation
-- Public interface: `list`, `get`, `getPublic`, `create`, `update`, `remove`, `updateStatus`, `toggleFavorite`, `updatePrivacy`
-- Automatic date tracking: `dateStarted` set on "currently-reading", `dateFinished` and `timesRead` increment on "read"
-- Privacy model: Books can be `private` (owner only) or `public` (sanitized fields for all)
-
-**Module 3: External Book Search** (Deferred for MVP)
-
-- Originally designed for Google Books API integration
-- MVP ships with manual entry only
-- Architecture preserved in DESIGN.md for future implementation
-
-**Module 4: Notes & Content** (`convex/notes.ts`)
-
-- Hides note CRUD complexity and ownership validation via book relationship
-- Supports two types: note, quote
-- Markdown content storage with rich text editor (Tiptap) on frontend
-
-**Module 5: File Upload** (`app/api/blob/upload/route.ts`)
-
-- Hides Vercel Blob complexity behind presigned URL pattern
-- Client uploads directly to blob storage (not through Next.js server)
-- API route only validates auth and generates upload token
-- 5MB max, image types only (JPEG, PNG, WebP)
+**Navigation shortcut:** Every directory has a `.glance.md` with pre-computed context (purpose, key files, gotchas). Read it before scanning the directory — saves tokens and orients faster. Regenerate with `/cartographer` after significant structural changes.
 
 ## Tech Stack
 
-### Frontend
+| Category | Technology |
+|----------|-----------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| UI | React 19, Tailwind CSS 3.4, Shadcn/UI, Framer Motion 12 |
+| Backend | Convex 1.28, Clerk 6.35, Stripe 20 |
+| Rich Text | Tiptap 3 |
+| Storage | Vercel Blob (covers, audio) |
+| Monitoring | Sentry 10, PostHog, pino |
+| Testing | Vitest, Playwright |
+| Deploy | Vercel |
 
-- **Framework**: Next.js 16.0.7 with App Router (Turbopack default)
-- **React**: 19.2.1
-- **Language**: TypeScript 5 (strict mode)
-- **Styling**: Tailwind CSS 3.4.1 with custom bibliophile palette
-- **Components**: Shadcn/UI (Radix UI primitives)
-- **Animations**: Framer Motion 12
-- **Rich Text**: Tiptap 3 with StarterKit
-- **Icons**: Lucide React
+**Design system:** Warm sepia aesthetic — Paper (#FDFBF7), Ink (#1A1A1A), Leather (#8B4513). Crimson Text (serif headers), Inter (body), JetBrains Mono (code).
 
-### Backend
+## Quality Gates
 
-- **Database/API**: Convex 1.28.2
-- **Authentication**: Clerk 6.34.5
-- **File Storage**: Vercel Blob
-- **Deployment**: Vercel
+**CI (`.github/workflows/ci.yml`):** lint → typecheck → test:coverage → trufflehog → build → e2e
 
-### Design System
+**Git hooks (lefthook):**
+- pre-commit: trufflehog, eslint --fix, prettier --write, tsc --noEmit
+- pre-push: env validation (local + prod), test, build
+- commit-msg: commitlint (conventional commits)
 
-- **Colors**: Paper (cream #FDFBF7), Ink (dark #1A1A1A), Leather (brown #8B4513), Border
-- **Fonts**: Crimson Text (serif for headers), Inter (sans for body), JetBrains Mono (code)
-- **Philosophy**: Warm, sepia aesthetic inspired by physical books and reading rooms
+**Conventions:** `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `ci:` with scope. Imperative mood, ≤72 char subject.
 
-## Directory Structure
+## Gotchas
 
-```
-bibliomnomnom/
-├── app/                         # Next.js App Router
-│   ├── (auth)/                 # Auth route group (public)
-│   │   ├── sign-in/[[...sign-in]]/
-│   │   └── sign-up/[[...sign-up]]/
-│   ├── (dashboard)/            # Protected routes
-│   │   ├── layout.tsx          # Dashboard layout with nav
-│   │   ├── library/            # Main book grid
-│   │   │   ├── page.tsx
-│   │   │   └── loading.tsx
-│   │   └── books/[id]/         # Private book detail
-│   ├── books/[id]/             # Public book view
-│   ├── api/
-│   │   ├── blob/upload/        # Vercel Blob upload endpoint
-│   │   └── health/             # Health check endpoint
-│   ├── layout.tsx              # Root layout (providers)
-│   ├── page.tsx                # Landing page
-│   ├── globals.css             # Global styles + Tailwind
-│   └── ConvexClientProvider.tsx # Convex + Clerk integration
-│
-├── components/
-│   ├── ui/                     # Shadcn/UI primitives (button, dialog, toast)
-│   ├── book/                   # Book-related components
-│   │   ├── BookCard.tsx        # Individual book card
-│   │   ├── BookGrid.tsx        # Grid layout with filters
-│   │   ├── BookDetail.tsx      # Full book details
-│   │   ├── PublicBookView.tsx  # Public book profile
-│   │   ├── AddBookModal.tsx    # Manual book entry modal
-│   │   ├── UploadCover.tsx     # Cover upload component
-│   │   ├── StatusBadge.tsx     # Reading status indicator
-│   │   └── PrivacyToggle.tsx   # Public/private toggle
-│   ├── notes/                  # Note/annotation components
-│   │   ├── NoteCard.tsx
-│   │   ├── NoteList.tsx
-│   │   ├── NoteEditor.tsx      # Tiptap rich text editor
-│   │   └── NoteTypeSelector.tsx
-│   ├── layout/                 # Layout components
-│   │   └── DashboardNav.tsx    # Navigation with active states
-│   └── shared/                 # Common UI patterns
-│       ├── ErrorBoundary.tsx
-│       ├── ErrorState.tsx
-│       ├── EmptyState.tsx
-│       └── LoadingSkeleton.tsx
-│
-├── convex/                      # Convex backend
-│   ├── _generated/             # Auto-generated types
-│   ├── schema.ts               # Database schema (users, books, notes)
-│   ├── auth.ts                 # Auth helpers (requireAuth, getAuthOrNull)
-│   ├── users.ts                # User queries/mutations
-│   ├── books.ts                # Book queries/mutations
-│   └── notes.ts                # Note queries/mutations
-│
-├── lib/
-│   ├── utils.ts                # Utility functions (cn)
-│   └── hooks/
-│       └── useAuth.ts          # Auth hook
-│
-├── proxy.ts                    # Next.js 16 proxy (Clerk route protection)
-├── convex.json                 # Convex config
-├── next.config.ts              # Next.js config
-├── tailwind.config.ts          # Tailwind config (custom colors/fonts)
-├── components.json             # Shadcn/UI config
-└── tsconfig.json               # TypeScript config
-```
+**Convex build order:** `bunx convex deploy && next build` — types depend on schema. Wrong order = deploy failure. The `build` script handles this correctly.
 
-## Key Patterns & Conventions
+**Convex schema sync:** After editing `convex/schema.ts`, run `bun run convex:push`. "Could not find public function" = schema not synced.
 
-### Authentication Flow
+**Stripe webhook secret:** Stripe CLI generates a new ephemeral secret each session. `scripts/dev-stripe.sh` auto-syncs to `.env.local`, but if Next.js was already running, restart it. Symptom: all webhooks return 400.
 
-1. User visits protected route (e.g., `/library`)
-2. Next.js middleware checks Clerk session → redirects to `/sign-in` if absent
-3. Clerk provides JWT in cookie/header
-4. `ConvexClientProvider` passes JWT to Convex
-5. Convex functions call `requireAuth(ctx)` to validate and get user ID
-6. All queries filter by `userId`, all mutations validate ownership
+**Clerk JWT template:** Must exist as `convex` in Clerk dashboard. Missing = 404 on `/tokens/convex`.
 
-### Privacy Model
+**Next.js image domains:** External image hostnames must be in `next.config.ts` `images.remotePatterns`.
 
-- Books have `privacy` field: `"private"` or `"public"`
-- **Private books**: Only owner can access via `books.get` query
-- **Public books**: Anyone can access via `books.getPublic` query (sanitized fields only)
-- Public route `/books/[id]` uses `getPublic` query (no auth required)
-- Private route `/library/books/[id]` uses `get` query (requires ownership)
+**Listening sessions cost:** LLM synthesis uses OpenRouter. Cost guardrails in `scripts/session-guardrails.ts` run in CI. Max context items capped at 4.
 
-### Status Tracking with Auto-Dating
-
-When book status changes via `updateStatus` mutation:
-
-- **"currently-reading"**: Sets `dateStarted` if not already set
-- **"read"**: Sets `dateFinished`, increments `timesRead`
-- **"want-to-read"**: No date changes
-
-### Ownership Validation Pattern
-
-All mutations follow this pattern:
-
-```typescript
-const userId = await requireAuth(ctx);
-const book = await ctx.db.get(args.id);
-if (!book || book.userId !== userId) {
-  throw new ConvexError("Access denied");
-}
-// ... proceed with mutation
-```
-
-### Optimistic Updates
-
-UI updates instantly before server confirmation:
-
-- Toggle favorite → UI updates immediately, mutation runs in background
-- Change status → Badge updates instantly, auto-dating happens server-side
-- If mutation fails, Convex automatically rolls back optimistic update
-
-### Error Handling
-
-- **Authentication errors**: Redirect to `/sign-in`
-- **Authorization errors**: Show toast with "Access denied"
-- **Not found**: Return `null` in queries, show `EmptyState` component
-- **External API failures**: Return empty array, never throw to client
-- **Upload failures**: Show toast, allow retry
-
-## Development Workflow
-
-### Adding a New Feature
-
-1. **Define schema** in `convex/schema.ts` with indexes
-2. **Create queries/mutations** in `convex/*.ts` with ownership validation
-3. **Build UI components** in `components/` directory
-4. **Create page** in `app/` directory with loading/error states
-5. **Test manually** in dev mode (no automated tests yet)
-
-### Modifying Convex Schema
-
-1. Edit `convex/schema.ts`
-2. Run `bun run convex:push` to sync to dev deployment
-3. Verify in Convex dashboard that schema updated
-4. Restart `bun run dev` if needed for type updates
-
-### Adding Shadcn/UI Components
+## Environment
 
 ```bash
-npx shadcn@latest add [component-name]
+# Auth
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+CLERK_SECRET_KEY
+CLERK_WEBHOOK_SECRET
+
+# Backend
+NEXT_PUBLIC_CONVEX_URL
+CONVEX_DEPLOYMENT
+CONVEX_DEPLOY_KEY          # Production deploy
+CONVEX_WEBHOOK_TOKEN       # Webhook auth between Next.js ↔ Convex
+
+# Storage
+BLOB_READ_WRITE_TOKEN
+
+# Payments
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+STRIPE_PRICE_ID_MONTHLY
+STRIPE_PRICE_ID_YEARLY
+
+# Monitoring
+NEXT_PUBLIC_SENTRY_DSN
+SENTRY_AUTH_TOKEN           # CLI/deploy only
+NEXT_PUBLIC_POSTHOG_KEY
+NEXT_PUBLIC_POSTHOG_HOST
+
+# AI (listening sessions)
+OPENROUTER_API_KEY
+ELEVENLABS_API_KEY          # Primary STT
+DEEPGRAM_API_KEY            # Fallback STT
 ```
 
-Components added to `components/ui/` and auto-configured for bibliophile theme.
+Copy `.env.example` → `.env.local`. Never commit secrets. Restart dev server after changes.
 
-### Working with Environment Variables
+## Deployment
 
-1. Copy `.env.example` to `.env.local`
-2. Fill in secrets (Clerk, Convex, Vercel Blob)
-3. Restart dev server to pick up changes
-4. Never commit `.env.local`
+Vercel auto-deploys from `master`. Build command: `bunx convex deploy --cmd 'next build'`.
 
-**Required variables:**
+**Release:** semantic-release on merge to master. Conventional commits drive versioning.
 
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-- `CLERK_SECRET_KEY`
-- `CLERK_WEBHOOK_SECRET`
-- `NEXT_PUBLIC_CONVEX_URL`
-- `CONVEX_DEPLOYMENT`
-- `BLOB_READ_WRITE_TOKEN`
-- `NEXT_PUBLIC_SENTRY_DSN` (for error tracking)
+**Health check:** `GET /api/health` (shallow) or `?mode=deep` (probes Convex, Clerk, Stripe).
 
-## Common Issues & Solutions
+## Module Boundaries
 
-### "Could not find public function" error
+Respect these interfaces when modifying code:
 
-**Cause**: Convex schema not synced to deployment
-**Fix**: Run `bun run convex:push` to sync schema
+1. **Auth** (`convex/auth.ts`) — Expose `requireAuth()` and `getAuthOrNull()` only
+2. **Books** (`convex/books.ts`) — All book ops through exported queries/mutations
+3. **Notes** (`convex/notes.ts`) — Ownership via book relationship
+4. **Imports** (`convex/imports.ts`, `lib/import/`) — Repository pattern, LLM extraction in actions
+5. **Listening Sessions** (`convex/listeningSessions.ts`) — State machine: idle → recording → uploading → transcribing → synthesizing → complete
+6. **Subscriptions** (`convex/subscriptions.ts`) — Stripe status mapped to internal tiers
+7. **Upload** (`app/api/blob/`) — Server generates tokens, client uploads direct to blob
 
-### Clerk returns 404 for `/tokens/convex`
+## References
 
-**Cause**: Missing JWT template in Clerk dashboard
-**Fix**: Create JWT template named `convex` with `convex` in metadata
-
-### Cover upload fails
-
-**Cause**: Missing `BLOB_READ_WRITE_TOKEN` env var
-**Fix**: Add token from Vercel dashboard to `.env.local`
-
-### Build fails with type errors
-
-**Cause**: Convex types out of sync
-**Fix**: Run `bun run convex:push` to regenerate types
-
-### Next.js Image Error: "hostname is not configured"
-
-**Cause**: External image domain not whitelisted in `next.config.ts`
-**Fix**: Add hostname to `images.remotePatterns` in `next.config.ts`
-
-### Stripe webhooks not received in local dev
-
-**Cause**: Stripe cannot reach `localhost` to deliver webhooks
-**Fix**: Use Stripe CLI to forward webhooks locally:
-
-```bash
-# 1. Install Stripe CLI (if not already)
-brew install stripe/stripe-cli/stripe
-
-# 2. Login to Stripe
-stripe login
-
-# 3. Forward webhooks to local dev server
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-
-# 4. Copy the webhook signing secret from CLI output to .env.local
-# It will look like: whsec_...
-```
-
-**Note**: `bun run dev` now runs the Stripe listener automatically. If running on a different port, run `stripe listen` manually with the correct port. Use `bun run dev:no-stripe` to run without the listener.
-
-### Stripe webhook signature verification fails (400 errors)
-
-**Cause**: Stripe CLI generates a **new ephemeral webhook secret** every time it starts. If `.env.local` has a stale secret from a previous CLI session, signature verification fails.
-
-**Symptoms**:
-- All webhook events return 400
-- Logs show: "No signatures found matching the expected signature for payload"
-- Checkout succeeds but subscription status doesn't update
-
-**Auto-fix**: The `scripts/dev-stripe.sh` script now auto-syncs the ephemeral secret to `.env.local` before starting the listener. However, if Next.js was already running, you need to restart it to pick up the new secret.
-
-**Manual fix** (if auto-sync fails):
-1. Find the current secret in the `stripe listen` output: `Your webhook signing secret is whsec_...`
-2. Update `.env.local`: `STRIPE_WEBHOOK_SECRET=whsec_<new-secret>`
-3. Restart Next.js dev server to pick up the new env var
-
-**Prevention**: Run `bun run dev` fresh (not `dev:no-stripe` + manual listener) to ensure secret stays in sync.
-
-## Testing Strategy
-
-### Current State (MVP)
-
-- **Manual testing** of critical paths during development
-- **No automated tests** yet (planned for post-MVP)
-- **Visual QA** for UI components and responsive design
-
-### Future Testing (Post-MVP)
-
-- **Unit tests**: Convex functions with `convex-test` library
-- **E2E tests**: Playwright for critical user flows
-- **Visual regression**: Chromatic for component library
-- Detailed testing architecture in DESIGN.md lines 1572-1809
-
-## Observability
-
-### Overview
-
-Production monitoring uses Sentry for error tracking, pino for structured logging (captured by Vercel), and PostHog for product analytics. All queryable from CLI.
-
-### CLI Access (`./scripts/obs`)
-
-```bash
-# Full status overview (health + issues + alerts)
-./scripts/obs status
-
-# List unresolved Sentry issues
-./scripts/obs issues [--limit N] [--env production|preview]
-
-# Get issue details
-./scripts/obs issue BIBLIOMNOMNOM-123
-
-# Check health endpoint
-./scripts/obs health [--deep] [--prod]
-
-# List alert rules
-./scripts/obs alerts
-
-# Resolve an issue
-./scripts/obs resolve BIBLIOMNOMNOM-123
-
-# Tail Vercel logs
-./scripts/obs logs [--follow]
-```
-
-**Requires:** `SENTRY_AUTH_TOKEN` environment variable set in shell.
-
-### Sentry Configuration
-
-- **Project:** `bibliomnomnom` in `misty-step` org
-- **DSN:** Set in `.env.local` and Vercel production
-- **Config:** `.sentryclirc` (gitignored, uses env token)
-- **Tunnel:** `/monitoring` route bypasses ad blockers
-
-**Alert Rules (5 active):**
-
-| Rule | Trigger |
-|------|---------|
-| New Error Alert | First occurrence of any new issue |
-| Regression Alert | Resolved issue resurfaces |
-| High-Frequency Error | Same error 10+ times in 1 hour |
-| Critical: Auth/Payment | Errors in stripe/clerk/webhook routes |
-| High-Priority Issues | Default Sentry rule |
-
-### Key Files
-
-| File | Purpose |
-|------|---------|
-| `sentry.client.config.ts` | Client-side Sentry init + session replay |
-| `sentry.server.config.ts` | Server-side Sentry init |
-| `lib/sentry-config.ts` | Shared config + PII scrubbing |
-| `lib/sentry.ts` | `captureError`/`captureMessage` utilities |
-| `lib/logger.ts` | pino logger (JSON in prod, pretty in dev) |
-| `lib/api/withObservability.ts` | API route wrapper with logging + error capture |
-| `app/api/health/route.ts` | Health endpoint with service probes |
-
-### Health Endpoint
-
-```bash
-# Shallow check (fast, no external calls)
-curl https://bibliomnomnom.com/api/health
-
-# Deep check (probes Convex, Clerk, Stripe)
-curl https://bibliomnomnom.com/api/health?mode=deep
-```
-
-### Error Capture in Code
-
-```typescript
-// In client components (safe for browser)
-import { captureError } from "@/lib/sentry";
-
-try {
-  // risky operation
-} catch (error) {
-  captureError(error, { tags: { feature: "book-import" } });
-}
-
-// In API routes (automatic via withObservability)
-export const POST = withObservability(async (req) => {
-  // errors auto-captured with context
-}, "operation-name");
-```
-
-### Logging
-
-**Server-only code** (not API routes):
-```typescript
-import { logger } from "@/lib/logger";
-
-// Pino structured JSON output
-logger.info({ msg: "book_created", bookId, userId });
-logger.error({ msg: "import_failed", error: err.message });
-```
-
-**API routes**: Use `withObservability` wrapper which provides structured JSON logging via `log()` export:
-```typescript
-import { log, withObservability } from "@/lib/api/withObservability";
-
-// Standalone logging
-log("info", "webhook_processed", { eventId: "evt_123" });
-
-// Or automatic via wrapper
-export const POST = withObservability(async (req) => {
-  // errors auto-captured with context
-}, "operation-name");
-```
-
-## Performance Targets
-
-- **Page load (LCP)**: < 1 second
-- **Query response**: < 100ms
-- **Mutation response**: < 200ms
-- **File upload**: < 3 seconds for 5MB
-- All queries use indexes (`by_user`, `by_user_status`, `by_book`)
-
-## Security Considerations
-
-1. **All mutations validate ownership** - Never trust client data
-2. **Privacy filtering in queries** - Server-side enforcement
-3. **API keys server-side only** - Never exposed to client
-4. **File upload restrictions** - Max 5MB, image types only
-5. **HTTPS enforced** - Vercel automatic, Clerk secure cookies
-6. **No SQL injection** - Convex is not SQL-based
-
-## Documentation References
-
-- **System architecture**: `ARCHITECTURE.md` (modules, data flow, decisions)
-- **Feature design (Reader Profile)**: `DESIGN.md` (detailed module spec for profiles feature)
-- **Getting started**: `README.md` (setup instructions)
-- **ADRs**: `docs/adr/` (architectural decision records)
-- **Flow diagrams**: `docs/flows/` (user journey diagrams)
-
-## Important Notes
-
-- **bun only** - Do not use npm/yarn/pnpm (enforced)
-- **Manual book entry only** - Google Books integration deferred
-- **No dark mode** - Single light theme (warm sepia aesthetic)
-- **No offline support** - Requires internet connection
-- **Single user per book** - No collaborative editing
-- **Real-time updates** - Convex queries auto-subscribe to changes
-
-## Module Boundaries (Critical)
-
-When modifying code, respect these module boundaries:
-
-1. **Auth Module** (`convex/auth.ts`) - Only expose `requireAuth()` and `getAuthOrNull()`, hide Clerk complexity
-2. **Books Module** (`convex/books.ts`) - All book operations go through exported queries/mutations, never direct database access
-3. **Notes Module** (`convex/notes.ts`) - Ownership validated via book relationship, not direct user check
-4. **Upload Module** (`app/api/blob/upload/route.ts`) - Client uploads directly to blob, server only generates tokens
-5. **UI Components** - Should be presentational, data fetching via Convex hooks only
-
-## Code Quality Principles
-
-From global CLAUDE.md and DESIGN.md:
-
-- **Manage complexity** - Anything that makes code hard to understand or modify is the enemy
-- **Deep modules** - Simple interfaces hiding powerful implementations
-- **Value formula**: Module worth = Functionality - Interface Complexity
-- **Avoid shallow modules** - Where interface complexity ≈ implementation complexity
-- **Information hiding** - Implementation details stay internal, expose intention not mechanism
-- **Red flags**: `Manager`, `Util`, `Helper` class names; pass-through methods; excessive config
-- **Strategic programming** - Invest 10-20% time in design improvement, not just features
-
-## Key Learnings
-
-From quality infrastructure audit (2025-11-20):
-
-1. **Quality gates prevent production fires** - No CI/CD = type errors in production. No git hooks = secrets committed. No backend tests = privacy bugs ship. Infrastructure isn't overhead—it's prevention.
-
-2. **Convex build order is critical** - `bunx convex deploy && next build` (not just `next build`). Types depend on Convex schema. Wrong order = guaranteed Vercel deploy failures.
-
-3. **Coverage for confidence, not vanity** - Track critical paths only (auth, privacy, payments) at 75% threshold. Don't waste time testing shadcn components or hitting 100% everywhere.
-
-From previous grooming sessions:
-
-4. **Import/Export is existential, not nice-to-have** - Every competitor has import. Data portability is ethical table stakes. Build before public launch.
-
-5. **Silent failures are killing UX** - Users losing work without feedback → trust erosion → churn. Toast notifications cost 2h but prevent massive frustration.
-
-6. **Design system is already exceptional** - 8.5/10 maturity for MVP. Token architecture is best-in-class. Fix quick bugs, then focus on features.
-
-7. **Testing is strategic, not tactical** - Backend mutations untested = data corruption risk. Invest in critical path tests before major refactors.
-
----
-
-**Last Updated**: 2026-01-23
-**Architecture Version**: 1.0 (Complete)
-**Status**: MVP in active development
+| Doc | Content |
+|-----|---------|
+| `docs/CODEBASE_MAP.md` | Full architecture map |
+| `docs/OBSERVABILITY.md` | Monitoring, logging, alerting detail |
+| `docs/adr/` | 15 architectural decision records |
+| `docs/flows/` | User journey diagrams |
+| `ARCHITECTURE.md` | System architecture overview |
+| `DESIGN.md` | Feature design specs |
+| `AGENTS.md` | Agent operational playbook |
