@@ -333,10 +333,9 @@ const makeCtx = (seed?: Partial<TestCtx["data"]>): TestCtx => {
       },
       order: (direction) => {
         rows = [...rows].sort((a, b) => {
-          const at = (a as Record<string, unknown>).updatedAt;
-          const bt = (b as Record<string, unknown>).updatedAt;
-          const left = typeof at === "number" ? at : 0;
-          const right = typeof bt === "number" ? bt : 0;
+          const rec = (r: DocForTable<T>) => r as Record<string, unknown>;
+          const left = (rec(a)._creationTime ?? rec(a).createdAt ?? 0) as number;
+          const right = (rec(b)._creationTime ?? rec(b).createdAt ?? 0) as number;
           return direction === "desc" ? right - left : left - right;
         });
         return chain;
@@ -829,6 +828,48 @@ describe("listening session state machine handlers", () => {
     });
     const addedNoteIds = data.notes.map((note) => note._id);
     expect(addedNoteIds).toContain(noteId(13));
+  });
+
+  it("skips duplicate transcript/artifact inserts on re-completion (idempotent)", async () => {
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ status: "transcribing", durationMs: 10_000 })],
+    });
+
+    // First completion
+    await completeListeningSessionHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      transcript: "Final transcript",
+      transcriptProvider: "openai",
+      synthesis: {
+        insights: [{ title: "I1", content: "C1" }],
+        openQuestions: ["Q1"],
+        quotes: [],
+        followUpQuestions: [],
+        contextExpansions: [],
+      },
+    });
+
+    expect(data.transcripts).toHaveLength(1);
+    expect(data.artifacts).toHaveLength(2);
+
+    // Second completion (complete→complete self-transition)
+    await completeListeningSessionHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      transcript: "Final transcript",
+      transcriptProvider: "openai",
+      synthesis: {
+        insights: [{ title: "I1", content: "C1" }],
+        openQuestions: ["Q1"],
+        quotes: [],
+        followUpQuestions: [],
+        contextExpansions: [],
+      },
+    });
+
+    // No duplicates
+    expect(data.transcripts).toHaveLength(1);
+    expect(data.artifacts).toHaveLength(2);
   });
 
   it("marks session as failed with truncated error", async () => {

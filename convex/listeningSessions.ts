@@ -266,6 +266,12 @@ async function persistListeningSessionTranscript(
     occurredAt: number;
   },
 ) {
+  const existing = await ctx.db
+    .query("listeningSessionTranscripts")
+    .withIndex("by_session", (q) => q.eq("sessionId", args.session._id))
+    .first();
+  if (existing) return;
+
   await ctx.db.insert("listeningSessionTranscripts", {
     userId: args.userId,
     bookId: args.session.bookId,
@@ -292,6 +298,12 @@ async function persistListeningSessionArtifacts(
   if (!args.synthesis) {
     return;
   }
+
+  const existingArtifact = await ctx.db
+    .query("listeningSessionArtifacts")
+    .withIndex("by_session", (q) => q.eq("sessionId", args.session._id))
+    .first();
+  if (existingArtifact) return;
 
   const addArtifact = async (artifact: {
     kind: ListeningSessionArtifactKind;
