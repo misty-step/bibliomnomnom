@@ -139,6 +139,25 @@ describe("getVoiceNoteSummariesForProfileHandler", () => {
     expect(result[0]).toMatchObject({ bookTitle: "Unknown", bookAuthor: "Unknown" });
   });
 
+  it("should preserve artifact kind through grouping", async () => {
+    // Arrange
+    const b1 = bookId(1);
+    const book: Book = { _id: b1, title: "Dune", author: "Frank Herbert" };
+    const artifacts = [
+      makeArtifact(1, b1, { kind: "insight" }),
+      makeArtifact(2, b1, { kind: "quote" }),
+      makeArtifact(3, b1, { kind: "openQuestion" }),
+    ];
+    const ctx = makeCtx(artifacts, [book]);
+    // Act
+    const result = await getVoiceNoteSummariesForProfileHandler(ctx, { userId });
+    // Assert
+    const kinds = result[0]!.artifacts.map((a) => a.kind);
+    expect(kinds).toContain("insight");
+    expect(kinds).toContain("quote");
+    expect(kinds).toContain("openQuestion");
+  });
+
   it("should only return artifacts for the given userId", async () => {
     // Arrange
     const otherUserId = "user_2" as unknown as Id<"users">;

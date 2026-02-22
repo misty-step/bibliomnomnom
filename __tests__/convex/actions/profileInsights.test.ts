@@ -105,6 +105,55 @@ describe("buildInsightsPrompt — voice note evidence", () => {
     expect(prompt).toContain("x".repeat(300));
     expect(prompt).not.toContain("x".repeat(301));
   });
+
+  it("should render multiple books' voice notes with separation when summaries span books", () => {
+    // Arrange
+    const multiBookNotes: VoiceNoteSummary[] = [
+      {
+        bookTitle: "Dune",
+        bookAuthor: "Frank Herbert",
+        artifacts: [{ kind: "insight", title: "Ecology", content: "Spice as oil allegory." }],
+      },
+      {
+        bookTitle: "Foundation",
+        bookAuthor: "Isaac Asimov",
+        artifacts: [
+          { kind: "quote", title: "Seldon quote", content: "Violence is the last refuge." },
+        ],
+      },
+    ];
+    // Act
+    const prompt = buildInsightsPrompt(baseBooks, 2, multiBookNotes);
+    // Assert
+    expect(prompt).toContain('"Dune" by Frank Herbert');
+    expect(prompt).toContain('"Foundation" by Isaac Asimov');
+    expect(prompt).toContain("Spice as oil allegory.");
+    expect(prompt).toContain("Violence is the last refuge.");
+    expect(prompt).toContain("[quote]");
+  });
+
+  it("should render all five artifact kinds with correct labels", () => {
+    // Arrange
+    const allKinds: VoiceNoteSummary = {
+      bookTitle: "Dune",
+      bookAuthor: "Frank Herbert",
+      artifacts: [
+        { kind: "insight", title: "T1", content: "C1" },
+        { kind: "openQuestion", title: "T2", content: "C2" },
+        { kind: "quote", title: "T3", content: "C3" },
+        { kind: "followUpQuestion", title: "T4", content: "C4" },
+        { kind: "contextExpansion", title: "T5", content: "C5" },
+      ],
+    };
+    // Act
+    const prompt = buildInsightsPrompt(baseBooks, 2, [allKinds]);
+    // Assert
+    expect(prompt).toContain("[insight]");
+    expect(prompt).toContain("[openQuestion]");
+    expect(prompt).toContain("[quote]");
+    expect(prompt).toContain("[followUpQuestion]");
+    expect(prompt).toContain("[contextExpansion]");
+  });
 });
 
 describe("fetchVoiceNoteSummariesSafe — graceful degradation", () => {
