@@ -505,28 +505,7 @@ describe("useListeningSessionRecorder", () => {
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: "Session processed" }));
   });
 
-  // ─── AC 4: unmount ────────────────────────────────────────────────────────
-
-  it("calls failSession best-effort when unmounted while recording", async () => {
-    const { unmount } = render(<RecorderHarness bookId="book_1" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "start" }));
-    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
-    expect(screen.getByTestId("recording")).toHaveTextContent("recording");
-
-    unmount();
-
-    await waitFor(() =>
-      expect(failSessionMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sessionId: "session_1",
-          message: "Session ended before processing completed.",
-        }),
-      ),
-    );
-  });
-
-  // ─── AC 3 (continued): recording too short ────────────────────────────────
+  // ─── AC 3 (continued): manual stop error paths ──────────────────────────
 
   it("fails session with clear message when recording is too short", async () => {
     render(<RecorderHarness bookId="book_1" />);
@@ -552,5 +531,100 @@ describe("useListeningSessionRecorder", () => {
     });
     expect(uploadCalls).toHaveLength(0);
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  it("fails session when all upload retries are exhausted during manual stop", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        return {
+          ok: false,
+          json: async () => ({ error: "Storage unavailable" }),
+        } as Response;
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "stop" }));
+
+    // Advance past all retry backoff delays (3 attempts, ~1500ms total + jitter)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({ message: expect.stringMatching(/upload failed after/i) }),
+      ),
+    );
+    expect(completeSessionMock).not.toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  it("fails session when transcription fails during manual stop", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        return { ok: true, json: async () => ({ ok: true }) } as Response;
+      }
+      if (url.includes("/api/listening-sessions/transcribe")) {
+        return {
+          ok: false,
+          json: async () => ({ error: "Transcription service unavailable" }),
+        } as Response;
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "stop" }));
+
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: expect.stringMatching(/transcription service unavailable/i),
+        }),
+      ),
+    );
+    expect(completeSessionMock).not.toHaveBeenCalled();
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  // ─── AC 4: unmount ────────────────────────────────────────────────────────
+
+  it("calls failSession best-effort when unmounted while recording", async () => {
+    const { unmount } = render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("recording")).toHaveTextContent("recording");
+
+    unmount();
+
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: "session_1",
+          message: "Session ended before processing completed.",
+        }),
+      ),
+    );
   });
 });
