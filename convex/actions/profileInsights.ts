@@ -5,6 +5,7 @@ import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { openRouterChatCompletion, OpenRouterApiError } from "../../lib/ai/openrouter";
 import { DEFAULT_PROFILE_MODEL, PROFILE_FALLBACK_MODELS } from "../../lib/ai/models";
+import { logger } from "../../lib/logger";
 import type { Doc } from "../_generated/dataModel";
 
 // --- Types ---
@@ -572,7 +573,10 @@ export const generate = internalAction({
           userId: profile.userId,
         });
       } catch (e) {
-        console.warn("Failed to fetch voice note summaries, proceeding without:", e);
+        logger.warn(
+          { err: e, profileId: args.profileId },
+          "Failed to fetch voice note summaries, proceeding without",
+        );
       }
 
       // Build prompt
