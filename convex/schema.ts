@@ -150,7 +150,7 @@ export default defineSchema({
     ),
     title: v.string(),
     content: v.string(),
-    source: v.optional(v.string()),
+    provider: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

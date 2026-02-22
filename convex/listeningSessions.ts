@@ -119,6 +119,11 @@ function formatDuration(durationMs: number | undefined): string {
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
+function formatQuote(text: string, source?: string): string {
+  const trimmed = text.trim();
+  return source?.trim() ? `> ${trimmed}\n\n— ${source.trim()}` : `> ${trimmed}`;
+}
+
 function truncate(input: string, maxChars: number): string {
   const normalized = input.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxChars) return normalized;
@@ -164,16 +169,17 @@ async function getActiveSessionForBook(
   userId: Id<"users">,
   bookId: Id<"books">,
 ) {
-  for (const status of ACTIVE_SESSION_STATUSES) {
-    const active = await ctx.db
-      .query("listeningSessions")
-      .withIndex("by_user_book_status", (q) =>
-        q.eq("userId", userId).eq("bookId", bookId).eq("status", status),
-      )
-      .first();
-    if (active) return active;
-  }
-  return null;
+  const results = await Promise.all(
+    ACTIVE_SESSION_STATUSES.map((status) =>
+      ctx.db
+        .query("listeningSessions")
+        .withIndex("by_user_book_status", (q) =>
+          q.eq("userId", userId).eq("bookId", bookId).eq("status", status),
+        )
+        .first(),
+    ),
+  );
+  return results.find((r) => r !== null) ?? null;
 }
 
 async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId: Id<"books">) {
@@ -309,7 +315,6 @@ async function persistListeningSessionArtifacts(
     kind: ListeningSessionArtifactKind;
     title: string;
     content: string;
-    source?: string;
   }) => {
     const normalizedTitle = artifact.title.trim();
     const normalizedContent = artifact.content.trim();
@@ -323,28 +328,18 @@ async function persistListeningSessionArtifacts(
       kind: artifact.kind,
       title: normalizedTitle,
       content: normalizedContent,
-      source: artifact.source,
+      provider: args.source,
       createdAt: args.occurredAt,
       updatedAt: args.occurredAt,
     });
   };
 
   for (const insight of args.synthesis.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-    await addArtifact({
-      kind: "insight",
-      title: insight.title,
-      content: insight.content.trim(),
-      source: args.source,
-    });
+    await addArtifact({ kind: "insight", title: insight.title, content: insight.content.trim() });
   }
 
   for (const question of args.synthesis.openQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-    await addArtifact({
-      kind: "openQuestion",
-      title: "Open question",
-      content: question.trim(),
-      source: args.source,
-    });
+    await addArtifact({ kind: "openQuestion", title: "Open question", content: question.trim() });
   }
 
   for (const question of args.synthesis.followUpQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
@@ -352,21 +347,15 @@ async function persistListeningSessionArtifacts(
       kind: "followUpQuestion",
       title: "Follow-up question",
       content: question.trim(),
-      source: args.source,
     });
   }
 
   for (const quote of args.synthesis.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
-    const trimmed = quote.text.trim();
-    if (!trimmed) continue;
-    const content = quote.source?.trim()
-      ? `> ${trimmed}\n\n— ${quote.source.trim()}`
-      : `> ${trimmed}`;
+    if (!quote.text.trim()) continue;
     await addArtifact({
       kind: "quote",
       title: "Quote",
-      content,
-      source: args.source,
+      content: formatQuote(quote.text, quote.source),
     });
   }
 
@@ -375,7 +364,6 @@ async function persistListeningSessionArtifacts(
       kind: "contextExpansion",
       title: expansion.title,
       content: expansion.content.trim(),
-      source: args.source,
     });
   }
 }
@@ -511,11 +499,7 @@ async function completeListeningSessionForUser(
       if (!normalized || seenQuotes.has(normalized)) continue;
       seenQuotes.add(normalized);
 
-      const content = quote.source?.trim()
-        ? `> ${quote.text.trim()}\n\n— ${quote.source.trim()}`
-        : `> ${quote.text.trim()}`;
-
-      await addSynthesizedNote("quote", content);
+      await addSynthesizedNote("quote", formatQuote(quote.text, quote.source));
     }
   }
 

@@ -70,7 +70,7 @@ type Artifact = {
   kind: "insight" | "openQuestion" | "quote" | "followUpQuestion" | "contextExpansion";
   title: string;
   content: string;
-  source?: string;
+  provider?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -775,11 +775,11 @@ describe("listening session state machine handlers", () => {
     expect(artifactKinds.filter((kind) => kind === "followUpQuestion")).toHaveLength(6);
     expect(artifactKinds.filter((kind) => kind === "quote")).toHaveLength(6);
     expect(artifactKinds.filter((kind) => kind === "contextExpansion")).toHaveLength(4);
-    expect(data.artifacts.every((artifact) => artifact.source === "openai")).toBe(true);
+    expect(data.artifacts.every((artifact) => artifact.provider === "openai")).toBe(true);
     expect(data.artifacts[0]).toMatchObject({
       _id: artifactId(1),
       kind: "insight",
-      source: "openai",
+      provider: "openai",
       title: "Insight 0",
     });
   });
@@ -821,10 +821,10 @@ describe("listening session state machine handlers", () => {
     const artifactKinds = data.artifacts.map((artifact) => artifact.kind);
     expect(artifactKinds.filter((kind) => kind === "insight")).toHaveLength(1);
     expect(artifactKinds.filter((kind) => kind === "quote")).toHaveLength(1);
-    expect(data.artifacts.every((artifact) => artifact.source === "unknown")).toBe(true);
+    expect(data.artifacts.every((artifact) => artifact.provider === "unknown")).toBe(true);
     expect(data.artifacts[0]).toMatchObject({
       _id: artifactId(1),
-      source: "unknown",
+      provider: "unknown",
     });
     const addedNoteIds = data.notes.map((note) => note._id);
     expect(addedNoteIds).toContain(noteId(13));
