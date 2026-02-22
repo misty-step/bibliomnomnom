@@ -15,11 +15,12 @@ export function PostHogProvider({ children }: { children: ReactNode }) {
       posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
         // Use reverse proxy to bypass ad blockers
         api_host: "/ingest",
-        ui_host: "https://us.i.posthog.com",
+        ui_host: "https://us.posthog.com",
         // Only create person profiles for identified users
         person_profiles: "identified_only",
         // Manual pageview tracking via PostHogPageview component
         capture_pageview: false,
+        respect_dnt: true,
         // Privacy: mask all text and inputs in session recordings
         session_recording: {
           maskAllInputs: true,
