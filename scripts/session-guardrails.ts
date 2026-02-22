@@ -120,6 +120,18 @@ function makeCtx(seed?: Partial<DataStore>) {
             },
           };
         }
+        // Persistence tables — idempotency guards query these before inserting
+        if (
+          tableName === "listeningSessionTranscripts" ||
+          tableName === "listeningSessionArtifacts"
+        ) {
+          return {
+            withIndex: () => ({
+              first: async () => null,
+              collect: async () => [],
+            }),
+          };
+        }
         throw new Error(`Unsupported query table: ${tableName}`);
       },
       get: async (id: string) => getById(id),
