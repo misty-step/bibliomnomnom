@@ -74,8 +74,8 @@ describe("buildInsightsPrompt — voice note evidence", () => {
     expect(prompt.toLowerCase()).toMatch(/only cite voice[- ]note/);
   });
 
-  it("includes guardrail even when no voice notes provided", () => {
-    // Guardrail rule should still appear in rules section regardless
+  it("should omit guardrail when no voice notes provided", () => {
+    // Guardrail should only appear when voice notes are present
     const promptWithVoiceNotes = buildInsightsPrompt(baseBooks, 2, [voiceNote]);
     const promptWithout = buildInsightsPrompt(baseBooks, 2, []);
     // When voice notes are present, the guardrail should appear
