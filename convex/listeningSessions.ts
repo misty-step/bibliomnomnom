@@ -68,6 +68,18 @@ const processListeningSessionRun = (
 
 type SessionStatus = Doc<"listeningSessions">["status"];
 type SynthesisArtifacts = Doc<"listeningSessions">["synthesis"];
+type ListeningSessionArtifactKind =
+  | "insight"
+  | "openQuestion"
+  | "quote"
+  | "followUpQuestion"
+  | "contextExpansion";
+const ACTIVE_SESSION_STATUSES: readonly SessionStatus[] = [
+  "recording",
+  "transcribing",
+  "synthesizing",
+  "review",
+];
 
 const ALLOWED_TRANSITIONS: Record<SessionStatus, SessionStatus[]> = {
   recording: ["transcribing", "failed"],
@@ -145,6 +157,23 @@ async function getOwnedSession(
     throw new ConvexError("Listening session not found or access denied");
   }
   return session;
+}
+
+async function getActiveSessionForBook(
+  ctx: Parameters<typeof requireAuth>[0],
+  userId: Id<"users">,
+  bookId: Id<"books">,
+) {
+  for (const status of ACTIVE_SESSION_STATUSES) {
+    const active = await ctx.db
+      .query("listeningSessions")
+      .withIndex("by_user_book_status", (q) =>
+        q.eq("userId", userId).eq("bookId", bookId).eq("status", status),
+      )
+      .first();
+    if (active) return active;
+  }
+  return null;
 }
 
 async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId: Id<"books">) {
@@ -225,6 +254,118 @@ async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId:
     ...pack,
     packSummary: pack.summary,
   };
+}
+
+async function persistListeningSessionTranscript(
+  ctx: MutationCtx,
+  args: {
+    session: Doc<"listeningSessions">;
+    userId: Id<"users">;
+    transcript: string;
+    transcriptProvider: string;
+    occurredAt: number;
+  },
+) {
+  await ctx.db.insert("listeningSessionTranscripts", {
+    userId: args.userId,
+    bookId: args.session.bookId,
+    sessionId: args.session._id,
+    type: "final",
+    provider: args.transcriptProvider,
+    content: args.transcript,
+    chars: args.transcript.length,
+    createdAt: args.occurredAt,
+    updatedAt: args.occurredAt,
+  });
+}
+
+async function persistListeningSessionArtifacts(
+  ctx: MutationCtx,
+  args: {
+    session: Doc<"listeningSessions">;
+    userId: Id<"users">;
+    synthesis: SynthesisArtifacts;
+    source: string;
+    occurredAt: number;
+  },
+) {
+  if (!args.synthesis) {
+    return;
+  }
+
+  const addArtifact = async (artifact: {
+    kind: ListeningSessionArtifactKind;
+    title: string;
+    content: string;
+    source?: string;
+  }) => {
+    const normalizedTitle = artifact.title.trim();
+    const normalizedContent = artifact.content.trim();
+    if (!normalizedContent || !normalizedTitle) {
+      return;
+    }
+    await ctx.db.insert("listeningSessionArtifacts", {
+      userId: args.userId,
+      bookId: args.session.bookId,
+      sessionId: args.session._id,
+      kind: artifact.kind,
+      title: normalizedTitle,
+      content: normalizedContent,
+      source: artifact.source,
+      createdAt: args.occurredAt,
+      updatedAt: args.occurredAt,
+    });
+  };
+
+  for (const insight of args.synthesis.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    await addArtifact({
+      kind: "insight",
+      title: insight.title,
+      content: insight.content.trim(),
+      source: args.source,
+    });
+  }
+
+  for (const question of args.synthesis.openQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    await addArtifact({
+      kind: "openQuestion",
+      title: "Open question",
+      content: question.trim(),
+      source: args.source,
+    });
+  }
+
+  for (const question of args.synthesis.followUpQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    await addArtifact({
+      kind: "followUpQuestion",
+      title: "Follow-up question",
+      content: question.trim(),
+      source: args.source,
+    });
+  }
+
+  for (const quote of args.synthesis.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    const trimmed = quote.text.trim();
+    if (!trimmed) continue;
+    const content = quote.source?.trim()
+      ? `> ${trimmed}\n\n— ${quote.source.trim()}`
+      : `> ${trimmed}`;
+    await addArtifact({
+      kind: "quote",
+      title: "Quote",
+      content,
+      source: args.source,
+    });
+  }
+
+  for (const expansion of args.synthesis.contextExpansions.slice(0, MAX_CONTEXT_EXPANSION_ITEMS)) {
+    await addArtifact({
+      kind: "contextExpansion",
+      title: expansion.title,
+      content: expansion.content.trim(),
+      source: args.source,
+    });
+  }
 }
 
 async function completeListeningSessionForUser(
@@ -381,6 +522,24 @@ async function completeListeningSessionForUser(
     completePatch.estimatedCostUsd = Math.max(0, args.estimatedCostUsd);
   }
   await ctx.db.patch(session._id, completePatch);
+
+  await persistListeningSessionTranscript(ctx, {
+    session,
+    userId,
+    transcript: cleanedTranscript,
+    transcriptProvider: provider,
+    occurredAt: now,
+  });
+
+  if (synth) {
+    await persistListeningSessionArtifacts(ctx, {
+      session,
+      userId,
+      synthesis: synth,
+      source: provider,
+      occurredAt: now,
+    });
+  }
 
   return { rawNoteId, synthesizedNoteIds };
 }
@@ -551,6 +710,10 @@ export const createListeningSessionHandler = async (
 ) => {
   const userId = await requireAuth(ctx);
   await getOwnedBook(ctx, userId, args.bookId);
+  const activeSession = await getActiveSessionForBook(ctx, userId, args.bookId);
+  if (activeSession) {
+    throw new ConvexError("Only one active listening session allowed per book");
+  }
 
   const now = Date.now();
   const capDurationMs = normalizeCapDuration(args.capDurationMs);

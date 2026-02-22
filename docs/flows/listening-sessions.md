@@ -46,8 +46,10 @@ Current backlog focus for this flow is tracked under pillar epic #166:
 
 5. **Persist**
    - Convex: `convex/listeningSessions.ts`
-   - Always writes/updates a **raw transcript note**.
-   - Writes **one synthesized note** plus **quote notes** (note types are `note` or `quote`).
+   - Always writes/updates a **raw transcript note** in `notes`.
+   - Writes each synthesis artifact into **`listeningSessionArtifacts`** (kinded `insight`, `openQuestion`, `quote`, `followUpQuestion`, `contextExpansion`).
+   - Also persists a final normalized transcript row in **`listeningSessionTranscripts`**.
+   - Single active session guard: creation is rejected if a `recording|transcribing|synthesizing|review` session already exists for the same user and book.
 
 ## Server Session Status
 
@@ -95,7 +97,7 @@ sequenceDiagram
     LLM-->>UI: { artifacts } (or fallback)
 
     UI->>CVX: complete(sessionId, transcript, provider, artifacts?)
-    CVX-->>UI: raw transcript note upserted + synthesized notes inserted
+    CVX-->>UI: raw transcript note upserted + synthesized notes inserted + artifacts/transcript persisted
 ```
 
 ## Future (Not Shipped)
