@@ -5,9 +5,20 @@ import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { openRouterChatCompletion, OpenRouterApiError } from "../../lib/ai/openrouter";
 import { DEFAULT_PROFILE_MODEL, PROFILE_FALLBACK_MODELS } from "../../lib/ai/models";
+import { logger } from "../../lib/logger";
 import type { Doc } from "../_generated/dataModel";
 
 // --- Types ---
+
+export type VoiceNoteSummary = {
+  bookTitle: string;
+  bookAuthor: string;
+  artifacts: Array<{
+    kind: "insight" | "openQuestion" | "quote" | "followUpQuestion" | "contextExpansion";
+    title: string;
+    content: string;
+  }>;
+};
 
 type BookSummary = {
   title: string;
@@ -95,7 +106,11 @@ function formatDate(timestamp: number): string {
   return date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
-function buildInsightsPrompt(books: BookSummary[], bookCount: number): string {
+export function buildInsightsPrompt(
+  books: BookSummary[],
+  bookCount: number,
+  voiceNoteSummaries: VoiceNoteSummary[] = [],
+): string {
   // Separate books by category for richer context
   const readBooks = books.filter((b) => b.status === "read");
   const favorites = books.filter((b) => b.isFavorite);
@@ -136,6 +151,17 @@ function buildInsightsPrompt(books: BookSummary[], bookCount: number): string {
       ? `\nRE-READS (books read multiple times):\n${rereads.map((b) => `- "${b.title}" by ${b.author} (${b.timesRead}x)`).join("\n")}`
       : "";
 
+  // Build voice note evidence section
+  const voiceNoteSection =
+    voiceNoteSummaries.length > 0
+      ? `\nVOICE NOTE EVIDENCE (reader's own spoken reactions while reading):\n${voiceNoteSummaries
+          .map(
+            (s) =>
+              `"${s.bookTitle}" by ${s.bookAuthor}:\n${s.artifacts.map((a) => `  [${a.kind}] ${a.title}: ${a.content.slice(0, 300)}`).join("\n")}`,
+          )
+          .join("\n\n")}`
+      : "";
+
   const confidenceLevel = bookCount >= MIN_BOOKS_FOR_FULL ? "strong" : "developing";
   const includeEvolution = bookCount >= MIN_BOOKS_FOR_FULL;
 
@@ -143,7 +169,7 @@ function buildInsightsPrompt(books: BookSummary[], bookCount: number): string {
 
 READER'S LIBRARY (${bookCount} books):
 ${bookList}
-${recentSection}${favoritesSection}${rereadsSection}
+${recentSection}${favoritesSection}${rereadsSection}${voiceNoteSection}
 
 Analyze this collection and provide insights in JSON format:
 
@@ -214,7 +240,7 @@ Analyze this collection and provide insights in JSON format:
 ANALYSIS RULES:
 - readerArchetype: Create a distinctive 2-3 word title that captures their reading identity. It should feel like an RPG class or a literary moniker — evocative and specific to THIS reader.
 - Be specific and insightful, never generic platitudes
-- Base analysis ONLY on books provided — do not assume books not listed
+- Base analysis ONLY on books provided — do not assume books not listed${voiceNoteSummaries.length > 0 ? "\n- Only cite voice note evidence that is explicitly present in the VOICE NOTE EVIDENCE section above — never infer or fabricate reader reactions not recorded there" : ""}
 - For "${confidenceLevel}" confidence: ${confidenceLevel === "developing" ? "note limited sample where appropriate" : "provide confident, deep analysis"}
 - Keep tasteTagline under 100 characters, make it memorable and unique to THIS reader
 - For complexity: "accessible" = popular fiction, "moderate" = literary-commercial, "literary" = dense/challenging
@@ -249,7 +275,7 @@ EVOLUTION RULES (for 50+ books):
 Respond with valid JSON only, no markdown or extra text.`;
 }
 
-function parseInsightsResponse(content: string, bookCount: number): ProfileInsights {
+export function parseInsightsResponse(content: string, bookCount: number): ProfileInsights {
   const confidence: ProfileInsights["confidence"] =
     bookCount >= MIN_BOOKS_FOR_FULL ? "strong" : "developing";
 
@@ -486,6 +512,21 @@ async function callWithFallback(apiKey: string, prompt: string): Promise<string>
   throw new Error("All models unavailable. Please try again later.");
 }
 
+// --- Helpers ---
+
+/** Exported for testing. Fetches voice note summaries; returns [] on any error. */
+export async function fetchVoiceNoteSummariesSafe(
+  fetcher: () => Promise<VoiceNoteSummary[]>,
+  profileId: string,
+): Promise<VoiceNoteSummary[]> {
+  try {
+    return await fetcher();
+  } catch (e) {
+    logger.warn({ err: e, profileId }, "Failed to fetch voice note summaries, proceeding without");
+    return [];
+  }
+}
+
 // --- Main Action ---
 
 export const generate = internalAction({
@@ -540,8 +581,17 @@ export const generate = internalAction({
           timesRead: book.timesRead,
         }));
 
+      // Fetch voice-note synthesis artifacts (graceful degradation if query fails)
+      const voiceNoteSummaries = await fetchVoiceNoteSummariesSafe(
+        () =>
+          ctx.runQuery(internal.profiles.getVoiceNoteSummariesForProfile, {
+            userId: profile.userId,
+          }),
+        args.profileId,
+      );
+
       // Build prompt
-      const prompt = buildInsightsPrompt(bookSummaries, bookCount);
+      const prompt = buildInsightsPrompt(bookSummaries, bookCount, voiceNoteSummaries);
 
       // Call LLM with fallback
       const responseContent = await callWithFallback(apiKey, prompt);
