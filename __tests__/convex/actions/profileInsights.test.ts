@@ -44,49 +44,56 @@ const voiceNote: VoiceNoteSummary = {
 };
 
 describe("buildInsightsPrompt — voice note evidence", () => {
-  it("includes VOICE NOTE EVIDENCE section when summaries provided", () => {
+  it("should include voice note evidence section when summaries are provided", () => {
+    // Arrange
     const prompt = buildInsightsPrompt(baseBooks, 2, [voiceNote]);
+    // Act / Assert
     expect(prompt).toContain("VOICE NOTE EVIDENCE");
     expect(prompt).toContain("Dune");
     expect(prompt).toContain("Ecological allegory");
     expect(prompt).toContain("The spice melange mirrors our addiction to fossil fuels.");
   });
 
-  it("includes artifact kind labels in voice note section", () => {
+  it("should include artifact kind labels when voice notes are provided", () => {
+    // Arrange
     const prompt = buildInsightsPrompt(baseBooks, 2, [voiceNote]);
+    // Act / Assert
     expect(prompt).toContain("insight");
     expect(prompt).toContain("openQuestion");
   });
 
-  it("omits VOICE NOTE EVIDENCE section when summaries is empty", () => {
+  it("should omit voice note evidence section when summaries are empty", () => {
+    // Arrange
     const prompt = buildInsightsPrompt(baseBooks, 2, []);
+    // Act / Assert
     expect(prompt).not.toContain("VOICE NOTE EVIDENCE");
   });
 
-  it("omits VOICE NOTE EVIDENCE section when summaries is not provided", () => {
+  it("should omit voice note evidence section when summaries are not provided", () => {
+    // Arrange
     const prompt = buildInsightsPrompt(baseBooks, 2);
+    // Act / Assert
     expect(prompt).not.toContain("VOICE NOTE EVIDENCE");
   });
 
-  it("includes guardrail against hallucinating voice evidence", () => {
+  it("should include voice note guardrail when voice notes are provided", () => {
+    // Arrange
     const prompt = buildInsightsPrompt(baseBooks, 2, [voiceNote]);
-    // Should contain some form of "only cite" voice note evidence that is present
+    // Act / Assert
     expect(prompt.toLowerCase()).toMatch(/only cite voice[- ]note/);
   });
 
-  it("should omit guardrail when no voice notes provided", () => {
-    // Guardrail should only appear when voice notes are present
-    const promptWithVoiceNotes = buildInsightsPrompt(baseBooks, 2, [voiceNote]);
+  it("should omit voice note guardrail when no voice notes are provided", () => {
+    // Arrange
     const promptWithout = buildInsightsPrompt(baseBooks, 2, []);
-    // When voice notes are present, the guardrail should appear
-    expect(promptWithVoiceNotes.toLowerCase()).toMatch(/only cite voice[- ]note/);
-    // When no voice notes, no guardrail needed
+    // Act / Assert
     expect(promptWithout.toLowerCase()).not.toMatch(/only cite voice[- ]note/);
   });
 });
 
 describe("parseInsightsResponse — no regression with voice note additions", () => {
-  it("parses minimal valid response", () => {
+  it("should parse minimal response when JSON is valid", () => {
+    // Arrange
     const response = JSON.stringify({
       tasteTagline: "A reader of speculative futures",
       literaryTaste: {
@@ -108,16 +115,19 @@ describe("parseInsightsResponse — no regression with voice note additions", ()
         goWider: [],
       },
     });
-
+    // Act
     const result = parseInsightsResponse(response, 25);
+    // Assert
     expect(result.tasteTagline).toBe("A reader of speculative futures");
     expect(result.confidence).toBe("developing");
     expect(result.recommendations?.goDeeper).toHaveLength(1);
     expect(result.recommendations?.goDeeper[0]!.title).toBe("Hyperion");
   });
 
-  it("falls back gracefully on malformed response", () => {
+  it("should fall back gracefully when response is malformed", () => {
+    // Act
     const result = parseInsightsResponse("not json at all", 25);
+    // Assert
     expect(result.tasteTagline).toBe("A reader with eclectic and diverse tastes");
     expect(result.literaryTaste.genres).toEqual([]);
     expect(result.confidence).toBe("developing");
