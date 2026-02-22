@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildInsightsPrompt,
+  fetchVoiceNoteSummariesSafe,
   parseInsightsResponse,
   type VoiceNoteSummary,
 } from "../../../convex/actions/profileInsights";
@@ -103,6 +104,35 @@ describe("buildInsightsPrompt — voice note evidence", () => {
     // Assert
     expect(prompt).toContain("x".repeat(300));
     expect(prompt).not.toContain("x".repeat(301));
+  });
+});
+
+describe("fetchVoiceNoteSummariesSafe — graceful degradation", () => {
+  it("should return empty array when fetcher throws", async () => {
+    // Arrange
+    const profileId = "profile_1";
+    const fetcher = () => Promise.reject(new Error("DB unavailable"));
+    // Act
+    const result = await fetchVoiceNoteSummariesSafe(fetcher, profileId);
+    // Assert
+    expect(result).toEqual([]);
+  });
+
+  it("should return summaries when fetcher resolves", async () => {
+    // Arrange
+    const profileId = "profile_1";
+    const summaries: VoiceNoteSummary[] = [
+      {
+        bookTitle: "Dune",
+        bookAuthor: "Frank Herbert",
+        artifacts: [{ kind: "insight", title: "Ecology", content: "Spice allegory." }],
+      },
+    ];
+    const fetcher = () => Promise.resolve(summaries);
+    // Act
+    const result = await fetchVoiceNoteSummariesSafe(fetcher, profileId);
+    // Assert
+    expect(result).toEqual(summaries);
   });
 });
 

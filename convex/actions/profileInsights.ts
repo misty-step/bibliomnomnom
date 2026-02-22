@@ -512,6 +512,21 @@ async function callWithFallback(apiKey: string, prompt: string): Promise<string>
   throw new Error("All models unavailable. Please try again later.");
 }
 
+// --- Helpers ---
+
+/** Exported for testing. Fetches voice note summaries; returns [] on any error. */
+export async function fetchVoiceNoteSummariesSafe(
+  fetcher: () => Promise<VoiceNoteSummary[]>,
+  profileId: string,
+): Promise<VoiceNoteSummary[]> {
+  try {
+    return await fetcher();
+  } catch (e) {
+    logger.warn({ err: e, profileId }, "Failed to fetch voice note summaries, proceeding without");
+    return [];
+  }
+}
+
 // --- Main Action ---
 
 export const generate = internalAction({
@@ -567,17 +582,13 @@ export const generate = internalAction({
         }));
 
       // Fetch voice-note synthesis artifacts (graceful degradation if query fails)
-      let voiceNoteSummaries: VoiceNoteSummary[] = [];
-      try {
-        voiceNoteSummaries = await ctx.runQuery(internal.profiles.getVoiceNoteSummariesForProfile, {
-          userId: profile.userId,
-        });
-      } catch (e) {
-        logger.warn(
-          { err: e, profileId: args.profileId },
-          "Failed to fetch voice note summaries, proceeding without",
-        );
-      }
+      const voiceNoteSummaries = await fetchVoiceNoteSummariesSafe(
+        () =>
+          ctx.runQuery(internal.profiles.getVoiceNoteSummariesForProfile, {
+            userId: profile.userId,
+          }),
+        args.profileId,
+      );
 
       // Build prompt
       const prompt = buildInsightsPrompt(bookSummaries, bookCount, voiceNoteSummaries);
