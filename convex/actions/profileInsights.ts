@@ -156,7 +156,7 @@ export function buildInsightsPrompt(
       ? `\nVOICE NOTE EVIDENCE (reader's own spoken reactions while reading):\n${voiceNoteSummaries
           .map(
             (s) =>
-              `"${s.bookTitle}" by ${s.bookAuthor}:\n${s.artifacts.map((a) => `  [${a.kind}] ${a.title}: ${a.content}`).join("\n")}`,
+              `"${s.bookTitle}" by ${s.bookAuthor}:\n${s.artifacts.map((a) => `  [${a.kind}] ${a.title}: ${a.content.slice(0, 300)}`).join("\n")}`,
           )
           .join("\n\n")}`
       : "";

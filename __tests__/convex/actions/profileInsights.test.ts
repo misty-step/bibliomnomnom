@@ -89,6 +89,21 @@ describe("buildInsightsPrompt — voice note evidence", () => {
     // Act / Assert
     expect(promptWithout.toLowerCase()).not.toMatch(/only cite voice[- ]note/);
   });
+
+  it("should truncate artifact content to 300 characters when content is long", () => {
+    // Arrange
+    const longContent = "x".repeat(400);
+    const noteWithLongContent: VoiceNoteSummary = {
+      bookTitle: "Dune",
+      bookAuthor: "Frank Herbert",
+      artifacts: [{ kind: "insight", title: "Long insight", content: longContent }],
+    };
+    // Act
+    const prompt = buildInsightsPrompt(baseBooks, 2, [noteWithLongContent]);
+    // Assert
+    expect(prompt).toContain("x".repeat(300));
+    expect(prompt).not.toContain("x".repeat(301));
+  });
 });
 
 describe("parseInsightsResponse — no regression with voice note additions", () => {
