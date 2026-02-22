@@ -68,6 +68,18 @@ const processListeningSessionRun = (
 
 type SessionStatus = Doc<"listeningSessions">["status"];
 type SynthesisArtifacts = Doc<"listeningSessions">["synthesis"];
+type ListeningSessionArtifactKind =
+  | "insight"
+  | "openQuestion"
+  | "quote"
+  | "followUpQuestion"
+  | "contextExpansion";
+const ACTIVE_SESSION_STATUSES: readonly SessionStatus[] = [
+  "recording",
+  "transcribing",
+  "synthesizing",
+  "review",
+];
 
 const ALLOWED_TRANSITIONS: Record<SessionStatus, SessionStatus[]> = {
   recording: ["transcribing", "failed"],
@@ -105,6 +117,11 @@ function formatDuration(durationMs: number | undefined): string {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatQuote(text: string, source?: string): string {
+  const trimmed = text.trim();
+  return source?.trim() ? `> ${trimmed}\n\n— ${source.trim()}` : `> ${trimmed}`;
 }
 
 function truncate(input: string, maxChars: number): string {
@@ -145,6 +162,24 @@ async function getOwnedSession(
     throw new ConvexError("Listening session not found or access denied");
   }
   return session;
+}
+
+async function getActiveSessionForBook(
+  ctx: Parameters<typeof requireAuth>[0],
+  userId: Id<"users">,
+  bookId: Id<"books">,
+) {
+  const results = await Promise.all(
+    ACTIVE_SESSION_STATUSES.map((status) =>
+      ctx.db
+        .query("listeningSessions")
+        .withIndex("by_user_book_status", (q) =>
+          q.eq("userId", userId).eq("bookId", bookId).eq("status", status),
+        )
+        .first(),
+    ),
+  );
+  return results.find((r) => r !== null) ?? null;
 }
 
 async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId: Id<"books">) {
@@ -225,6 +260,112 @@ async function buildSynthesisContext(ctx: QueryCtx, userId: Id<"users">, bookId:
     ...pack,
     packSummary: pack.summary,
   };
+}
+
+async function persistListeningSessionTranscript(
+  ctx: MutationCtx,
+  args: {
+    session: Doc<"listeningSessions">;
+    userId: Id<"users">;
+    transcript: string;
+    transcriptProvider: string;
+    occurredAt: number;
+  },
+) {
+  const existing = await ctx.db
+    .query("listeningSessionTranscripts")
+    .withIndex("by_session", (q) => q.eq("sessionId", args.session._id))
+    .first();
+  if (existing) return;
+
+  await ctx.db.insert("listeningSessionTranscripts", {
+    userId: args.userId,
+    bookId: args.session.bookId,
+    sessionId: args.session._id,
+    type: "final",
+    provider: args.transcriptProvider,
+    content: args.transcript,
+    chars: args.transcript.length,
+    createdAt: args.occurredAt,
+    updatedAt: args.occurredAt,
+  });
+}
+
+async function persistListeningSessionArtifacts(
+  ctx: MutationCtx,
+  args: {
+    session: Doc<"listeningSessions">;
+    userId: Id<"users">;
+    synthesis: SynthesisArtifacts;
+    source: string;
+    occurredAt: number;
+  },
+) {
+  if (!args.synthesis) {
+    return;
+  }
+
+  const existingArtifact = await ctx.db
+    .query("listeningSessionArtifacts")
+    .withIndex("by_session", (q) => q.eq("sessionId", args.session._id))
+    .first();
+  if (existingArtifact) return;
+
+  const addArtifact = async (artifact: {
+    kind: ListeningSessionArtifactKind;
+    title: string;
+    content: string;
+  }) => {
+    const normalizedTitle = artifact.title.trim();
+    const normalizedContent = artifact.content.trim();
+    if (!normalizedContent || !normalizedTitle) {
+      return;
+    }
+    await ctx.db.insert("listeningSessionArtifacts", {
+      userId: args.userId,
+      bookId: args.session.bookId,
+      sessionId: args.session._id,
+      kind: artifact.kind,
+      title: normalizedTitle,
+      content: normalizedContent,
+      provider: args.source,
+      createdAt: args.occurredAt,
+      updatedAt: args.occurredAt,
+    });
+  };
+
+  for (const insight of args.synthesis.insights.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    await addArtifact({ kind: "insight", title: insight.title, content: insight.content.trim() });
+  }
+
+  for (const question of args.synthesis.openQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    await addArtifact({ kind: "openQuestion", title: "Open question", content: question.trim() });
+  }
+
+  for (const question of args.synthesis.followUpQuestions.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    await addArtifact({
+      kind: "followUpQuestion",
+      title: "Follow-up question",
+      content: question.trim(),
+    });
+  }
+
+  for (const quote of args.synthesis.quotes.slice(0, MAX_SYNTH_ARTIFACT_ITEMS)) {
+    if (!quote.text.trim()) continue;
+    await addArtifact({
+      kind: "quote",
+      title: "Quote",
+      content: formatQuote(quote.text, quote.source),
+    });
+  }
+
+  for (const expansion of args.synthesis.contextExpansions.slice(0, MAX_CONTEXT_EXPANSION_ITEMS)) {
+    await addArtifact({
+      kind: "contextExpansion",
+      title: expansion.title,
+      content: expansion.content.trim(),
+    });
+  }
 }
 
 async function completeListeningSessionForUser(
@@ -358,11 +499,7 @@ async function completeListeningSessionForUser(
       if (!normalized || seenQuotes.has(normalized)) continue;
       seenQuotes.add(normalized);
 
-      const content = quote.source?.trim()
-        ? `> ${quote.text.trim()}\n\n— ${quote.source.trim()}`
-        : `> ${quote.text.trim()}`;
-
-      await addSynthesizedNote("quote", content);
+      await addSynthesizedNote("quote", formatQuote(quote.text, quote.source));
     }
   }
 
@@ -381,6 +518,24 @@ async function completeListeningSessionForUser(
     completePatch.estimatedCostUsd = Math.max(0, args.estimatedCostUsd);
   }
   await ctx.db.patch(session._id, completePatch);
+
+  await persistListeningSessionTranscript(ctx, {
+    session,
+    userId,
+    transcript: cleanedTranscript,
+    transcriptProvider: provider,
+    occurredAt: now,
+  });
+
+  if (synth) {
+    await persistListeningSessionArtifacts(ctx, {
+      session,
+      userId,
+      synthesis: synth,
+      source: provider,
+      occurredAt: now,
+    });
+  }
 
   return { rawNoteId, synthesizedNoteIds };
 }
@@ -551,6 +706,10 @@ export const createListeningSessionHandler = async (
 ) => {
   const userId = await requireAuth(ctx);
   await getOwnedBook(ctx, userId, args.bookId);
+  const activeSession = await getActiveSessionForBook(ctx, userId, args.bookId);
+  if (activeSession) {
+    throw new ConvexError("Only one active listening session allowed per book");
+  }
 
   const now = Date.now();
   const capDurationMs = normalizeCapDuration(args.capDurationMs);

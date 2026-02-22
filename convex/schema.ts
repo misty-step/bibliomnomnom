@@ -115,8 +115,49 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_book", ["bookId"])
     .index("by_user_status", ["userId", "status"])
+    .index("by_user_book_status", ["userId", "bookId", "status"])
     .index("by_user_updatedAt", ["userId", "updatedAt"])
-    .index("by_status_updatedAt", ["status", "updatedAt"]),
+    .index("by_status", ["status"])
+    .index("by_status_updatedAt", ["status", "updatedAt"])
+    .index("by_createdAt", ["createdAt"]),
+  listeningSessionTranscripts: defineTable({
+    userId: v.id("users"),
+    bookId: v.id("books"),
+    sessionId: v.id("listeningSessions"),
+    type: v.union(v.literal("segment"), v.literal("final")),
+    provider: v.optional(v.string()),
+    content: v.string(),
+    chars: v.number(),
+    segmentStartMs: v.optional(v.number()),
+    segmentEndMs: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user_session", ["userId", "sessionId"])
+    .index("by_book", ["bookId"])
+    .index("by_createdAt", ["createdAt"]),
+  listeningSessionArtifacts: defineTable({
+    userId: v.id("users"),
+    bookId: v.id("books"),
+    sessionId: v.id("listeningSessions"),
+    kind: v.union(
+      v.literal("insight"),
+      v.literal("openQuestion"),
+      v.literal("quote"),
+      v.literal("followUpQuestion"),
+      v.literal("contextExpansion"),
+    ),
+    title: v.string(),
+    content: v.string(),
+    provider: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_session", ["sessionId"])
+    .index("by_user_session", ["userId", "sessionId"])
+    .index("by_book", ["bookId"])
+    .index("by_kind", ["kind", "createdAt"]),
   importRuns: defineTable({
     userId: v.id("users"),
     importRunId: v.string(),

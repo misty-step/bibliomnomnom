@@ -18,6 +18,9 @@ const BOOK_ID = "book_1" as unknown as Id<"books">;
 const OTHER_BOOK_ID = "book_2" as unknown as Id<"books">;
 const SESSION_ID = "session_1" as unknown as Id<"listeningSessions">;
 const noteId = (n: number) => `note_${n}` as unknown as Id<"notes">;
+const transcriptId = (n: number) =>
+  `transcript_${n}` as unknown as Id<"listeningSessionTranscripts">;
+const artifactId = (n: number) => `artifact_${n}` as unknown as Id<"listeningSessionArtifacts">;
 
 type SessionStatus =
   | "recording"
@@ -46,6 +49,32 @@ type Note = {
   updatedAt?: number;
 };
 
+type Transcript = {
+  _id: Id<"listeningSessionTranscripts">;
+  userId: Id<"users">;
+  bookId: Id<"books">;
+  sessionId: Id<"listeningSessions">;
+  type: "segment" | "final";
+  provider?: string;
+  content: string;
+  chars: number;
+  createdAt: number;
+  updatedAt: number;
+};
+
+type Artifact = {
+  _id: Id<"listeningSessionArtifacts">;
+  userId: Id<"users">;
+  bookId: Id<"books">;
+  sessionId: Id<"listeningSessions">;
+  kind: "insight" | "openQuestion" | "quote" | "followUpQuestion" | "contextExpansion";
+  title: string;
+  content: string;
+  provider?: string;
+  createdAt: number;
+  updatedAt: number;
+};
+
 type Session = {
   _id: Id<"listeningSessions">;
   userId: Id<"users">;
@@ -70,46 +99,105 @@ type Session = {
   lastError?: string;
 };
 
-type DbId = Id<"books"> | Id<"listeningSessions"> | Id<"notes">;
-type DbPatch = Partial<Book> | Partial<Session> | Partial<Note>;
-type InsertTableName = "listeningSessions" | "notes";
+type DbId =
+  | Id<"books">
+  | Id<"listeningSessions">
+  | Id<"notes">
+  | Id<"listeningSessionTranscripts">
+  | Id<"listeningSessionArtifacts">;
+type DbPatch =
+  | Partial<Book>
+  | Partial<Session>
+  | Partial<Note>
+  | Partial<Transcript>
+  | Partial<Artifact>;
+type InsertTableName =
+  | "listeningSessions"
+  | "notes"
+  | "listeningSessionTranscripts"
+  | "listeningSessionArtifacts";
 type InsertDoc<T extends InsertTableName> = T extends "listeningSessions"
   ? Omit<Session, "_id">
-  : Omit<Note, "_id">;
+  : T extends "notes"
+    ? Omit<Note, "_id">
+    : T extends "listeningSessionTranscripts"
+      ? Omit<Transcript, "_id">
+      : Omit<Artifact, "_id">;
 type InsertedId<T extends InsertTableName> = T extends "listeningSessions"
   ? Id<"listeningSessions">
-  : Id<"notes">;
+  : T extends "notes"
+    ? Id<"notes">
+    : T extends "listeningSessionTranscripts"
+      ? Id<"listeningSessionTranscripts">
+      : Id<"listeningSessionArtifacts">;
+type QueryTableName = InsertTableName | "books";
+
+type QueryBuilder = {
+  eq: (field: string, value: unknown) => QueryBuilder;
+  neq: (field: string, value: unknown) => QueryBuilder;
+  gte: (field: string, value: unknown) => QueryBuilder;
+  lte: (field: string, value: unknown) => QueryBuilder;
+  lt: (field: string, value: unknown) => QueryBuilder;
+  gt: (field: string, value: unknown) => QueryBuilder;
+  field: (name: string) => string;
+};
 
 type TestCtx = {
   ctx: {
     db: {
-      get: (id: DbId) => Promise<Book | Session | Note | null>;
+      get: (id: DbId) => Promise<Book | Session | Note | Transcript | Artifact | null>;
       insert: <T extends InsertTableName>(
         tableName: T,
         doc: InsertDoc<T>,
       ) => Promise<InsertedId<T>>;
       patch: (id: DbId, doc: DbPatch) => Promise<void>;
+      query: <T extends QueryTableName>(tableName: T) => QueryHandle<T>;
     };
   };
   data: {
     books: Book[];
     sessions: Session[];
     notes: Note[];
+    transcripts: Transcript[];
+    artifacts: Artifact[];
   };
   patchCalls: { id: DbId; doc: DbPatch }[];
-  insertCalls: { tableName: InsertTableName; doc: Session | Note }[];
+  insertCalls: { tableName: InsertTableName; doc: Session | Note | Transcript | Artifact }[];
 };
+
+type QueryHandle<T extends QueryTableName> = {
+  withIndex: (indexName: string, buildIndex: (q: QueryBuilder) => void) => QueryHandle<T>;
+  filter: (filterFn: (q: QueryBuilder) => void) => QueryHandle<T>;
+  order: (direction: "asc" | "desc") => QueryHandle<T>;
+  collect: () => Promise<Array<DocForTable<T>>>;
+  take: (n: number) => Promise<Array<DocForTable<T>>>;
+  first: () => Promise<DocForTable<T> | null>;
+};
+
+type DocForTable<T extends QueryTableName> = T extends "listeningSessions"
+  ? Session
+  : T extends "notes"
+    ? Note
+    : T extends "listeningSessionTranscripts"
+      ? Transcript
+      : T extends "listeningSessionArtifacts"
+        ? Artifact
+        : Book;
 
 const makeCtx = (seed?: Partial<TestCtx["data"]>): TestCtx => {
   const data: TestCtx["data"] = {
     books: [...(seed?.books ?? [])],
     sessions: [...(seed?.sessions ?? [])],
     notes: [...(seed?.notes ?? [])],
+    transcripts: [...(seed?.transcripts ?? [])],
+    artifacts: [...(seed?.artifacts ?? [])],
   };
 
   const counters = {
     listeningSessions: data.sessions.length,
     notes: data.notes.length,
+    listeningSessionTranscripts: data.transcripts.length,
+    listeningSessionArtifacts: data.artifacts.length,
   };
 
   const patchCalls: TestCtx["patchCalls"] = [];
@@ -119,6 +207,8 @@ const makeCtx = (seed?: Partial<TestCtx["data"]>): TestCtx => {
     data.books.find((doc) => doc._id === id) ??
     data.sessions.find((doc) => doc._id === id) ??
     data.notes.find((doc) => doc._id === id) ??
+    data.transcripts.find((doc) => doc._id === id) ??
+    data.artifacts.find((doc) => doc._id === id) ??
     null;
 
   const insert = async <T extends InsertTableName>(
@@ -132,12 +222,130 @@ const makeCtx = (seed?: Partial<TestCtx["data"]>): TestCtx => {
       insertCalls.push({ tableName, doc: full });
       return id as InsertedId<T>;
     }
+    if (tableName === "listeningSessionTranscripts") {
+      const id =
+        `transcript_${++counters.listeningSessionTranscripts}` as unknown as Id<"listeningSessionTranscripts">;
+      const full = { ...(doc as Omit<Transcript, "_id">), _id: id } as Transcript;
+      data.transcripts.push(full);
+      insertCalls.push({ tableName, doc: full });
+      return id as InsertedId<T>;
+    }
+    if (tableName === "listeningSessionArtifacts") {
+      const id =
+        `artifact_${++counters.listeningSessionArtifacts}` as unknown as Id<"listeningSessionArtifacts">;
+      const full = { ...(doc as Omit<Artifact, "_id">), _id: id } as Artifact;
+      data.artifacts.push(full);
+      insertCalls.push({ tableName, doc: full });
+      return id as InsertedId<T>;
+    }
 
     const id = `note_${++counters.notes}` as unknown as Id<"notes">;
     const full = { ...(doc as Omit<Note, "_id">), _id: id } as Note;
     data.notes.push(full);
     insertCalls.push({ tableName, doc: full });
     return id as InsertedId<T>;
+  };
+
+  const query = <T extends QueryTableName>(tableName: T): QueryHandle<T> => {
+    const getRows = (): Array<DocForTable<T>> => {
+      if (tableName === "notes") return [...(data.notes as Array<DocForTable<T>>)];
+      if (tableName === "listeningSessionTranscripts") {
+        return [...(data.transcripts as Array<DocForTable<T>>)];
+      }
+      if (tableName === "listeningSessionArtifacts") {
+        return [...(data.artifacts as Array<DocForTable<T>>)];
+      }
+      if (tableName === "books") {
+        return [...(data.books as Array<DocForTable<T>>)];
+      }
+      return [...(data.sessions as Array<DocForTable<T>>)];
+    };
+
+    let rows = getRows();
+
+    const makeBuilder = () => {
+      const predicates: Array<(row: DocForTable<T>) => boolean> = [];
+      const qb: QueryBuilder = {
+        eq: (field, value) => {
+          predicates.push((row) => {
+            const left = (row as Record<string, unknown>)[field];
+            return left === value;
+          });
+          return qb;
+        },
+        neq: (field, value) => {
+          predicates.push((row) => {
+            const left = (row as Record<string, unknown>)[field];
+            return left !== value;
+          });
+          return qb;
+        },
+        gte: (field, value) => {
+          predicates.push((row) => {
+            const left = (row as Record<string, unknown>)[field];
+            return (left as number) >= (value as number);
+          });
+          return qb;
+        },
+        lte: (field, value) => {
+          predicates.push((row) => {
+            const left = (row as Record<string, unknown>)[field];
+            return (left as number) <= (value as number);
+          });
+          return qb;
+        },
+        lt: (field, value) => {
+          predicates.push((row) => {
+            const left = (row as Record<string, unknown>)[field];
+            return (left as number) < (value as number);
+          });
+          return qb;
+        },
+        gt: (field, value) => {
+          predicates.push((row) => {
+            const left = (row as Record<string, unknown>)[field];
+            return (left as number) > (value as number);
+          });
+          return qb;
+        },
+        field: (name) => name,
+      };
+
+      const apply = () => {
+        rows = rows.filter((row) => predicates.every((predicate) => predicate(row)));
+      };
+
+      return { qb, apply };
+    };
+
+    const chain: QueryHandle<T> = {
+      withIndex: (_indexName, buildIndex) => {
+        const { qb, apply } = makeBuilder();
+        buildIndex(qb);
+        apply();
+        return chain;
+      },
+      filter: (filterFn) => {
+        const { qb, apply } = makeBuilder();
+        filterFn(qb);
+        apply();
+        return chain;
+      },
+      order: (direction) => {
+        rows = [...rows].sort((a, b) => {
+          const rec = (r: DocForTable<T>) => r as Record<string, unknown>;
+          const left = (rec(a)._creationTime ?? rec(a).createdAt ?? 0) as number;
+          const right = (rec(b)._creationTime ?? rec(b).createdAt ?? 0) as number;
+          return direction === "desc" ? right - left : left - right;
+        });
+        return chain;
+      },
+      collect: async () => rows,
+      take: async (n: number) => rows.slice(0, n),
+      first: async () => rows[0] ?? null,
+    };
+
+    return chain;
   };
 
   return {
@@ -152,6 +360,7 @@ const makeCtx = (seed?: Partial<TestCtx["data"]>): TestCtx => {
           }
           patchCalls.push({ id, doc });
         },
+        query,
       },
     },
     data,
@@ -182,7 +391,7 @@ const buildBook = (): Book => ({
 });
 
 const mutationCtx = (ctx: TestCtx["ctx"]) =>
-  ctx as Parameters<typeof createListeningSessionHandler>[0];
+  ctx as unknown as Parameters<typeof createListeningSessionHandler>[0];
 
 describe("listening session state machine handlers", () => {
   beforeEach(() => {
@@ -244,6 +453,45 @@ describe("listening session state machine handlers", () => {
       createdAt: now.getTime(),
       updatedAt: now.getTime(),
     });
+  });
+
+  it("prevents creating a new session while another active session exists for the same book", async () => {
+    const activeStatuses: SessionStatus[] = ["recording", "transcribing", "synthesizing", "review"];
+
+    for (const status of activeStatuses) {
+      const { ctx } = makeCtx({
+        books: [buildBook()],
+        sessions: [buildSession({ status })],
+      });
+
+      await expect(
+        createListeningSessionHandler(mutationCtx(ctx), {
+          bookId: BOOK_ID,
+        }),
+      ).rejects.toThrow("Only one active listening session allowed per book");
+    }
+  });
+
+  it("allows creating a new session after prior session is terminal", async () => {
+    const terminalStatuses: SessionStatus[] = ["complete", "failed"];
+
+    for (const status of terminalStatuses) {
+      const { ctx, data } = makeCtx({
+        books: [buildBook()],
+        sessions: [buildSession({ status })],
+      });
+
+      const sessionId = await createListeningSessionHandler(mutationCtx(ctx), {
+        bookId: BOOK_ID,
+      });
+
+      expect(sessionId).toBe("session_2");
+      expect(data.sessions).toHaveLength(2);
+      expect(data.sessions[1]).toMatchObject({
+        status: "recording",
+        userId,
+      });
+    }
   });
 
   it("rejects when book or session are not owned by user", async () => {
@@ -402,6 +650,17 @@ describe("listening session state machine handlers", () => {
       content: expect.stringContaining("Final transcript"),
     });
     expect(rawNote.content).toContain("Duration: 1:05");
+    expect(data.transcripts).toHaveLength(1);
+    expect(data.transcripts[0]).toMatchObject({
+      _id: transcriptId(1),
+      sessionId: SESSION_ID,
+      userId,
+      bookId: BOOK_ID,
+      type: "final",
+      provider: "openai",
+      content: "Final transcript",
+      chars: 16,
+    });
     expect(data.sessions[0]!).toMatchObject({
       status: "complete",
       transcript: "Final transcript",
@@ -476,6 +735,7 @@ describe("listening session state machine handlers", () => {
     const result = await completeListeningSessionHandler(mutationCtx(ctx), {
       sessionId: SESSION_ID,
       transcript: "Final transcript",
+      transcriptProvider: "openai",
       synthesis: {
         insights: Array.from({ length: 12 }, (_v, i) => ({
           title: `Insight ${i}`,
@@ -501,11 +761,27 @@ describe("listening session state machine handlers", () => {
 
     expect(result.synthesizedNoteIds).toHaveLength(6);
     expect(data.notes).toHaveLength(20);
+    expect(data.transcripts).toHaveLength(1);
+    expect(data.artifacts).toHaveLength(28);
     const session = data.sessions[0]!;
     expect(session.synthesizedNoteIds).toHaveLength(6);
     expect(session.synthesizedNoteIds!.every((id) => id.startsWith("note_"))).toBe(true);
     expect(result.synthesizedNoteIds.every((id) => id.startsWith("note_"))).toBe(true);
     expect(new Set(result.synthesizedNoteIds).size).toBe(6);
+
+    const artifactKinds = data.artifacts.map((artifact) => artifact.kind);
+    expect(artifactKinds.filter((kind) => kind === "insight")).toHaveLength(6);
+    expect(artifactKinds.filter((kind) => kind === "openQuestion")).toHaveLength(6);
+    expect(artifactKinds.filter((kind) => kind === "followUpQuestion")).toHaveLength(6);
+    expect(artifactKinds.filter((kind) => kind === "quote")).toHaveLength(6);
+    expect(artifactKinds.filter((kind) => kind === "contextExpansion")).toHaveLength(4);
+    expect(data.artifacts.every((artifact) => artifact.provider === "openai")).toBe(true);
+    expect(data.artifacts[0]).toMatchObject({
+      _id: artifactId(1),
+      kind: "insight",
+      provider: "openai",
+      title: "Insight 0",
+    });
   });
 
   it("enforces existing synthesized-note cap during completion", async () => {
@@ -541,8 +817,59 @@ describe("listening session state machine handlers", () => {
 
     expect(result.synthesizedNoteIds).toHaveLength(12);
     expect(data.notes).toHaveLength(13);
+    expect(data.artifacts).toHaveLength(2);
+    const artifactKinds = data.artifacts.map((artifact) => artifact.kind);
+    expect(artifactKinds.filter((kind) => kind === "insight")).toHaveLength(1);
+    expect(artifactKinds.filter((kind) => kind === "quote")).toHaveLength(1);
+    expect(data.artifacts.every((artifact) => artifact.provider === "unknown")).toBe(true);
+    expect(data.artifacts[0]).toMatchObject({
+      _id: artifactId(1),
+      provider: "unknown",
+    });
     const addedNoteIds = data.notes.map((note) => note._id);
     expect(addedNoteIds).toContain(noteId(13));
+  });
+
+  it("skips duplicate transcript/artifact inserts on re-completion (idempotent)", async () => {
+    const { ctx, data } = makeCtx({
+      books: [buildBook()],
+      sessions: [buildSession({ status: "transcribing", durationMs: 10_000 })],
+    });
+
+    // First completion
+    await completeListeningSessionHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      transcript: "Final transcript",
+      transcriptProvider: "openai",
+      synthesis: {
+        insights: [{ title: "I1", content: "C1" }],
+        openQuestions: ["Q1"],
+        quotes: [],
+        followUpQuestions: [],
+        contextExpansions: [],
+      },
+    });
+
+    expect(data.transcripts).toHaveLength(1);
+    expect(data.artifacts).toHaveLength(2);
+
+    // Second completion (complete→complete self-transition)
+    await completeListeningSessionHandler(mutationCtx(ctx), {
+      sessionId: SESSION_ID,
+      transcript: "Final transcript",
+      transcriptProvider: "openai",
+      synthesis: {
+        insights: [{ title: "I1", content: "C1" }],
+        openQuestions: ["Q1"],
+        quotes: [],
+        followUpQuestions: [],
+        contextExpansions: [],
+      },
+    });
+
+    // No duplicates
+    expect(data.transcripts).toHaveLength(1);
+    expect(data.artifacts).toHaveLength(2);
   });
 
   it("marks session as failed with truncated error", async () => {

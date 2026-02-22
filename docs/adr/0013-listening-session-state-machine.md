@@ -14,17 +14,21 @@ A naive approach (fire-and-forget API calls) would lose user recordings on failu
 
 Model listening sessions as an explicit state machine in Convex with these states:
 
-`idle → recording → uploading → transcribing → synthesizing → complete`
+`idle → recording → transcribing → synthesizing → review → complete`
 
 Each transition is a separate Convex mutation that validates the current state before advancing. The state machine lives in `convex/listeningSessions.ts` with transitions enforced server-side.
+
+`review` is present to support a future curate-before-publish workflow and can also be a no-op intermediate step once synthesis is complete.
 
 Key design choices:
 
 - **Server-side processing**: Audio is uploaded to Vercel Blob, then processing happens via Convex actions (not client-side) for reliability
+- **Transcript + artifact persistence**: Completed sessions write a final transcript row to `listeningSessionTranscripts` and each synthesis artifact to `listeningSessionArtifacts` while still rendering the raw transcript/synthesized notes in legacy `notes` rows for display.
 - **ElevenLabs primary STT, Deepgram fallback**: Based on benchmark evaluation (see `docs/performance/stt-decision-matrix.md`)
 - **Cost estimation**: Each session records provider, model, duration, and estimated cost for observability
 - **Session rollover**: Long recordings are capped and rolled over to prevent unbounded LLM costs
 - **Guardrails in CI**: `scripts/session-guardrails.ts` runs in CI to catch cost regressions
+- **Single active session invariant**: Create is blocked when a non-terminal session already exists for the same user and book (`recording`, `transcribing`, `synthesizing`, `review`).
 
 ## Consequences
 

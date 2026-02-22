@@ -78,20 +78,61 @@ function makeCtx(seed?: Partial<DataStore>) {
     auth: { getUserIdentity: async () => ({ subject: "clerk_user_1" }) },
     db: {
       query: (tableName: string) => {
-        if (tableName !== "users") throw new Error(`Unsupported query table: ${tableName}`);
-        return {
-          withIndex: (
-            _index: string,
-            where: (q: { eq: (field: string, value: string) => unknown }) => unknown,
-          ) => {
-            let clerkId = "";
-            where({ eq: (_field: string, value: string) => ((clerkId = value), null) });
-            return {
-              unique: async () => data.users.find((user) => user.clerkId === clerkId) ?? null,
-              collect: async () => data.users.filter((user) => user.clerkId === clerkId),
-            };
-          },
-        };
+        if (tableName === "users") {
+          return {
+            withIndex: (
+              _index: string,
+              where: (q: { eq: (field: string, value: string) => unknown }) => unknown,
+            ) => {
+              let clerkId = "";
+              where({ eq: (_field: string, value: string) => ((clerkId = value), null) });
+              return {
+                unique: async () => data.users.find((user) => user.clerkId === clerkId) ?? null,
+                collect: async () => data.users.filter((user) => user.clerkId === clerkId),
+              };
+            },
+          };
+        }
+        if (tableName === "listeningSessions") {
+          return {
+            withIndex: (
+              _index: string,
+              where: (q: { eq: (field: string, value: unknown) => unknown }) => unknown,
+            ) => {
+              const filters: Record<string, unknown> = {};
+              const builder = {
+                eq: (field: string, value: unknown) => {
+                  filters[field] = value;
+                  return builder;
+                },
+              };
+              where(builder as unknown as { eq: (field: string, value: unknown) => unknown });
+              const filtered = data.sessions.filter((session) =>
+                Object.entries(filters).every(
+                  ([field, value]) =>
+                    (session as unknown as Record<string, unknown>)[field] === value,
+                ),
+              );
+              return {
+                first: async () => filtered[0] ?? null,
+                collect: async () => filtered,
+              };
+            },
+          };
+        }
+        // Persistence tables — idempotency guards query these before inserting
+        if (
+          tableName === "listeningSessionTranscripts" ||
+          tableName === "listeningSessionArtifacts"
+        ) {
+          return {
+            withIndex: () => ({
+              first: async () => null,
+              collect: async () => [],
+            }),
+          };
+        }
+        throw new Error(`Unsupported query table: ${tableName}`);
       },
       get: async (id: string) => getById(id),
       insert: async (table: string, doc: Omit<Session, "_id"> | Omit<Note, "_id">) => {
@@ -104,6 +145,10 @@ function makeCtx(seed?: Partial<DataStore>) {
           const id = `note_${++counters.notes}` as Id<"notes">;
           data.notes.push({ ...(doc as Omit<Note, "_id">), _id: id });
           return id;
+        }
+        // Persistence tables — callers don't use the returned ID in guardrail tests
+        if (table === "listeningSessionTranscripts" || table === "listeningSessionArtifacts") {
+          return `${table}_${Date.now()}` as unknown as Id<never>;
         }
         throw new Error(`Unsupported insert table: ${table}`);
       },
