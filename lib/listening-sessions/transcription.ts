@@ -1,5 +1,7 @@
 import { MAX_LISTENING_SESSION_AUDIO_BYTES } from "@/lib/constants";
 import { DEFAULT_AUDIO_MIME_TYPE, normalizeAudioMimeType } from "@/lib/listening-sessions/mime";
+import { ElevenLabsAdapter } from "@/lib/stt/adapters/elevenlabs";
+import { DeepgramAdapter } from "@/lib/stt/adapters/deepgram";
 
 export type TranscriptionResponse = {
   transcript: string;
@@ -117,104 +119,6 @@ export async function readAudioFromUrl(
   return { bytes, mimeType };
 }
 
-async function transcribeWithDeepgram(params: {
-  apiKey: string;
-  audioBytes: ArrayBuffer;
-  mimeType: string;
-}): Promise<TranscriptionResponse> {
-  const model = process.env.DEEPGRAM_STT_MODEL || "nova-3";
-  const endpoint = new URL("https://api.deepgram.com/v1/listen");
-  endpoint.searchParams.set("model", model);
-  endpoint.searchParams.set("punctuate", "true");
-  endpoint.searchParams.set("smart_format", "true");
-
-  const response = await fetchWithTimeout(
-    endpoint,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Token ${params.apiKey}`,
-        "Content-Type": params.mimeType,
-      },
-      body: params.audioBytes,
-    },
-    25_000,
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Deepgram transcription failed (${response.status}): ${errorText.slice(0, 220)}`,
-    );
-  }
-
-  const payload = (await response.json()) as {
-    results?: {
-      channels?: Array<{
-        alternatives?: Array<{
-          transcript?: string;
-          confidence?: number;
-        }>;
-      }>;
-    };
-  };
-
-  const alt = payload.results?.channels?.[0]?.alternatives?.[0];
-  const transcript = cleanTranscript(alt?.transcript ?? "");
-  if (!transcript) {
-    throw new Error("Deepgram returned an empty transcript");
-  }
-
-  return {
-    transcript,
-    provider: "deepgram",
-    confidence: alt?.confidence,
-  };
-}
-
-async function transcribeWithElevenLabs(params: {
-  apiKey: string;
-  audioBytes: ArrayBuffer;
-  mimeType: string;
-}): Promise<TranscriptionResponse> {
-  const formData = new FormData();
-  const blob = new Blob([params.audioBytes], { type: params.mimeType });
-  formData.append("file", blob, "session-audio.webm");
-  formData.append("model_id", process.env.ELEVENLABS_STT_MODEL || "scribe_v2");
-
-  const response = await fetchWithTimeout(
-    "https://api.elevenlabs.io/v1/speech-to-text",
-    {
-      method: "POST",
-      headers: {
-        "xi-api-key": params.apiKey,
-      },
-      body: formData,
-    },
-    25_000,
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `ElevenLabs transcription failed (${response.status}): ${errorText.slice(0, 220)}`,
-    );
-  }
-
-  const payload = (await response.json()) as {
-    text?: string;
-  };
-  const transcript = cleanTranscript(payload.text ?? "");
-  if (!transcript) {
-    throw new Error("ElevenLabs returned an empty transcript");
-  }
-
-  return {
-    transcript,
-    provider: "elevenlabs",
-  };
-}
-
 export async function transcribeAudio(
   audioUrl: string,
   elevenLabsKey: string | undefined,
@@ -228,40 +132,27 @@ export async function transcribeAudio(
 
   const { bytes, mimeType } = await readAudioFromUrl(audioUrl);
 
-  const providerErrors: string[] = [];
-  let transcription: TranscriptionResponse | null = null;
+  // Build ordered adapter list (ElevenLabs primary, Deepgram fallback).
+  // Adapters are constructed with the explicit keys passed by the caller so
+  // this function works even when env vars are not set (e.g. in tests).
+  const adapters = [
+    elevenLabsApiKey ? new ElevenLabsAdapter(elevenLabsApiKey) : null,
+    deepgramApiKey ? new DeepgramAdapter(deepgramApiKey) : null,
+  ].filter((a): a is ElevenLabsAdapter | DeepgramAdapter => a !== null);
 
-  // ElevenLabs Scribe v2 is the primary provider (higher accuracy, lower cost).
-  // Deepgram Nova-3 is the fallback.
-  if (elevenLabsApiKey) {
+  const errors: string[] = [];
+  for (const adapter of adapters) {
     try {
-      transcription = await transcribeWithElevenLabs({
-        apiKey: elevenLabsApiKey,
-        audioBytes: bytes,
-        mimeType,
-      });
-    } catch (error) {
-      providerErrors.push(`elevenlabs: ${error instanceof Error ? error.message : String(error)}`);
+      const result = await adapter.transcribe({ audioBytes: bytes, mimeType });
+      return {
+        transcript: cleanTranscript(result.transcript),
+        provider: result.provider as "elevenlabs" | "deepgram",
+        confidence: result.confidence,
+      };
+    } catch (err) {
+      errors.push(`${adapter.provider}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  if (!transcription && deepgramApiKey) {
-    try {
-      transcription = await transcribeWithDeepgram({
-        apiKey: deepgramApiKey,
-        audioBytes: bytes,
-        mimeType,
-      });
-    } catch (error) {
-      providerErrors.push(`deepgram: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  if (!transcription) {
-    throw new Error(
-      providerErrors.join(" | ") || "Transcription failed for all configured providers.",
-    );
-  }
-
-  return transcription;
+  throw new Error(errors.join(" | ") || "Transcription failed for all configured providers.");
 }
