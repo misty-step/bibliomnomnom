@@ -79,6 +79,8 @@ afterEach(() => {
   vi.clearAllMocks();
   delete process.env.DEEPGRAM_STT_MODEL;
   delete process.env.ELEVENLABS_STT_MODEL;
+  delete process.env.ELEVENLABS_API_KEY;
+  delete process.env.DEEPGRAM_API_KEY;
 });
 
 describe("readAudioFromUrl", () => {
@@ -132,18 +134,17 @@ describe("readAudioFromUrl", () => {
 
 describe("transcribeAudio", () => {
   it("throws when no provider keys configured", async () => {
-    await expect(transcribeAudio(TRUSTED_URL, undefined, undefined)).rejects.toThrow(
-      "No STT provider is configured",
-    );
+    await expect(transcribeAudio(TRUSTED_URL)).rejects.toThrow("No STT provider is configured");
   });
 
-  it("throws when empty string keys provided", async () => {
-    await expect(transcribeAudio(TRUSTED_URL, "  ", "  ")).rejects.toThrow(
-      "No STT provider is configured",
-    );
+  it("throws when only whitespace keys set", async () => {
+    process.env.ELEVENLABS_API_KEY = "  ";
+    process.env.DEEPGRAM_API_KEY = "  ";
+    await expect(transcribeAudio(TRUSTED_URL)).rejects.toThrow("No STT provider is configured");
   });
 
   it("transcribes using Deepgram when key provided", async () => {
+    process.env.DEEPGRAM_API_KEY = "dg-key";
     mockFetch
       .mockResolvedValueOnce(makeResponse()) // readAudioFromUrl
       .mockResolvedValueOnce({
@@ -155,13 +156,15 @@ describe("transcribeAudio", () => {
         }),
       } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, undefined, "dg-key");
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.transcript).toBe("Hello world");
     expect(result.provider).toBe("deepgram");
     expect(result.confidence).toBe(0.99);
   });
 
   it("falls back to Deepgram when ElevenLabs fails", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
+    process.env.DEEPGRAM_API_KEY = "dg-key";
     mockFetch
       .mockResolvedValueOnce(makeResponse()) // readAudioFromUrl
       .mockResolvedValueOnce({
@@ -178,12 +181,14 @@ describe("transcribeAudio", () => {
         }),
       } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "el-key", "dg-key");
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.transcript).toBe("Deepgram fallback result");
     expect(result.provider).toBe("deepgram");
   });
 
   it("falls back to Deepgram when ElevenLabs times out (AbortError)", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
+    process.env.DEEPGRAM_API_KEY = "dg-key";
     mockFetch
       .mockResolvedValueOnce(makeResponse()) // readAudioFromUrl
       .mockRejectedValueOnce(new DOMException("The operation was aborted.", "AbortError")) // ElevenLabs timeout
@@ -196,22 +201,25 @@ describe("transcribeAudio", () => {
         }),
       } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "el-key", "dg-key");
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.transcript).toBe("Deepgram after timeout");
     expect(result.provider).toBe("deepgram");
   });
 
   it("transcribes using ElevenLabs when only that key provided", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
     mockFetch.mockResolvedValueOnce(makeResponse()).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ text: "ElevenLabs only" }),
     } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "el-key", undefined);
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.provider).toBe("elevenlabs");
   });
 
   it("throws when all providers fail", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
+    process.env.DEEPGRAM_API_KEY = "dg-key";
     mockFetch
       .mockResolvedValueOnce(makeResponse())
       .mockResolvedValueOnce({
@@ -225,32 +233,35 @@ describe("transcribeAudio", () => {
         text: async () => "dg error",
       } as unknown as Response); // Deepgram fails (fallback)
 
-    await expect(transcribeAudio(TRUSTED_URL, "el-key", "dg-key")).rejects.toThrow("elevenlabs");
+    await expect(transcribeAudio(TRUSTED_URL)).rejects.toThrow("elevenlabs");
   });
 
   it("throws when Deepgram returns empty transcript", async () => {
+    process.env.DEEPGRAM_API_KEY = "dg-key";
     mockFetch.mockResolvedValueOnce(makeResponse()).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ results: { channels: [{ alternatives: [{ transcript: "   " }] }] } }),
     } as unknown as Response);
 
-    await expect(transcribeAudio(TRUSTED_URL, undefined, "dg-key")).rejects.toThrow(
+    await expect(transcribeAudio(TRUSTED_URL)).rejects.toThrow(
       "Deepgram returned an empty transcript",
     );
   });
 
   it("throws when ElevenLabs returns empty transcript", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
     mockFetch.mockResolvedValueOnce(makeResponse()).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ text: "" }),
     } as unknown as Response);
 
-    await expect(transcribeAudio(TRUSTED_URL, "el-key", undefined)).rejects.toThrow(
+    await expect(transcribeAudio(TRUSTED_URL)).rejects.toThrow(
       "ElevenLabs returned an empty transcript",
     );
   });
 
   it("uses DEEPGRAM_STT_MODEL env var when set", async () => {
+    process.env.DEEPGRAM_API_KEY = "dg-key";
     process.env.DEEPGRAM_STT_MODEL = "nova-2";
     mockFetch.mockResolvedValueOnce(makeResponse()).mockResolvedValueOnce({
       ok: true,
@@ -259,7 +270,7 @@ describe("transcribeAudio", () => {
       }),
     } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, undefined, "dg-key");
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.transcript).toBe("test");
     // Verify model param was sent in the URL
     const callUrl = String(mockFetch.mock.calls[1]?.[0]);
