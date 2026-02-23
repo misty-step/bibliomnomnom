@@ -133,11 +133,7 @@ export async function processListeningSessionHandler(
       }
 
       try {
-        const transcription = await transcribeAudioFn(
-          session.audioUrl,
-          process.env.ELEVENLABS_API_KEY,
-          process.env.DEEPGRAM_API_KEY,
-        );
+        const transcription = await transcribeAudioFn(session.audioUrl);
         transcript = transcription.transcript;
         transcriptProvider = transcription.provider;
 

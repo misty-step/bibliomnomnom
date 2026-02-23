@@ -114,14 +114,10 @@ export const POST = withObservability(async (request: Request) => {
 
   try {
     const transcribeStart = Date.now();
-    const transcription: TranscriptionResponse = await transcribeAudio(
-      audioUrl,
-      elevenLabsKey,
-      deepgramKey,
-    );
+    const transcription: TranscriptionResponse = await transcribeAudio(audioUrl);
     const transcribeLatencyMs = Date.now() - transcribeStart;
     const transcribeFallbackUsed =
-      transcription.provider === "deepgram" && Boolean(elevenLabsKey?.trim());
+      Boolean(elevenLabsKey?.trim()) && transcription.provider !== "elevenlabs";
 
     try {
       await entitlement.convex.mutation(api.listeningSessions.recordTranscribeTelemetry, {

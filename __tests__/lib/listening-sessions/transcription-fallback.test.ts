@@ -28,10 +28,15 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
+  delete process.env.ELEVENLABS_API_KEY;
+  delete process.env.DEEPGRAM_API_KEY;
 });
 
 describe("transcription provider fallback reliability", () => {
   it("falls back to Deepgram when ElevenLabs returns 503", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
+    process.env.DEEPGRAM_API_KEY = "dg-key";
+
     mockFetch
       .mockResolvedValueOnce(makeAudioResponse())
       .mockResolvedValueOnce({
@@ -48,12 +53,15 @@ describe("transcription provider fallback reliability", () => {
         }),
       } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, "el-key", "dg-key");
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.provider).toBe("deepgram");
     expect(result.transcript).toBe("Deepgram recovered transcript");
   });
 
   it("throws when both providers fail", async () => {
+    process.env.ELEVENLABS_API_KEY = "el-key";
+    process.env.DEEPGRAM_API_KEY = "dg-key";
+
     mockFetch
       .mockResolvedValueOnce(makeAudioResponse())
       .mockResolvedValueOnce({
@@ -67,10 +75,12 @@ describe("transcription provider fallback reliability", () => {
         text: async () => "Deepgram down",
       } as unknown as Response);
 
-    await expect(transcribeAudio(TRUSTED_URL, "el-key", "dg-key")).rejects.toThrow("deepgram");
+    await expect(transcribeAudio(TRUSTED_URL)).rejects.toThrow("deepgram");
   });
 
   it("returns transcript even if confidence is undefined", async () => {
+    process.env.DEEPGRAM_API_KEY = "dg-key";
+
     mockFetch.mockResolvedValueOnce(makeAudioResponse()).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -80,13 +90,15 @@ describe("transcription provider fallback reliability", () => {
       }),
     } as unknown as Response);
 
-    const result = await transcribeAudio(TRUSTED_URL, undefined, "dg-key");
+    const result = await transcribeAudio(TRUSTED_URL);
     expect(result.provider).toBe("deepgram");
     expect(result.transcript).toBe("Transcript without confidence");
     expect(result.confidence).toBeUndefined();
   });
 
   it("cleans up timeout on provider success", async () => {
+    process.env.DEEPGRAM_API_KEY = "dg-key";
+
     const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
     mockFetch.mockResolvedValueOnce(makeAudioResponse()).mockResolvedValueOnce({
       ok: true,
@@ -97,7 +109,7 @@ describe("transcription provider fallback reliability", () => {
       }),
     } as unknown as Response);
 
-    await transcribeAudio(TRUSTED_URL, undefined, "dg-key");
+    await transcribeAudio(TRUSTED_URL);
     expect(clearTimeoutSpy).toHaveBeenCalled();
   });
 });

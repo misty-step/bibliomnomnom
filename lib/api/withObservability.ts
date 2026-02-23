@@ -85,6 +85,10 @@ export function log(
   console[method](JSON.stringify(entry));
 }
 
+export function captureError(error: unknown, context?: Record<string, unknown>): void {
+  Sentry.captureException(error, { extra: context });
+}
+
 export function withObservability(
   handler: (req: Request) => Promise<Response>,
   operationName: string,
