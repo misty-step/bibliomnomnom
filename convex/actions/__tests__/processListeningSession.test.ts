@@ -87,6 +87,7 @@ describe("processListeningSessionHandler", () => {
         retryCount: 0,
       }),
       true, // checkAccessForUser
+      null, // getTranscriptForSession → no transcript yet, will transcribe from audioUrl
       {
         book: { title: "Dune", author: "Frank Herbert" },
         currentlyReading: [],

@@ -119,7 +119,10 @@ export async function processListeningSessionHandler(
   }
 
   try {
-    let transcript = typeof session.transcript === "string" ? session.transcript.trim() : "";
+    const transcriptRow = await ctx.runQuery(internal.listeningSessions.getTranscriptForSession, {
+      sessionId: args.sessionId,
+    });
+    let transcript = typeof transcriptRow?.content === "string" ? transcriptRow.content.trim() : "";
     let transcriptProvider =
       typeof session.transcriptProvider === "string" ? session.transcriptProvider.trim() : "";
 

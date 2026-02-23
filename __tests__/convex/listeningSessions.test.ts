@@ -663,7 +663,6 @@ describe("listening session state machine handlers", () => {
     });
     expect(data.sessions[0]!).toMatchObject({
       status: "complete",
-      transcript: "Final transcript",
       transcriptChars: 16,
       rawNoteId: noteId(1),
     });
