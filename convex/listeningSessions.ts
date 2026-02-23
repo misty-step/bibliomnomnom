@@ -15,6 +15,7 @@ import { packContext, type ContextPackLibraryBook } from "../lib/listening-sessi
 import {
   MAX_SYNTH_ARTIFACT_ITEMS,
   MAX_CONTEXT_EXPANSION_ITEMS,
+  type SynthesisArtifacts as SynthesisArtifactsShape,
 } from "../lib/listening-sessions/synthesis";
 
 const synthesisArtifacts = v.object({
@@ -67,7 +68,7 @@ const processListeningSessionRun = (
 ).actions.processListeningSession.run;
 
 type SessionStatus = Doc<"listeningSessions">["status"];
-type SynthesisArtifacts = Doc<"listeningSessions">["synthesis"];
+type SynthesisArtifacts = SynthesisArtifactsShape | undefined;
 type ListeningSessionArtifactKind =
   | "insight"
   | "openQuestion"
@@ -505,12 +506,10 @@ async function completeListeningSessionForUser(
 
   const completePatch: Parameters<typeof ctx.db.patch>[1] = {
     status: "complete",
-    transcript: cleanedTranscript,
     transcriptChars: cleanedTranscript.length,
     transcriptProvider: provider,
     rawNoteId,
     synthesizedNoteIds: synthesizedNoteIds.length > 0 ? synthesizedNoteIds : undefined,
-    synthesis: synth,
     updatedAt: now,
     lastError: undefined,
   };
@@ -605,6 +604,21 @@ export const getForProcessing = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db.get(args.sessionId);
   },
+});
+
+export async function getTranscriptForSessionHandler(
+  ctx: Pick<QueryCtx, "db">,
+  args: { sessionId: Id<"listeningSessions"> },
+) {
+  return await ctx.db
+    .query("listeningSessionTranscripts")
+    .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+    .first();
+}
+
+export const getTranscriptForSession = internalQuery({
+  args: { sessionId: v.id("listeningSessions") },
+  handler: getTranscriptForSessionHandler,
 });
 
 export const getDebugStats = internalQuery({
@@ -897,11 +911,23 @@ export const transitionSynthesizingInternal = internalMutation({
       throw new ConvexError("Transcript cannot be empty");
     }
 
+    const provider = args.transcriptProvider.trim() || "unknown";
+    const now = Date.now();
+
+    // Persist to table FIRST so retries can find the transcript if the patch below fails.
+    // persistListeningSessionTranscript is idempotent (checks by_session index before inserting).
+    await persistListeningSessionTranscript(ctx, {
+      session,
+      userId: session.userId,
+      transcript: cleanedTranscript,
+      transcriptProvider: provider,
+      occurredAt: now,
+    });
+
     await ctx.db.patch(session._id, {
       status: "synthesizing",
-      transcript: cleanedTranscript,
-      transcriptProvider: args.transcriptProvider.trim() || "unknown",
-      updatedAt: Date.now(),
+      transcriptProvider: provider,
+      updatedAt: now,
       lastError: undefined,
     });
   },

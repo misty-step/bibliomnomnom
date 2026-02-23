@@ -70,35 +70,10 @@ export default defineSchema({
     startedAt: v.number(),
     endedAt: v.optional(v.number()),
     transcriptLive: v.optional(v.string()),
-    transcript: v.optional(v.string()),
     transcriptProvider: v.optional(v.string()),
     transcriptChars: v.optional(v.number()),
     rawNoteId: v.optional(v.id("notes")),
     synthesizedNoteIds: v.optional(v.array(v.id("notes"))),
-    synthesis: v.optional(
-      v.object({
-        insights: v.array(
-          v.object({
-            title: v.string(),
-            content: v.string(),
-          }),
-        ),
-        openQuestions: v.array(v.string()),
-        quotes: v.array(
-          v.object({
-            text: v.string(),
-            source: v.optional(v.string()),
-          }),
-        ),
-        followUpQuestions: v.array(v.string()),
-        contextExpansions: v.array(
-          v.object({
-            title: v.string(),
-            content: v.string(),
-          }),
-        ),
-      }),
-    ),
     lastError: v.optional(v.string()),
     retryCount: v.optional(v.number()),
     lastRetryAt: v.optional(v.number()),

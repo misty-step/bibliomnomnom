@@ -119,7 +119,16 @@ export async function processListeningSessionHandler(
   }
 
   try {
-    let transcript = typeof session.transcript === "string" ? session.transcript.trim() : "";
+    const transcriptRow = await ctx.runQuery(internal.listeningSessions.getTranscriptForSession, {
+      sessionId: args.sessionId,
+    });
+    // Migration fallback: in-flight sessions created before the schema refactor may still carry
+    // transcript text inline on the session document (old schema field, not yet in the table).
+     
+    const legacyTranscript =
+      typeof (session as any).transcript === "string" ? (session as any).transcript.trim() : "";
+    let transcript =
+      typeof transcriptRow?.content === "string" ? transcriptRow.content.trim() : legacyTranscript;
     let transcriptProvider =
       typeof session.transcriptProvider === "string" ? session.transcriptProvider.trim() : "";
 
