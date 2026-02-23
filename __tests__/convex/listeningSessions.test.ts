@@ -4,6 +4,7 @@ import {
   completeListeningSessionHandler,
   createListeningSessionHandler,
   failListeningSessionHandler,
+  getTranscriptForSessionHandler,
   markSynthesizingHandler,
   markTranscribingHandler,
   toClientSession,
@@ -1090,5 +1091,70 @@ describe("toClientSession", () => {
     const session = buildSession();
     const result = toClientSession(session as never);
     expect("audioUrl" in result).toBe(false);
+  });
+});
+
+describe("getTranscriptForSessionHandler", () => {
+  const queryCtxFrom = (ctx: TestCtx["ctx"]) =>
+    ctx as unknown as Parameters<typeof getTranscriptForSessionHandler>[0];
+
+  it("returns null when no transcript row exists for session", async () => {
+    const { ctx } = makeCtx({ sessions: [buildSession()] });
+    const result = await getTranscriptForSessionHandler(queryCtxFrom(ctx), {
+      sessionId: SESSION_ID,
+    });
+    expect(result).toBeNull();
+  });
+
+  it("returns the transcript row when one exists", async () => {
+    const transcript: Transcript = {
+      _id: transcriptId(1),
+      sessionId: SESSION_ID,
+      userId,
+      bookId: BOOK_ID,
+      type: "final",
+      provider: "elevenlabs",
+      content: "Here is the transcript content.",
+      chars: 31,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const { ctx } = makeCtx({
+      sessions: [buildSession()],
+      transcripts: [transcript],
+    });
+    const result = await getTranscriptForSessionHandler(queryCtxFrom(ctx), {
+      sessionId: SESSION_ID,
+    });
+    expect(result).toMatchObject({
+      sessionId: SESSION_ID,
+      content: "Here is the transcript content.",
+      provider: "elevenlabs",
+      type: "final",
+    });
+  });
+
+  it("returns null for an unrelated session ID even when transcripts exist", async () => {
+    const otherSessionId = "session_other" as unknown as Id<"listeningSessions">;
+    const transcript: Transcript = {
+      _id: transcriptId(1),
+      sessionId: otherSessionId,
+      userId,
+      bookId: BOOK_ID,
+      type: "final",
+      provider: "deepgram",
+      content: "Other session transcript.",
+      chars: 24,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const { ctx } = makeCtx({
+      sessions: [buildSession()],
+      transcripts: [transcript],
+    });
+    const result = await getTranscriptForSessionHandler(queryCtxFrom(ctx), {
+      sessionId: SESSION_ID,
+    });
+    expect(result).toBeNull();
   });
 });

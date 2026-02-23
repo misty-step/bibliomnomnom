@@ -606,14 +606,19 @@ export const getForProcessing = internalQuery({
   },
 });
 
+export async function getTranscriptForSessionHandler(
+  ctx: Pick<QueryCtx, "db">,
+  args: { sessionId: Id<"listeningSessions"> },
+) {
+  return await ctx.db
+    .query("listeningSessionTranscripts")
+    .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
+    .first();
+}
+
 export const getTranscriptForSession = internalQuery({
   args: { sessionId: v.id("listeningSessions") },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("listeningSessionTranscripts")
-      .withIndex("by_session", (q) => q.eq("sessionId", args.sessionId))
-      .first();
-  },
+  handler: getTranscriptForSessionHandler,
 });
 
 export const getDebugStats = internalQuery({
@@ -909,19 +914,21 @@ export const transitionSynthesizingInternal = internalMutation({
     const provider = args.transcriptProvider.trim() || "unknown";
     const now = Date.now();
 
-    await ctx.db.patch(session._id, {
-      status: "synthesizing",
-      transcriptProvider: provider,
-      updatedAt: now,
-      lastError: undefined,
-    });
-
+    // Persist to table FIRST so retries can find the transcript if the patch below fails.
+    // persistListeningSessionTranscript is idempotent (checks by_session index before inserting).
     await persistListeningSessionTranscript(ctx, {
       session,
       userId: session.userId,
       transcript: cleanedTranscript,
       transcriptProvider: provider,
       occurredAt: now,
+    });
+
+    await ctx.db.patch(session._id, {
+      status: "synthesizing",
+      transcriptProvider: provider,
+      updatedAt: now,
+      lastError: undefined,
     });
   },
 });
