@@ -16,7 +16,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: misty-step/cerberus/validate@v2.29.0
+      - uses: misty-step/cerberus/validate@v2
 
   matrix:
     needs: validate
@@ -26,7 +26,7 @@ jobs:
       matrix: ${{ steps.generate.outputs.matrix }}
       count: ${{ steps.generate.outputs.count }}
     steps:
-      - uses: misty-step/cerberus/matrix@v2.29.0
+      - uses: misty-step/cerberus/matrix@v2
         id: generate
 
   review:
@@ -43,7 +43,7 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v6
-      - uses: misty-step/cerberus@v2.29.0
+      - uses: misty-step/cerberus@v2
         with:
           perspective: ${{ matrix.perspective }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -64,7 +64,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: misty-step/cerberus/verdict@v2.29.0
+      - uses: misty-step/cerberus/verdict@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Start advisory: always post the council verdict, but don't block merges on AI output.
