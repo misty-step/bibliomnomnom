@@ -1,4 +1,4 @@
-import { log } from "@/lib/api/withObservability";
+import { captureError, log } from "@/lib/api/withObservability";
 import type { FallbackPolicy, FinalTranscript, ProviderFlags, STTProvider } from "./types";
 import { STTError } from "./types";
 import { createAdapter, resolveProviderFlags } from "./registry";
@@ -52,6 +52,11 @@ export async function transcribeWithGateway(params: {
       const result = await adapter.transcribe({ audioBytes, mimeType });
       return result;
     } catch (err) {
+      captureError(err, {
+        provider,
+        retryable: err instanceof STTError ? err.retryable : false,
+        mimeType,
+      });
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`${provider}: ${msg}`);
       log("warn", "stt_provider_failed", {
@@ -62,10 +67,12 @@ export async function transcribeWithGateway(params: {
     }
   }
 
-  throw new STTError({
+  const finalError = new STTError({
     code: "provider_error",
     provider: policy.primary,
     message: errors.join(" | ") || "All STT providers failed",
     retryable: false,
   });
+  captureError(finalError, { providers: ordered });
+  throw finalError;
 }

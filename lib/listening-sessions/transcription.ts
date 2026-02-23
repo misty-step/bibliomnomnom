@@ -1,11 +1,10 @@
 import { MAX_LISTENING_SESSION_AUDIO_BYTES } from "@/lib/constants";
 import { DEFAULT_AUDIO_MIME_TYPE, normalizeAudioMimeType } from "@/lib/listening-sessions/mime";
-import { ElevenLabsAdapter } from "@/lib/stt/adapters/elevenlabs";
-import { DeepgramAdapter } from "@/lib/stt/adapters/deepgram";
+import { transcribeWithGateway, type STTProvider } from "@/lib/stt";
 
 export type TranscriptionResponse = {
   transcript: string;
-  provider: "deepgram" | "elevenlabs";
+  provider: STTProvider;
   confidence?: number;
 };
 
@@ -119,40 +118,24 @@ export async function readAudioFromUrl(
   return { bytes, mimeType };
 }
 
-export async function transcribeAudio(
-  audioUrl: string,
-  elevenLabsKey: string | undefined,
-  deepgramKey: string | undefined,
-): Promise<TranscriptionResponse> {
-  const elevenLabsApiKey = elevenLabsKey?.trim();
-  const deepgramApiKey = deepgramKey?.trim();
+export async function transcribeAudio(audioUrl: string): Promise<TranscriptionResponse> {
+  const elevenLabsApiKey = process.env.ELEVENLABS_API_KEY?.trim();
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY?.trim();
   if (!deepgramApiKey && !elevenLabsApiKey) {
     throw new Error("No STT provider is configured. Set DEEPGRAM_API_KEY or ELEVENLABS_API_KEY.");
   }
 
   const { bytes, mimeType } = await readAudioFromUrl(audioUrl);
 
-  // Build ordered adapter list (ElevenLabs primary, Deepgram fallback).
-  // Adapters are constructed with the explicit keys passed by the caller so
-  // this function works even when env vars are not set (e.g. in tests).
-  const adapters = [
-    elevenLabsApiKey ? new ElevenLabsAdapter(elevenLabsApiKey) : null,
-    deepgramApiKey ? new DeepgramAdapter(deepgramApiKey) : null,
-  ].filter((a): a is ElevenLabsAdapter | DeepgramAdapter => a !== null);
+  const result = await transcribeWithGateway({
+    audioBytes: bytes,
+    mimeType,
+    policy: { primary: "elevenlabs", secondary: "deepgram" },
+  });
 
-  const errors: string[] = [];
-  for (const adapter of adapters) {
-    try {
-      const result = await adapter.transcribe({ audioBytes: bytes, mimeType });
-      return {
-        transcript: cleanTranscript(result.transcript),
-        provider: result.provider as "elevenlabs" | "deepgram",
-        confidence: result.confidence,
-      };
-    } catch (err) {
-      errors.push(`${adapter.provider}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
-  throw new Error(errors.join(" | ") || "Transcription failed for all configured providers.");
+  return {
+    transcript: cleanTranscript(result.transcript),
+    provider: result.provider,
+    confidence: result.confidence,
+  };
 }

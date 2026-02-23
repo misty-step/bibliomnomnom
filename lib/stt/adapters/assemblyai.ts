@@ -132,8 +132,6 @@ export class AssemblyAIAdapter implements STTAdapter {
     const url = `${TRANSCRIPT_ENDPOINT}/${jobId}`;
 
     while (Date.now() < deadline) {
-      await sleep(POLL_INTERVAL_MS);
-
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
@@ -191,7 +189,8 @@ export class AssemblyAIAdapter implements STTAdapter {
         });
       }
 
-      // status is "queued" or "processing" — keep polling
+      // status is "queued" or "processing" — sleep before next attempt
+      await sleep(POLL_INTERVAL_MS);
     }
 
     throw new STTError({

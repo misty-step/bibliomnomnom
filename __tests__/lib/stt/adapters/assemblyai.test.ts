@@ -44,7 +44,7 @@ function mockHappyPath(transcript: string): void {
 }
 
 describe("AssemblyAIAdapter", () => {
-  it("returns transcript after polling", async () => {
+  it("should return transcript when polling completes", async () => {
     mockHappyPath("Hello world");
     const adapter = new AssemblyAIAdapter(API_KEY);
 
@@ -57,7 +57,7 @@ describe("AssemblyAIAdapter", () => {
     expect(result.transcript).toBe("Hello world");
   });
 
-  it("maps upload 401 to unauthorized", async () => {
+  it("should map to unauthorized when upload returns 401", async () => {
     mockFetch.mockResolvedValueOnce(makeResponse({}, 401));
     const adapter = new AssemblyAIAdapter(API_KEY);
 
@@ -68,7 +68,7 @@ describe("AssemblyAIAdapter", () => {
     expect((err as STTError).code).toBe("unauthorized");
   });
 
-  it("maps job error status to provider_error", async () => {
+  it("should map to provider_error when job status is error", async () => {
     mockFetch.mockResolvedValueOnce(
       makeResponse({ upload_url: "https://cdn.assemblyai.com/audio/123" }),
     );
@@ -88,7 +88,7 @@ describe("AssemblyAIAdapter", () => {
     expect((err as STTError).retryable).toBe(false);
   });
 
-  it("maps empty completed transcript to empty_transcript", async () => {
+  it("should map to empty_transcript when completed transcript is empty", async () => {
     mockFetch.mockResolvedValueOnce(
       makeResponse({ upload_url: "https://cdn.assemblyai.com/audio/123" }),
     );
@@ -107,7 +107,7 @@ describe("AssemblyAIAdapter", () => {
     expect((err as STTError).code).toBe("empty_transcript");
   });
 
-  it("maps upload network error to network_error", async () => {
+  it("should map to network_error when upload fails with a network error", async () => {
     mockFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
     const adapter = new AssemblyAIAdapter(API_KEY);
     const err = await adapter
@@ -118,7 +118,7 @@ describe("AssemblyAIAdapter", () => {
     expect((err as STTError).code).toBe("network_error");
   });
 
-  it("maps upload AbortError to timeout", async () => {
+  it("should map to timeout when upload aborts", async () => {
     const abort = new Error("aborted");
     abort.name = "AbortError";
     mockFetch.mockRejectedValueOnce(abort);
