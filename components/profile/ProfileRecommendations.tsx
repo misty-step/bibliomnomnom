@@ -231,6 +231,7 @@ export function ProfileRecommendations({
   isRefreshing = false,
   onRefreshRecommendations,
 }: ProfileRecommendationsProps) {
+  const canRefresh = Boolean(onRefreshRecommendations);
   const normalized = normalizeRecommendations(recommendations);
   const [showAll, setShowAll] = useState(false);
   const shouldReduce = useReducedMotion();
@@ -267,15 +268,17 @@ export function ProfileRecommendations({
                 See All
               </Button>
             )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onRefreshRecommendations}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
-              Refresh Suggestions
-            </Button>
+            {canRefresh && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onRefreshRecommendations}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+                Refresh Suggestions
+              </Button>
+            )}
           </div>
         </motion.div>
 
@@ -312,15 +315,17 @@ export function ProfileRecommendations({
             <Button variant="secondary" size="sm" onClick={() => setShowAll(false)}>
               Show Top {maxItems}
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={onRefreshRecommendations}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
-              Refresh Suggestions
-            </Button>
+            {canRefresh && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onRefreshRecommendations}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+                Refresh Suggestions
+              </Button>
+            )}
           </div>
         )}
       </motion.div>
