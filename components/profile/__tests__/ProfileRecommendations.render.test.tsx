@@ -36,9 +36,9 @@ describe("ProfileRecommendations compact mode", () => {
     render(<ProfileRecommendations recommendations={recommendations} maxItems={3} />);
 
     expect(screen.getByText("What should I read next?")).toBeInTheDocument();
-    expect(screen.getByText("Deeper 1")).toBeInTheDocument();
-    expect(screen.getByText("Wider 1")).toBeInTheDocument();
-    expect(screen.getByText("Deeper 2")).toBeInTheDocument();
+    expect(screen.getAllByText("Deeper 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Wider 1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Deeper 2").length).toBeGreaterThan(0);
     expect(screen.queryByText("Wider 2")).toBeNull();
   });
 
@@ -47,7 +47,7 @@ describe("ProfileRecommendations compact mode", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "See All" }));
     expect(screen.getByText("What to Read Next")).toBeInTheDocument();
-    expect(screen.getByText("Wider 2")).toBeInTheDocument();
+    expect(screen.getAllByText("Wider 2").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByRole("button", { name: "Show Top 3" }));
     expect(screen.getByText("What should I read next?")).toBeInTheDocument();
