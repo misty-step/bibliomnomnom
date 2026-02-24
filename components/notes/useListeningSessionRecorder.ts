@@ -504,6 +504,53 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     }
   };
 
+  const discardSession = async (message = "Recording discarded before processing completed.") => {
+    if (isStoppingRef.current || isProcessing) return;
+
+    const sessionId = sessionIdRef.current;
+    const recorder = mediaRecorderRef.current;
+
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    setCapRolloverReady(false);
+    setCapNotice(null);
+
+    clearTiming();
+    stopSpeechRecognition();
+
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        // no-op
+      }
+    }
+
+    stopMediaStream();
+    mediaRecorderRef.current = null;
+    sessionIdRef.current = null;
+    chunksRef.current = [];
+
+    resetCaptureState();
+
+    if (sessionId) {
+      try {
+        await failSession({
+          sessionId,
+          message,
+          failedStage: "recording",
+        });
+      } catch {
+        // no-op
+      }
+    }
+
+    toast({
+      title: "Recording discarded",
+      description: "Session was cancelled before processing.",
+    });
+  };
+
   const startSession = async () => {
     if (isRecording || isProcessing) return;
 
@@ -731,5 +778,6 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     capRolloverReady,
     startSession,
     stopAndProcess,
+    discardSession,
   };
 }

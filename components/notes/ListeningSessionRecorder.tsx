@@ -1,11 +1,22 @@
 // UI wrapper. Orchestration lives in `useListeningSessionRecorder`.
 "use client";
 
-import { AlertTriangle, Loader2, Mic, Sparkles, Square, Volume2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, Loader2, Mic, Sparkles, Square, Volume2, X } from "lucide-react";
 import type { Id } from "@/convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Surface } from "@/components/ui/Surface";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { SynthesisArtifacts } from "@/lib/listening-sessions/synthesis";
 import { useListeningSessionRecorder } from "@/components/notes/useListeningSessionRecorder";
 
@@ -49,9 +60,30 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
     capRolloverReady,
     startSession,
     stopAndProcess,
+    discardSession,
   } = useListeningSessionRecorder(bookId);
 
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
   const recordButtonLabel = capRolloverReady ? "Record next session" : "Record";
+
+  useEffect(() => {
+    if (!isRecording) {
+      setShowDiscardConfirm(false);
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setShowDiscardConfirm(true);
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isRecording]);
 
   return (
     <>
@@ -73,6 +105,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
               onClick={() => void startSession()}
               disabled={isRecording || isProcessing}
               className="min-w-[8rem]"
+              aria-label="Start voice recording session"
             >
               {isProcessing ? (
                 <>
@@ -138,59 +171,107 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
       </Surface>
 
       {isRecording ? (
-        <div className="fixed inset-0 z-[60] bg-black/90 text-canvas-bone backdrop-blur-sm">
-          <div className="mx-auto flex h-full w-full max-w-3xl min-h-0 flex-col px-6 py-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="h-3 w-3 animate-pulse rounded-full bg-accent-ember" />
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-canvas-bone/90">
-                  Recording active
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/90 text-canvas-bone backdrop-blur-sm"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Voice recording in progress"
+          >
+            <div className="mx-auto flex h-full w-full max-w-3xl min-h-0 flex-col px-6 py-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="h-3 w-3 animate-pulse rounded-full bg-accent-ember" />
+                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-canvas-bone/90">
+                    Recording active
+                  </p>
+                </div>
+                <p
+                  className="font-mono text-xl text-canvas-bone"
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {formatDuration(elapsedMs)}
                 </p>
               </div>
-              <p className="font-mono text-xl text-canvas-bone">{formatDuration(elapsedMs)}</p>
-            </div>
 
-            <div
-              className={cn(
-                "mt-4 rounded-md border px-3 py-2 text-sm",
-                warningActive
-                  ? "border-amber-300 bg-amber-100 text-amber-900"
-                  : "border-canvas-bone/20 bg-white/10 text-canvas-bone/80",
-              )}
-            >
-              {warningActive ? (
-                <div className="flex items-center gap-2">
-                  <Volume2 className="h-4 w-4" />
-                  <AlertTriangle className="h-4 w-4" />
-                  <span>Session auto-processes in {remainingSeconds}s at cap.</span>
+              <div
+                className={cn(
+                  "mt-4 rounded-md border px-3 py-2 text-sm",
+                  warningActive
+                    ? "border-amber-300 bg-amber-100 text-amber-900"
+                    : "border-canvas-bone/20 bg-white/10 text-canvas-bone/80",
+                )}
+              >
+                {warningActive ? (
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="h-4 w-4" />
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Session auto-processes in {remainingSeconds}s at cap.</span>
+                  </div>
+                ) : (
+                  "Speak freely. Live transcript is best-effort and browser-dependent."
+                )}
+              </div>
+
+              <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-canvas-bone/20 bg-white/5 px-4 py-4">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-canvas-bone/70">
+                  Live transcript
+                </p>
+                <div
+                  className="mt-3 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-canvas-bone/95"
+                  aria-live="polite"
+                  aria-label="Live transcript preview"
+                >
+                  {liveTranscript || "Listening…"}
                 </div>
-              ) : (
-                "Speak freely. Live transcript is best-effort and browser-dependent."
-              )}
-            </div>
+              </div>
 
-            <div className="mt-6 flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-canvas-bone/20 bg-white/5 px-4 py-4">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-canvas-bone/70">
-                Live transcript
-              </p>
-              <div className="mt-3 min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-canvas-bone/95">
-                {liveTranscript || "Listening…"}
+              <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
+                <Button
+                  variant="destructive"
+                  size="lg"
+                  className="min-w-56"
+                  onClick={() => void stopAndProcess(false)}
+                  aria-label="Stop recording and process session"
+                >
+                  <Square className="h-4 w-4" />
+                  Stop and process
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="lg"
+                  className="min-w-56 border-canvas-bone/30 bg-transparent text-canvas-bone hover:bg-white/10"
+                  onClick={() => setShowDiscardConfirm(true)}
+                  aria-label="Discard current recording"
+                >
+                  <X className="h-4 w-4" />
+                  Discard recording
+                </Button>
               </div>
             </div>
-
-            <div className="mt-6 flex justify-center">
-              <Button
-                variant="destructive"
-                size="lg"
-                className="min-w-56"
-                onClick={() => void stopAndProcess(false)}
-              >
-                <Square className="h-4 w-4" />
-                Stop and process
-              </Button>
-            </div>
           </div>
-        </div>
+
+          <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Discard this recording?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  The current transcript preview and captured audio will be lost.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep recording</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => void discardSession()}
+                  className="bg-accent-ember text-canvas-bone hover:bg-accent-ember/90"
+                >
+                  Discard
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
       ) : null}
     </>
   );

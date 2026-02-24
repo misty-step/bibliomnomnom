@@ -69,6 +69,9 @@ function RecorderHarness({ bookId }: { bookId: string }) {
       <button type="button" onClick={() => void recorder.stopAndProcess(false)}>
         stop
       </button>
+      <button type="button" onClick={() => void recorder.discardSession()}>
+        discard
+      </button>
       <span data-testid="rollover">{recorder.capRolloverReady ? "ready" : "idle"}</span>
       <span data-testid="recording">{recorder.isRecording ? "recording" : "idle"}</span>
       <span data-testid="notice">{recorder.capNotice ?? ""}</span>
@@ -605,6 +608,36 @@ describe("useListeningSessionRecorder", () => {
     );
     expect(completeSessionMock).not.toHaveBeenCalled();
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
+  });
+
+  it("discards active recording without upload and marks session failed", async () => {
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("recording")).toHaveTextContent("recording");
+
+    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+
+    await waitFor(() =>
+      expect(failSessionMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sessionId: "session_1",
+          message: "Recording discarded before processing completed.",
+          failedStage: "recording",
+        }),
+      ),
+    );
+
+    const uploadCalls = fetchMock.mock.calls.filter(([input]) => {
+      const url = String(input);
+      return url.includes("/api/listening-sessions/") && url.includes("/upload");
+    });
+    expect(uploadCalls).toHaveLength(0);
+    expect(screen.getByTestId("recording")).toHaveTextContent("idle");
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Recording discarded" }),
+    );
   });
 
   // ─── AC 4: unmount ────────────────────────────────────────────────────────
