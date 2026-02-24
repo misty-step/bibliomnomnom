@@ -33,8 +33,10 @@ const recommendations = {
 
 describe("ProfileRecommendations compact mode", () => {
   it("should render compact view with top recommendations when maxItems is set", () => {
+    // Arrange
     render(<ProfileRecommendations recommendations={recommendations} maxItems={3} />);
 
+    // Assert
     expect(screen.getByText("What should I read next?")).toBeInTheDocument();
     expect(screen.getAllByText("Deeper 1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Wider 1").length).toBeGreaterThan(0);
@@ -42,22 +44,36 @@ describe("ProfileRecommendations compact mode", () => {
     expect(screen.queryByText("Wider 2")).toBeNull();
   });
 
-  it("should toggle to full view when See All is clicked and back when Show Top is clicked", () => {
+  it("should show full view when See All is clicked", () => {
+    // Arrange
     render(<ProfileRecommendations recommendations={recommendations} maxItems={3} />);
 
+    // Act
     fireEvent.click(screen.getByRole("button", { name: "See All" }));
+
+    // Assert
     expect(screen.getByText("What to Read Next")).toBeInTheDocument();
     expect(screen.getAllByText("Wider 2").length).toBeGreaterThan(0);
+  });
 
+  it("should return to compact view when Show Top 3 is clicked", () => {
+    // Arrange
+    render(<ProfileRecommendations recommendations={recommendations} maxItems={3} />);
+    fireEvent.click(screen.getByRole("button", { name: "See All" }));
+
+    // Act
     fireEvent.click(screen.getByRole("button", { name: "Show Top 3" }));
+
+    // Assert
     expect(screen.getByText("What should I read next?")).toBeInTheDocument();
     expect(screen.queryByText("Wider 2")).toBeNull();
   });
 
-  it("should invoke refresh callback and disable refresh button when refreshing", () => {
+  it("should invoke refresh callback when refresh button is clicked", () => {
+    // Arrange
     const onRefresh = vi.fn();
 
-    const { rerender } = render(
+    render(
       <ProfileRecommendations
         recommendations={recommendations}
         maxItems={3}
@@ -65,10 +81,17 @@ describe("ProfileRecommendations compact mode", () => {
       />,
     );
 
+    // Act
     fireEvent.click(screen.getByRole("button", { name: "Refresh Suggestions" }));
-    expect(onRefresh).toHaveBeenCalledTimes(1);
 
-    rerender(
+    // Assert
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("should disable refresh button when isRefreshing is true", () => {
+    // Arrange
+    const onRefresh = vi.fn();
+    render(
       <ProfileRecommendations
         recommendations={recommendations}
         maxItems={3}
@@ -77,6 +100,7 @@ describe("ProfileRecommendations compact mode", () => {
       />,
     );
 
+    // Assert
     expect(screen.getByRole("button", { name: "Refresh Suggestions" })).toBeDisabled();
   });
 });
