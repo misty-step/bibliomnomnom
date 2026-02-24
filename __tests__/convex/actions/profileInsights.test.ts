@@ -154,6 +154,14 @@ describe("buildInsightsPrompt — voice note evidence", () => {
     expect(prompt).toContain("[followUpQuestion]");
     expect(prompt).toContain("[contextExpansion]");
   });
+
+  it("should keep badge guidance optional instead of forcing fixed taxonomy", () => {
+    // Arrange
+    const prompt = buildInsightsPrompt(baseBooks, 2, [voiceNote]);
+    // Act / Assert
+    expect(prompt).toContain('"badges" are optional');
+    expect(prompt).not.toContain("Each must have 1-2 badges from:");
+  });
 });
 
 describe("fetchVoiceNoteSummariesSafe — graceful degradation", () => {
@@ -216,6 +224,71 @@ describe("parseInsightsResponse — no regression with voice note additions", ()
     expect(result.confidence).toBe("developing");
     expect(result.recommendations?.goDeeper).toHaveLength(1);
     expect(result.recommendations?.goDeeper[0]!.title).toBe("Hyperion");
+  });
+
+  it("should preserve free-form badges while normalizing and capping to prompt limits", () => {
+    // Arrange
+    const response = JSON.stringify({
+      tasteTagline: "Cross-genre seeker",
+      literaryTaste: {
+        genres: ["classics"],
+        moods: ["reflective"],
+        complexity: "moderate",
+      },
+      thematicConnections: [],
+      recommendations: {
+        goDeeper: [
+          {
+            title: "City of God",
+            author: "Augustine",
+            reason: "Foundational theology",
+            badges: [
+              " Foundational Read  ",
+              "foundational read",
+              "historical cornerstone",
+              "",
+              "x".repeat(60),
+            ],
+          },
+        ],
+        goWider: [],
+      },
+    });
+    // Act
+    const result = parseInsightsResponse(response, 25);
+    // Assert
+    expect(result.recommendations?.goDeeper[0]?.badges).toEqual([
+      "Foundational Read",
+      "historical cornerstone",
+    ]);
+  });
+
+  it("should clamp free-form badge labels to 24 characters", () => {
+    // Arrange
+    const response = JSON.stringify({
+      tasteTagline: "Cross-genre seeker",
+      literaryTaste: {
+        genres: ["classics"],
+        moods: ["reflective"],
+        complexity: "moderate",
+      },
+      thematicConnections: [],
+      recommendations: {
+        goDeeper: [
+          {
+            title: "City of God",
+            author: "Augustine",
+            reason: "Foundational theology",
+            badges: ["x".repeat(60)],
+          },
+        ],
+        goWider: [],
+      },
+    });
+    // Act
+    const result = parseInsightsResponse(response, 25);
+    // Assert
+    expect(result.recommendations?.goDeeper[0]?.badges).toEqual(["xxxxxxxxxxxxxxxxxxxxxxxx"]);
   });
 
   it("should fall back gracefully when response is malformed", () => {

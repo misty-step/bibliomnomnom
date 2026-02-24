@@ -10,9 +10,11 @@
 
 import type * as actions_bookSearch from "../actions/bookSearch.js";
 import type * as actions_coverFetch from "../actions/coverFetch.js";
+import type * as actions_processListeningSession from "../actions/processListeningSession.js";
 import type * as actions_profileInsights from "../actions/profileInsights.js";
 import type * as auth from "../auth.js";
 import type * as books from "../books.js";
+import type * as crons from "../crons.js";
 import type * as imports from "../imports.js";
 import type * as listeningSessions from "../listeningSessions.js";
 import type * as notes from "../notes.js";
@@ -31,9 +33,11 @@ import type {
 declare const fullApi: ApiFromModules<{
   "actions/bookSearch": typeof actions_bookSearch;
   "actions/coverFetch": typeof actions_coverFetch;
+  "actions/processListeningSession": typeof actions_processListeningSession;
   "actions/profileInsights": typeof actions_profileInsights;
   auth: typeof auth;
   books: typeof books;
+  crons: typeof crons;
   imports: typeof imports;
   listeningSessions: typeof listeningSessions;
   notes: typeof notes;

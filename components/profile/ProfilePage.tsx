@@ -272,7 +272,12 @@ export function ProfilePage() {
       {/* Book recommendations - back to bone */}
       {profile.insights?.recommendations && (
         <section className="bg-canvas-bone">
-          <ProfileRecommendations recommendations={profile.insights.recommendations} />
+          <ProfileRecommendations
+            recommendations={profile.insights.recommendations}
+            maxItems={3}
+            isRefreshing={isRegenerating}
+            onRefreshRecommendations={handleRegenerate}
+          />
         </section>
       )}
 

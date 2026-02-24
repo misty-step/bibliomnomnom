@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { ProfileBookCover } from "./ProfileBookCover";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // Badge configuration - unified gold color scheme for all badges
 const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string }> = {
@@ -45,6 +47,47 @@ const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string }> = {
 
 // Unified badge styling - all gold
 const BADGE_CLASSNAME = "bg-deco-gold/10 text-deco-goldDark";
+const MAX_VISIBLE_BADGES = 2;
+const MAX_BADGE_LABEL_LENGTH = 24;
+
+function formatBadgeLabel(rawBadge: string): string {
+  const config = BADGE_CONFIG[rawBadge];
+  if (config) return config.label;
+
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawBadge)) {
+    return rawBadge
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  return rawBadge;
+}
+
+function getVisibleBadges(badges?: string[]) {
+  const visible: Array<{ id: string; label: string; icon: typeof Award }> = [];
+  const seen = new Set<string>();
+
+  for (const rawBadge of badges ?? []) {
+    const cleaned = String(rawBadge).trim().replace(/\s+/g, " ").slice(0, MAX_BADGE_LABEL_LENGTH);
+    if (!cleaned) continue;
+
+    const label = formatBadgeLabel(cleaned);
+    const normalizedLabel = label.toLowerCase();
+    if (seen.has(normalizedLabel)) continue;
+    seen.add(normalizedLabel);
+
+    visible.push({
+      id: cleaned,
+      label,
+      icon: BADGE_CONFIG[cleaned]?.icon ?? Award,
+    });
+
+    if (visible.length >= MAX_VISIBLE_BADGES) break;
+  }
+
+  return visible;
+}
 
 // Schema-compatible recommendation with optional enhanced fields
 type BookRecommendation = {
@@ -68,6 +111,9 @@ type RecommendationsData = {
 
 type ProfileRecommendationsProps = {
   recommendations: RecommendationsData;
+  maxItems?: number;
+  isRefreshing?: boolean;
+  onRefreshRecommendations?: () => void;
 };
 
 /**
@@ -97,14 +143,8 @@ function normalizeRecommendations(recs: RecommendationsData) {
  * Horizontal layout: cover on left, full content on right.
  * No truncation - shows complete reasoning immediately.
  */
-function RecommendationCard({
-  book,
-  variant = "deeper",
-}: {
-  book: BookRecommendation;
-  variant?: "deeper" | "wider";
-}) {
-  const validBadges = book.badges?.filter((b) => BADGE_CONFIG[b]) ?? [];
+function RecommendationCard({ book }: { book: BookRecommendation }) {
+  const visibleBadges = getVisibleBadges(book.badges);
 
   return (
     <motion.article
@@ -150,22 +190,20 @@ function RecommendationCard({
         )}
 
         {/* Badges */}
-        {validBadges.length > 0 && (
+        {visibleBadges.length > 0 && (
           <div className="flex flex-wrap gap-xs pt-xs">
-            {validBadges.map((badge) => {
-              const config = BADGE_CONFIG[badge];
-              if (!config) return null;
-              const Icon = config.icon;
+            {visibleBadges.map((badge) => {
+              const Icon = badge.icon;
               return (
                 <span
-                  key={badge}
+                  key={badge.id}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
                     BADGE_CLASSNAME,
                   )}
                 >
                   <Icon className="h-3 w-3" />
-                  {config.label}
+                  {badge.label}
                 </span>
               );
             })}
@@ -188,12 +226,74 @@ function RecommendationCard({
  * Book recommendations as feature cards with full reasoning.
  * Two-column layout on desktop: Go Deeper | Go Wider side by side.
  */
-export function ProfileRecommendations({ recommendations }: ProfileRecommendationsProps) {
+export function ProfileRecommendations({
+  recommendations,
+  maxItems,
+  isRefreshing = false,
+  onRefreshRecommendations,
+}: ProfileRecommendationsProps) {
+  const canRefresh = Boolean(onRefreshRecommendations);
   const normalized = normalizeRecommendations(recommendations);
+  const [showAll, setShowAll] = useState(false);
+  const shouldReduce = useReducedMotion();
+  const topItems = getTopRecommendations(normalized, maxItems);
+  const isTopOnly = Boolean(maxItems && maxItems > 0);
   const hasAny = normalized.goDeeper.length > 0 || normalized.goWider.length > 0;
+  const totalItems = normalized.goDeeper.length + normalized.goWider.length;
+  const canExpand = totalItems > topItems.length;
+
+  // Show a deterministic top-N feed when requested (new flow).
+  if (isTopOnly && !showAll) {
+    if (topItems.length === 0) return null;
+
+    return (
+      <div className="max-w-6xl mx-auto px-md py-2xl md:py-3xl">
+        <motion.div
+          className="mb-xl flex items-start justify-between gap-md"
+          initial={shouldReduce ? undefined : { opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+        >
+          <div>
+            <h2 className="font-display text-2xl md:text-3xl text-text-ink mb-xs">
+              What should I read next?
+            </h2>
+            <p className="text-text-inkMuted max-w-2xl">
+              Personalized recommendations from your reading history, favorites, and patterns
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {canExpand && (
+              <Button variant="secondary" size="sm" onClick={() => setShowAll(true)}>
+                See All
+              </Button>
+            )}
+            {canRefresh && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onRefreshRecommendations}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+                Refresh Suggestions
+              </Button>
+            )}
+          </div>
+        </motion.div>
+
+        <div className="space-y-md">
+          {topItems.map((book, index) => (
+            <RecommendationCard key={`${book.title}-${book.author}-${index}`} book={book} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const hasDeeper = normalized.goDeeper.length > 0;
   const hasWider = normalized.goWider.length > 0;
-  const shouldReduce = useReducedMotion();
 
   if (!hasAny) return null;
 
@@ -211,6 +311,24 @@ export function ProfileRecommendations({ recommendations }: ProfileRecommendatio
         <p className="text-text-inkMuted max-w-2xl">
           Personalized recommendations based on your reading patterns and literary preferences
         </p>
+        {isTopOnly && (
+          <div className="mt-sm flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowAll(false)}>
+              Show Top {maxItems}
+            </Button>
+            {canRefresh && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onRefreshRecommendations}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+                Refresh Suggestions
+              </Button>
+            )}
+          </div>
+        )}
       </motion.div>
 
       {/* Two-column layout on desktop */}
@@ -236,12 +354,8 @@ export function ProfileRecommendations({ recommendations }: ProfileRecommendatio
             </motion.div>
 
             <div className="space-y-md">
-              {normalized.goDeeper.map((book) => (
-                <RecommendationCard
-                  key={`${book.title}-${book.author}`}
-                  book={book}
-                  variant="deeper"
-                />
+              {normalized.goDeeper.map((book, index) => (
+                <RecommendationCard key={`${book.title}-${book.author}-${index}`} book={book} />
               ))}
             </div>
           </div>
@@ -266,12 +380,8 @@ export function ProfileRecommendations({ recommendations }: ProfileRecommendatio
             </motion.div>
 
             <div className="space-y-md">
-              {normalized.goWider.map((book) => (
-                <RecommendationCard
-                  key={`${book.title}-${book.author}`}
-                  book={book}
-                  variant="wider"
-                />
+              {normalized.goWider.map((book, index) => (
+                <RecommendationCard key={`${book.title}-${book.author}-${index}`} book={book} />
               ))}
             </div>
           </div>
@@ -279,6 +389,32 @@ export function ProfileRecommendations({ recommendations }: ProfileRecommendatio
       </div>
     </div>
   );
+}
+
+/**
+ * Get top recommendations for concise recommendation feed.
+ */
+export function getTopRecommendations(
+  recommendations: { goDeeper: BookRecommendation[]; goWider: BookRecommendation[] },
+  maxItems = 3,
+): BookRecommendation[] {
+  // Interleave deeper/wider picks to keep variety in compact mode.
+  const ordered: BookRecommendation[] = [];
+  const maxLength = Math.max(recommendations.goDeeper.length, recommendations.goWider.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const deeper = recommendations.goDeeper[index];
+    if (deeper) {
+      ordered.push(deeper);
+    }
+
+    const wider = recommendations.goWider[index];
+    if (wider) {
+      ordered.push(wider);
+    }
+  }
+
+  return ordered.slice(0, maxItems);
 }
 
 /**

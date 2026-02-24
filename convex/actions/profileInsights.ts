@@ -98,6 +98,8 @@ type ProfileInsights = {
 const MIN_BOOKS_FOR_FULL = 50;
 const MAX_BOOKS_TO_ANALYZE = 200; // Limit context size
 const GENERATION_TIMEOUT_MS = 120_000; // 2 minutes
+const MAX_RECOMMENDATION_BADGES = 2;
+const MAX_BADGE_LABEL_LENGTH = 24;
 
 // --- Prompt Engineering ---
 
@@ -220,7 +222,7 @@ Analyze this collection and provide insights in JSON format:
         "reason": "Hook < 80 chars - why this deepens current interests",
         "detailedReason": "2-3 sentences connecting to SPECIFIC books they've read and why this continues that thread",
         "connectionBooks": ["Their Book 1", "Their Book 2"],
-        "badges": ["similar-atmosphere", "award-winner"],
+        "badges": ["Foundational Read", "Rich Character Work"],
         "isReread": false
       }
     ],
@@ -231,7 +233,7 @@ Analyze this collection and provide insights in JSON format:
         "reason": "Hook < 80 chars - why this expands into NEW territory",
         "detailedReason": "2-3 sentences explaining what makes this genuinely different and why it would resonate",
         "connectionBooks": ["Their Book that shows readiness"],
-        "badges": ["genre-defining", "cult-classic"]
+        "badges": ["Cross-Cultural Lens", "Historical Cornerstone"]
       }
     ]
   }
@@ -252,18 +254,18 @@ RECOMMENDATION RULES:
   • 8-10 external books that deepen themes they're actively exploring
   • 2-3 books FROM their library worth re-reading (mark isReread: true)
   • Each must have connectionBooks (1-3 titles from THEIR library)
-  • Each must have 1-2 badges from: similar-atmosphere, same-author-style, award-winner, cult-classic, genre-defining, recently-adapted
 - goWider (10-12 books): Identify GAPS in their reading
   • What perspectives, genres, time periods, or cultures are missing?
   • Suggest books that would genuinely expand their worldview
   • Not variations of existing themes — truly different territory
   • Each must have connectionBooks showing what they've read that suggests readiness
-  • Each must have 1-2 badges
 - Both:
   • Real published books only
   • "reason" is a hook UNDER 80 chars
   • "detailedReason" is 2-3 sentences of specific reasoning
   • Connect every recommendation to SPECIFIC titles from their library
+  • "badges" are optional; use 0-2 only when they add real signal
+  • Badge labels should be short (1-3 words, <=24 chars), concrete, and not hype-y
 
 EVOLUTION RULES (for 50+ books):
 - Identify 3-5 distinct phases in their reading journey
@@ -305,6 +307,29 @@ export function parseInsightsResponse(content: string, bookCount: number): Profi
       ? (parsed.literaryTaste.complexity as ProfileInsights["literaryTaste"]["complexity"])
       : "moderate";
 
+    const normalizeBadges = (badges: unknown): string[] | undefined => {
+      if (!Array.isArray(badges)) return undefined;
+
+      const seen = new Set<string>();
+      const normalized: string[] = [];
+
+      for (const candidate of badges) {
+        if (typeof candidate !== "string") continue;
+
+        const cleaned = candidate.trim().replace(/\s+/g, " ").slice(0, MAX_BADGE_LABEL_LENGTH);
+        if (!cleaned) continue;
+
+        const key = cleaned.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        normalized.push(cleaned);
+        if (normalized.length >= MAX_RECOMMENDATION_BADGES) break;
+      }
+
+      return normalized.length > 0 ? normalized : undefined;
+    };
+
     // Parse new-format recommendations with rich fields (goDeeper/goWider)
     const parseNewRecommendations = (
       recs: unknown[],
@@ -321,6 +346,7 @@ export function parseInsightsResponse(content: string, bookCount: number): Profi
           badges?: string[];
           isReread?: boolean;
         };
+        const normalizedBadges = normalizeBadges(rec.badges);
         return {
           title: String(rec.title ?? "").slice(0, 200),
           author: String(rec.author ?? "").slice(0, 100),
@@ -331,9 +357,7 @@ export function parseInsightsResponse(content: string, bookCount: number): Profi
           ...(Array.isArray(rec.connectionBooks) && rec.connectionBooks.length > 0
             ? { connectionBooks: rec.connectionBooks.slice(0, 5).map(String) }
             : {}),
-          ...(Array.isArray(rec.badges) && rec.badges.length > 0
-            ? { badges: rec.badges.slice(0, 3).map(String) }
-            : {}),
+          ...(normalizedBadges ? { badges: normalizedBadges } : {}),
           ...(rec.isReread ? { isReread: true } : {}),
         };
       });
