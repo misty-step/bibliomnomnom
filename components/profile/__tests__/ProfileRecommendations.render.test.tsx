@@ -103,4 +103,28 @@ describe("ProfileRecommendations compact mode", () => {
     // Assert
     expect(screen.getByRole("button", { name: "Refresh Suggestions" })).toBeDisabled();
   });
+
+  it("should normalize and dedupe dynamic badge labels in recommendation cards", () => {
+    // Arrange
+    render(
+      <ProfileRecommendations
+        recommendations={{
+          goDeeper: [
+            {
+              title: "Badge Book",
+              author: "Badge Author",
+              reason: "Badge Reason",
+              badges: ["foundational-read", "Foundational Read", "historical cornerstone"],
+            },
+          ],
+          goWider: [],
+        }}
+      />,
+    );
+
+    // Assert
+    expect(screen.getByText("Foundational Read")).toBeInTheDocument();
+    expect(screen.getByText("historical cornerstone")).toBeInTheDocument();
+    expect(screen.getAllByText("Foundational Read")).toHaveLength(1);
+  });
 });

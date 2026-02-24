@@ -348,8 +348,8 @@ export function ProfileRecommendations({
             </motion.div>
 
             <div className="space-y-md">
-              {normalized.goDeeper.map((book) => (
-                <RecommendationCard key={`${book.title}-${book.author}`} book={book} />
+              {normalized.goDeeper.map((book, index) => (
+                <RecommendationCard key={`${book.title}-${book.author}-${index}`} book={book} />
               ))}
             </div>
           </div>
@@ -374,8 +374,8 @@ export function ProfileRecommendations({
             </motion.div>
 
             <div className="space-y-md">
-              {normalized.goWider.map((book) => (
-                <RecommendationCard key={`${book.title}-${book.author}`} book={book} />
+              {normalized.goWider.map((book, index) => (
+                <RecommendationCard key={`${book.title}-${book.author}-${index}`} book={book} />
               ))}
             </div>
           </div>
