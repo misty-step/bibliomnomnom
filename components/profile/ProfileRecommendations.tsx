@@ -47,7 +47,8 @@ const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string }> = {
 
 // Unified badge styling - all gold
 const BADGE_CLASSNAME = "bg-deco-gold/10 text-deco-goldDark";
-const MAX_VISIBLE_BADGES = 3;
+const MAX_VISIBLE_BADGES = 2;
+const MAX_BADGE_LABEL_LENGTH = 24;
 
 function formatBadgeLabel(rawBadge: string): string {
   const config = BADGE_CONFIG[rawBadge];
@@ -68,7 +69,7 @@ function getVisibleBadges(badges?: string[]) {
   const seen = new Set<string>();
 
   for (const rawBadge of badges ?? []) {
-    const cleaned = String(rawBadge).trim().replace(/\s+/g, " ").slice(0, 32);
+    const cleaned = String(rawBadge).trim().replace(/\s+/g, " ").slice(0, MAX_BADGE_LABEL_LENGTH);
     if (!cleaned) continue;
 
     const label = formatBadgeLabel(cleaned);

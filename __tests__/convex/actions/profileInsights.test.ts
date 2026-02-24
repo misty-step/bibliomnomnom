@@ -226,7 +226,7 @@ describe("parseInsightsResponse — no regression with voice note additions", ()
     expect(result.recommendations?.goDeeper[0]!.title).toBe("Hyperion");
   });
 
-  it("should preserve free-form badges while normalizing whitespace and duplicates", () => {
+  it("should preserve free-form badges while normalizing and capping to prompt limits", () => {
     // Arrange
     const response = JSON.stringify({
       tasteTagline: "Cross-genre seeker",
@@ -260,8 +260,35 @@ describe("parseInsightsResponse — no regression with voice note additions", ()
     expect(result.recommendations?.goDeeper[0]?.badges).toEqual([
       "Foundational Read",
       "historical cornerstone",
-      "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     ]);
+  });
+
+  it("should clamp free-form badge labels to 24 characters", () => {
+    // Arrange
+    const response = JSON.stringify({
+      tasteTagline: "Cross-genre seeker",
+      literaryTaste: {
+        genres: ["classics"],
+        moods: ["reflective"],
+        complexity: "moderate",
+      },
+      thematicConnections: [],
+      recommendations: {
+        goDeeper: [
+          {
+            title: "City of God",
+            author: "Augustine",
+            reason: "Foundational theology",
+            badges: ["x".repeat(60)],
+          },
+        ],
+        goWider: [],
+      },
+    });
+    // Act
+    const result = parseInsightsResponse(response, 25);
+    // Assert
+    expect(result.recommendations?.goDeeper[0]?.badges).toEqual(["xxxxxxxxxxxxxxxxxxxxxxxx"]);
   });
 
   it("should fall back gracefully when response is malformed", () => {

@@ -98,6 +98,8 @@ type ProfileInsights = {
 const MIN_BOOKS_FOR_FULL = 50;
 const MAX_BOOKS_TO_ANALYZE = 200; // Limit context size
 const GENERATION_TIMEOUT_MS = 120_000; // 2 minutes
+const MAX_RECOMMENDATION_BADGES = 2;
+const MAX_BADGE_LABEL_LENGTH = 24;
 
 // --- Prompt Engineering ---
 
@@ -314,7 +316,7 @@ export function parseInsightsResponse(content: string, bookCount: number): Profi
       for (const candidate of badges) {
         if (typeof candidate !== "string") continue;
 
-        const cleaned = candidate.trim().replace(/\s+/g, " ").slice(0, 32);
+        const cleaned = candidate.trim().replace(/\s+/g, " ").slice(0, MAX_BADGE_LABEL_LENGTH);
         if (!cleaned) continue;
 
         const key = cleaned.toLowerCase();
@@ -322,7 +324,7 @@ export function parseInsightsResponse(content: string, bookCount: number): Profi
         seen.add(key);
 
         normalized.push(cleaned);
-        if (normalized.length >= 3) break;
+        if (normalized.length >= MAX_RECOMMENDATION_BADGES) break;
       }
 
       return normalized.length > 0 ? normalized : undefined;

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ProfileRecommendations } from "../ProfileRecommendations";
 
@@ -11,9 +11,20 @@ class IntersectionObserverMock {
   }
 }
 
-Object.defineProperty(globalThis, "IntersectionObserver", {
-  writable: true,
-  value: IntersectionObserverMock,
+const originalIntersectionObserver = globalThis.IntersectionObserver;
+
+beforeAll(() => {
+  Object.defineProperty(globalThis, "IntersectionObserver", {
+    writable: true,
+    value: IntersectionObserverMock,
+  });
+});
+
+afterAll(() => {
+  Object.defineProperty(globalThis, "IntersectionObserver", {
+    writable: true,
+    value: originalIntersectionObserver,
+  });
 });
 
 vi.mock("../ProfileBookCover", () => ({
