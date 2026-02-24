@@ -372,7 +372,7 @@ export function ProfileRecommendations({
 /**
  * Get top recommendations for concise recommendation feed.
  */
-function getTopRecommendations(
+export function getTopRecommendations(
   recommendations: { goDeeper: BookRecommendation[]; goWider: BookRecommendation[] },
   maxItems = 3,
 ): RecommendationDisplay[] {
