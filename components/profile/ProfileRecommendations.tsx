@@ -47,6 +47,46 @@ const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string }> = {
 
 // Unified badge styling - all gold
 const BADGE_CLASSNAME = "bg-deco-gold/10 text-deco-goldDark";
+const MAX_VISIBLE_BADGES = 3;
+
+function formatBadgeLabel(rawBadge: string): string {
+  const config = BADGE_CONFIG[rawBadge];
+  if (config) return config.label;
+
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawBadge)) {
+    return rawBadge
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  return rawBadge;
+}
+
+function getVisibleBadges(badges?: string[]) {
+  const visible: Array<{ id: string; label: string; icon: typeof Award }> = [];
+  const seen = new Set<string>();
+
+  for (const rawBadge of badges ?? []) {
+    const cleaned = String(rawBadge).trim().replace(/\s+/g, " ").slice(0, 32);
+    if (!cleaned) continue;
+
+    const label = formatBadgeLabel(cleaned);
+    const normalizedLabel = label.toLowerCase();
+    if (seen.has(normalizedLabel)) continue;
+    seen.add(normalizedLabel);
+
+    visible.push({
+      id: cleaned,
+      label,
+      icon: BADGE_CONFIG[cleaned]?.icon ?? Award,
+    });
+
+    if (visible.length >= MAX_VISIBLE_BADGES) break;
+  }
+
+  return visible;
+}
 
 // Schema-compatible recommendation with optional enhanced fields
 type BookRecommendation = {
@@ -103,7 +143,7 @@ function normalizeRecommendations(recs: RecommendationsData) {
  * No truncation - shows complete reasoning immediately.
  */
 function RecommendationCard({ book }: { book: BookRecommendation }) {
-  const validBadges = book.badges?.filter((b) => BADGE_CONFIG[b]) ?? [];
+  const visibleBadges = getVisibleBadges(book.badges);
 
   return (
     <motion.article
@@ -149,22 +189,20 @@ function RecommendationCard({ book }: { book: BookRecommendation }) {
         )}
 
         {/* Badges */}
-        {validBadges.length > 0 && (
+        {visibleBadges.length > 0 && (
           <div className="flex flex-wrap gap-xs pt-xs">
-            {validBadges.map((badge) => {
-              const config = BADGE_CONFIG[badge];
-              if (!config) return null;
-              const Icon = config.icon;
+            {visibleBadges.map((badge) => {
+              const Icon = badge.icon;
               return (
                 <span
-                  key={badge}
+                  key={badge.id}
                   className={cn(
                     "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
                     BADGE_CLASSNAME,
                   )}
                 >
                   <Icon className="h-3 w-3" />
-                  {config.label}
+                  {badge.label}
                 </span>
               );
             })}

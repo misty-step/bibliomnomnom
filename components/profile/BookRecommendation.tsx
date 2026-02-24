@@ -40,6 +40,49 @@ const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string; classNam
     className: "bg-accent-teal/10 text-accent-teal border border-accent-teal/20",
   },
 };
+const DEFAULT_BADGE_CLASSNAME = "bg-canvas-bone/90 text-text-ink border border-line-ghost";
+const MAX_VISIBLE_BADGES = 2;
+
+function formatBadgeLabel(rawBadge: string): string {
+  const config = BADGE_CONFIG[rawBadge];
+  if (config) return config.label;
+
+  if (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(rawBadge)) {
+    return rawBadge
+      .split("-")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+  }
+
+  return rawBadge;
+}
+
+function getVisibleBadges(badges?: string[]) {
+  const visible: Array<{ id: string; label: string; icon: typeof Award; className: string }> = [];
+  const seen = new Set<string>();
+
+  for (const rawBadge of badges ?? []) {
+    const cleaned = String(rawBadge).trim().replace(/\s+/g, " ").slice(0, 32);
+    if (!cleaned) continue;
+
+    const config = BADGE_CONFIG[cleaned];
+    const label = formatBadgeLabel(cleaned);
+    const normalizedLabel = label.toLowerCase();
+    if (seen.has(normalizedLabel)) continue;
+    seen.add(normalizedLabel);
+
+    visible.push({
+      id: cleaned,
+      label,
+      icon: config?.icon ?? Award,
+      className: config?.className ?? DEFAULT_BADGE_CLASSNAME,
+    });
+
+    if (visible.length >= MAX_VISIBLE_BADGES) break;
+  }
+
+  return visible;
+}
 
 // Hostnames that Next.js Image can optimize (configured in next.config.ts)
 const OPTIMIZABLE_IMAGE_HOSTNAMES = [
@@ -57,7 +100,7 @@ export type BookRecommendationProps = {
   reason: string; // Short hook < 80 chars
   detailedReason?: string; // 2-3 sentence explanation
   connectionBooks?: string[]; // Titles from user's library
-  badges?: string[]; // Badge keys
+  badges?: string[]; // Short tags from recommendation generation
   isReread?: boolean;
   className?: string;
 };
@@ -113,7 +156,7 @@ export function BookRecommendation({
 
   const showCover = coverUrl && !imageError;
   const hasDetails = detailedReason || (connectionBooks && connectionBooks.length > 0);
-  const visibleBadges = badges?.slice(0, 2).filter((b) => BADGE_CONFIG[b]) ?? [];
+  const visibleBadges = getVisibleBadges(badges);
 
   return (
     <motion.article
@@ -215,20 +258,18 @@ export function BookRecommendation({
         {visibleBadges.length > 0 && (
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {visibleBadges.map((badge) => {
-              const config = BADGE_CONFIG[badge];
-              if (!config) return null;
-              const Icon = config.icon;
+              const Icon = badge.icon;
               return (
                 <div
-                  key={badge}
+                  key={badge.id}
                   className={cn(
                     "flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium shadow-sm",
-                    config.className,
+                    badge.className,
                   )}
-                  title={config.label}
+                  title={badge.label}
                 >
                   <Icon className="h-3 w-3" />
-                  <span className="sr-only">{config.label}</span>
+                  <span className="sr-only">{badge.label}</span>
                 </div>
               );
             })}
@@ -283,19 +324,17 @@ export function BookRecommendation({
               {visibleBadges.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
                   {visibleBadges.map((badge) => {
-                    const config = BADGE_CONFIG[badge];
-                    if (!config) return null;
-                    const Icon = config.icon;
+                    const Icon = badge.icon;
                     return (
                       <span
-                        key={badge}
+                        key={badge.id}
                         className={cn(
                           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
-                          config.className,
+                          badge.className,
                         )}
                       >
                         <Icon className="h-3 w-3" />
-                        {config.label}
+                        {badge.label}
                       </span>
                     );
                   })}
