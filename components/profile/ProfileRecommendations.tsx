@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { ProfileBookCover } from "./ProfileBookCover";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // Badge configuration - unified gold color scheme for all badges
 const BADGE_CONFIG: Record<string, { icon: typeof Award; label: string }> = {
@@ -68,6 +69,9 @@ type RecommendationsData = {
 
 type ProfileRecommendationsProps = {
   recommendations: RecommendationsData;
+  maxItems?: number;
+  isRefreshing?: boolean;
+  onRefreshRecommendations?: () => void;
 };
 
 /**
@@ -97,11 +101,15 @@ function normalizeRecommendations(recs: RecommendationsData) {
  * Horizontal layout: cover on left, full content on right.
  * No truncation - shows complete reasoning immediately.
  */
+type RecommendationDisplay = BookRecommendation & {
+  source?: "goDeeper" | "goWider";
+};
+
 function RecommendationCard({
   book,
   variant = "deeper",
 }: {
-  book: BookRecommendation;
+  book: RecommendationDisplay;
   variant?: "deeper" | "wider";
 }) {
   const validBadges = book.badges?.filter((b) => BADGE_CONFIG[b]) ?? [];
@@ -188,12 +196,65 @@ function RecommendationCard({
  * Book recommendations as feature cards with full reasoning.
  * Two-column layout on desktop: Go Deeper | Go Wider side by side.
  */
-export function ProfileRecommendations({ recommendations }: ProfileRecommendationsProps) {
+export function ProfileRecommendations({
+  recommendations,
+  maxItems,
+  isRefreshing = false,
+  onRefreshRecommendations,
+}: ProfileRecommendationsProps) {
   const normalized = normalizeRecommendations(recommendations);
+  const shouldReduce = useReducedMotion();
+  const topItems = getTopRecommendations(normalized, maxItems);
+  const isTopOnly = Boolean(maxItems && maxItems > 0);
   const hasAny = normalized.goDeeper.length > 0 || normalized.goWider.length > 0;
+
+  // Show a deterministic top-N feed when requested (new flow).
+  if (isTopOnly) {
+    if (topItems.length === 0) return null;
+
+    return (
+      <div className="max-w-6xl mx-auto px-md py-2xl md:py-3xl">
+        <motion.div
+          className="mb-xl flex items-start justify-between gap-md"
+          initial={shouldReduce ? undefined : { opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+        >
+          <div>
+            <h2 className="font-display text-2xl md:text-3xl text-text-ink mb-xs">
+              What should I read next?
+            </h2>
+            <p className="text-text-inkMuted max-w-2xl">
+              Personalized recommendations from your reading history, favorites, and patterns
+            </p>
+          </div>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onRefreshRecommendations}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+            Refresh Suggestions
+          </Button>
+        </motion.div>
+
+        <div className="space-y-md">
+          {topItems.map((book, index) => (
+            <RecommendationCard
+              key={`${book.title}-${book.author}-${index}`}
+              book={book}
+              variant={book.source === "goWider" ? "wider" : "deeper"}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   const hasDeeper = normalized.goDeeper.length > 0;
   const hasWider = normalized.goWider.length > 0;
-  const shouldReduce = useReducedMotion();
 
   if (!hasAny) return null;
 
@@ -279,6 +340,24 @@ export function ProfileRecommendations({ recommendations }: ProfileRecommendatio
       </div>
     </div>
   );
+}
+
+/**
+ * Get top recommendations for concise recommendation feed.
+ */
+function getTopRecommendations(
+  recommendations: { goDeeper: BookRecommendation[]; goWider: BookRecommendation[] },
+  maxItems = 3,
+): RecommendationDisplay[] {
+  const ordered = [
+    ...recommendations.goDeeper.map((book) => ({
+      ...book,
+      source: "goDeeper" as const,
+    })),
+    ...recommendations.goWider.map((book) => ({ ...book, source: "goWider" as const })),
+  ];
+
+  return ordered.slice(0, maxItems);
 }
 
 /**
