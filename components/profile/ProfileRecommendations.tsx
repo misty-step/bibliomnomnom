@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowDown,
@@ -203,13 +204,16 @@ export function ProfileRecommendations({
   onRefreshRecommendations,
 }: ProfileRecommendationsProps) {
   const normalized = normalizeRecommendations(recommendations);
+  const [showAll, setShowAll] = useState(false);
   const shouldReduce = useReducedMotion();
   const topItems = getTopRecommendations(normalized, maxItems);
   const isTopOnly = Boolean(maxItems && maxItems > 0);
   const hasAny = normalized.goDeeper.length > 0 || normalized.goWider.length > 0;
+  const totalItems = normalized.goDeeper.length + normalized.goWider.length;
+  const canExpand = totalItems > topItems.length;
 
   // Show a deterministic top-N feed when requested (new flow).
-  if (isTopOnly) {
+  if (isTopOnly && !showAll) {
     if (topItems.length === 0) return null;
 
     return (
@@ -229,15 +233,22 @@ export function ProfileRecommendations({
             </p>
           </div>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onRefreshRecommendations}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
-            Refresh Suggestions
-          </Button>
+          <div className="flex items-center gap-2">
+            {canExpand && (
+              <Button variant="secondary" size="sm" onClick={() => setShowAll(true)}>
+                See All
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onRefreshRecommendations}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+              Refresh Suggestions
+            </Button>
+          </div>
         </motion.div>
 
         <div className="space-y-md">
@@ -272,6 +283,22 @@ export function ProfileRecommendations({
         <p className="text-text-inkMuted max-w-2xl">
           Personalized recommendations based on your reading patterns and literary preferences
         </p>
+        {isTopOnly && (
+          <div className="mt-sm flex items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setShowAll(false)}>
+              Show Top {maxItems}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onRefreshRecommendations}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing && "animate-spin")} />
+              Refresh Suggestions
+            </Button>
+          </div>
+        )}
       </motion.div>
 
       {/* Two-column layout on desktop */}
@@ -349,13 +376,21 @@ function getTopRecommendations(
   recommendations: { goDeeper: BookRecommendation[]; goWider: BookRecommendation[] },
   maxItems = 3,
 ): RecommendationDisplay[] {
-  const ordered = [
-    ...recommendations.goDeeper.map((book) => ({
-      ...book,
-      source: "goDeeper" as const,
-    })),
-    ...recommendations.goWider.map((book) => ({ ...book, source: "goWider" as const })),
-  ];
+  // Interleave deeper/wider picks to keep variety in compact mode.
+  const ordered: RecommendationDisplay[] = [];
+  const maxLength = Math.max(recommendations.goDeeper.length, recommendations.goWider.length);
+
+  for (let index = 0; index < maxLength; index += 1) {
+    const deeper = recommendations.goDeeper[index];
+    if (deeper) {
+      ordered.push({ ...deeper, source: "goDeeper" });
+    }
+
+    const wider = recommendations.goWider[index];
+    if (wider) {
+      ordered.push({ ...wider, source: "goWider" });
+    }
+  }
 
   return ordered.slice(0, maxItems);
 }
