@@ -102,17 +102,7 @@ function normalizeRecommendations(recs: RecommendationsData) {
  * Horizontal layout: cover on left, full content on right.
  * No truncation - shows complete reasoning immediately.
  */
-type RecommendationDisplay = BookRecommendation & {
-  source?: "goDeeper" | "goWider";
-};
-
-function RecommendationCard({
-  book,
-  variant = "deeper",
-}: {
-  book: RecommendationDisplay;
-  variant?: "deeper" | "wider";
-}) {
+function RecommendationCard({ book }: { book: BookRecommendation }) {
   const validBadges = book.badges?.filter((b) => BADGE_CONFIG[b]) ?? [];
 
   return (
@@ -253,11 +243,7 @@ export function ProfileRecommendations({
 
         <div className="space-y-md">
           {topItems.map((book, index) => (
-            <RecommendationCard
-              key={`${book.title}-${book.author}-${index}`}
-              book={book}
-              variant={book.source === "goWider" ? "wider" : "deeper"}
-            />
+            <RecommendationCard key={`${book.title}-${book.author}-${index}`} book={book} />
           ))}
         </div>
       </div>
@@ -325,11 +311,7 @@ export function ProfileRecommendations({
 
             <div className="space-y-md">
               {normalized.goDeeper.map((book) => (
-                <RecommendationCard
-                  key={`${book.title}-${book.author}`}
-                  book={book}
-                  variant="deeper"
-                />
+                <RecommendationCard key={`${book.title}-${book.author}`} book={book} />
               ))}
             </div>
           </div>
@@ -355,11 +337,7 @@ export function ProfileRecommendations({
 
             <div className="space-y-md">
               {normalized.goWider.map((book) => (
-                <RecommendationCard
-                  key={`${book.title}-${book.author}`}
-                  book={book}
-                  variant="wider"
-                />
+                <RecommendationCard key={`${book.title}-${book.author}`} book={book} />
               ))}
             </div>
           </div>
@@ -375,20 +353,20 @@ export function ProfileRecommendations({
 export function getTopRecommendations(
   recommendations: { goDeeper: BookRecommendation[]; goWider: BookRecommendation[] },
   maxItems = 3,
-): RecommendationDisplay[] {
+): BookRecommendation[] {
   // Interleave deeper/wider picks to keep variety in compact mode.
-  const ordered: RecommendationDisplay[] = [];
+  const ordered: BookRecommendation[] = [];
   const maxLength = Math.max(recommendations.goDeeper.length, recommendations.goWider.length);
 
   for (let index = 0; index < maxLength; index += 1) {
     const deeper = recommendations.goDeeper[index];
     if (deeper) {
-      ordered.push({ ...deeper, source: "goDeeper" });
+      ordered.push(deeper);
     }
 
     const wider = recommendations.goWider[index];
     if (wider) {
-      ordered.push({ ...wider, source: "goWider" });
+      ordered.push(wider);
     }
   }
 
