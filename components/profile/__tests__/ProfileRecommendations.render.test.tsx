@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ProfileRecommendations } from "../ProfileRecommendations";
 
+class IntersectionObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+
+Object.defineProperty(globalThis, "IntersectionObserver", {
+  writable: true,
+  value: IntersectionObserverMock,
+});
+
 vi.mock("../ProfileBookCover", () => ({
   ProfileBookCover: ({ title }: { title: string }) => <div data-testid="mock-cover">{title}</div>,
 }));
