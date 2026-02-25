@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Id } from "@/convex/_generated/dataModel";
 import { ListeningSessionRecorder } from "./ListeningSessionRecorder";
 
 const startSessionMock = vi.fn();
@@ -39,7 +40,7 @@ describe("ListeningSessionRecorder", () => {
   });
 
   it("renders full-screen recording UI with accessible controls", () => {
-    render(<ListeningSessionRecorder bookId={"book_1" as never} />);
+    render(<ListeningSessionRecorder bookId={"book_1" as Id<"books">} />);
 
     expect(screen.getByRole("dialog", { name: "Voice recording in progress" })).toBeInTheDocument();
     expect(
@@ -50,13 +51,22 @@ describe("ListeningSessionRecorder", () => {
   });
 
   it("opens discard confirmation on Escape and confirms discard", () => {
-    render(<ListeningSessionRecorder bookId={"book_1" as never} />);
+    render(<ListeningSessionRecorder bookId={"book_1" as Id<"books">} />);
 
+    expect(screen.queryByText("Discard this recording?")).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: "Escape" });
 
     expect(screen.getByText("Discard this recording?")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Discard" }));
 
     expect(discardSessionMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens discard confirmation when discard button is clicked", () => {
+    render(<ListeningSessionRecorder bookId={"book_1" as Id<"books">} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Discard current recording" }));
+
+    expect(screen.getByText("Discard this recording?")).toBeInTheDocument();
   });
 });

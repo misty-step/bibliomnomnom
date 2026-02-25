@@ -194,6 +194,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
   const finalTranscriptRef = useRef("");
   const isStoppingRef = useRef(false);
   const isRecordingRef = useRef(false);
+  const isProcessingRef = useRef(false);
 
   const warningTimeoutRef = useRef<number | null>(null);
   const capTimeoutRef = useRef<number | null>(null);
@@ -244,6 +245,11 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     properties: Record<string, string | number | boolean> = {},
   ) => {
     posthog?.capture(event, { bookId, ...properties });
+  };
+
+  const setProcessingState = (next: boolean) => {
+    isProcessingRef.current = next;
+    setIsProcessing(next);
   };
 
   const resetCaptureState = () => {
@@ -364,7 +370,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     isStoppingRef.current = true;
     isRecordingRef.current = false;
     setIsRecording(false);
-    setIsProcessing(true);
+    setProcessingState(true);
     clearTiming();
     stopSpeechRecognition();
     let failedStage: PipelineStage = "recording";
@@ -499,56 +505,54 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
       }
       sessionIdRef.current = null;
       resetCaptureState();
-      setIsProcessing(false);
+      setProcessingState(false);
       isStoppingRef.current = false;
     }
   };
 
   const discardSession = async (message = "Recording discarded before processing completed.") => {
-    if (isStoppingRef.current || isProcessing) return;
+    if (isStoppingRef.current || isProcessingRef.current) return;
 
-    const sessionId = sessionIdRef.current;
-    const recorder = mediaRecorderRef.current;
+    isStoppingRef.current = true;
+    try {
+      const sessionId = sessionIdRef.current;
+      const recorder = mediaRecorderRef.current;
 
-    isRecordingRef.current = false;
-    setIsRecording(false);
-    setCapRolloverReady(false);
-    setCapNotice(null);
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      setCapRolloverReady(false);
+      setCapNotice(null);
 
-    clearTiming();
-    stopSpeechRecognition();
-
-    if (recorder && recorder.state !== "inactive") {
-      try {
-        recorder.stop();
-      } catch {
-        // no-op
+      if (recorder && recorder.state !== "inactive") {
+        try {
+          recorder.stop();
+        } catch {
+          // no-op
+        }
       }
-    }
 
-    stopMediaStream();
-    mediaRecorderRef.current = null;
-    sessionIdRef.current = null;
-    chunksRef.current = [];
+      sessionIdRef.current = null;
+      resetCaptureState();
 
-    resetCaptureState();
-
-    if (sessionId) {
-      try {
-        await failSession({
-          sessionId,
-          message,
-          failedStage: "recording",
-        });
-      } catch {
-        // no-op
+      if (sessionId) {
+        try {
+          await failSession({
+            sessionId,
+            message,
+            failedStage: "recording",
+          });
+        } catch {
+          // no-op
+        }
       }
-    }
 
-    toast({
-      title: "Recording discarded",
-      description: "Session was cancelled before processing.",
-    });
+      toast({
+        title: "Recording discarded",
+        description: "Session was cancelled before processing.",
+      });
+    } finally {
+      isStoppingRef.current = false;
+    }
   };
 
   const startSession = async () => {
@@ -730,7 +734,7 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
     }
 
     setIsRecording(false);
-    setIsProcessing(false);
+    setProcessingState(false);
     setElapsedMs(0);
     setWarningActive(false);
     setLiveTranscript("");

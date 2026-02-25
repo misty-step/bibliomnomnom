@@ -74,6 +74,7 @@ function RecorderHarness({ bookId }: { bookId: string }) {
       </button>
       <span data-testid="rollover">{recorder.capRolloverReady ? "ready" : "idle"}</span>
       <span data-testid="recording">{recorder.isRecording ? "recording" : "idle"}</span>
+      <span data-testid="processing">{recorder.isProcessing ? "processing" : "idle"}</span>
       <span data-testid="notice">{recorder.capNotice ?? ""}</span>
       <span data-testid="transcript">{recorder.lastTranscript}</span>
     </div>
@@ -636,6 +637,63 @@ describe("useListeningSessionRecorder", () => {
     expect(uploadCalls).toHaveLength(0);
     expect(screen.getByTestId("recording")).toHaveTextContent("idle");
     expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Recording discarded" }),
+    );
+  });
+
+  it("ignores discard while processing is already in flight", async () => {
+    let resolveTranscribe!: (value: Response) => void;
+    const pendingTranscription = new Promise<Response>((resolve) => {
+      resolveTranscribe = resolve;
+    });
+
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/listening-sessions/") && url.includes("/upload")) {
+        return { ok: true, json: async () => ({ ok: true }) } as Response;
+      }
+      if (url.includes("/api/listening-sessions/transcribe")) {
+        return await pendingTranscription;
+      }
+      if (url.includes("/api/listening-sessions/synthesize")) {
+        return {
+          ok: true,
+          json: async () => ({
+            artifacts: {
+              insights: [],
+              openQuestions: [],
+              quotes: [],
+              followUpQuestions: [],
+              contextExpansions: [],
+            },
+          }),
+        } as Response;
+      }
+      throw new Error(`Unhandled fetch: ${url}`);
+    });
+
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_000);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "stop" }));
+    await waitFor(() => expect(screen.getByTestId("processing")).toHaveTextContent("processing"));
+
+    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+    expect(failSessionMock).not.toHaveBeenCalled();
+
+    resolveTranscribe({
+      ok: true,
+      json: async () => ({ transcript: "hello transcript", provider: "deepgram" }),
+    } as Response);
+
+    await waitFor(() => expect(completeSessionMock).toHaveBeenCalledTimes(1));
+    expect(toastMock).not.toHaveBeenCalledWith(
       expect.objectContaining({ title: "Recording discarded" }),
     );
   });

@@ -75,6 +75,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (event.defaultPrevented || showDiscardConfirm) return;
       event.preventDefault();
       setShowDiscardConfirm(true);
     };
@@ -83,7 +84,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [isRecording]);
+  }, [isRecording, showDiscardConfirm]);
 
   return (
     <>
@@ -186,13 +187,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
                     Recording active
                   </p>
                 </div>
-                <p
-                  className="font-mono text-xl text-canvas-bone"
-                  aria-live="polite"
-                  aria-atomic="true"
-                >
-                  {formatDuration(elapsedMs)}
-                </p>
+                <p className="font-mono text-xl text-canvas-bone">{formatDuration(elapsedMs)}</p>
               </div>
 
               <div
@@ -253,7 +248,7 @@ export function ListeningSessionRecorder({ bookId }: ListeningSessionRecorderPro
           </div>
 
           <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
-            <AlertDialogContent>
+            <AlertDialogContent className="z-[70]">
               <AlertDialogHeader>
                 <AlertDialogTitle>Discard this recording?</AlertDialogTitle>
                 <AlertDialogDescription>
