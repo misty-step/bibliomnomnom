@@ -1,71 +1,46 @@
-name: Cerberus Council
+# Cerberus AI Code Review
+# https://github.com/misty-step/cerberus
+#
+# Drop this file into .github/workflows/cerberus.yml in your repository.
+# Set OPENROUTER_API_KEY in your repository secrets and you're done.
+#
+# Optional inputs:
+#   timeout:     Max seconds per reviewer (default: 600)
+#   model:       Override LLM model for all reviewers
+#   context:     Project context to calibrate reviewer severity (no secrets)
+#   reviewers:   Force specific reviewers, bypassing routing (e.g. trace,guard)
+#   fail-on-verdict: Fail when verdict is FAIL (default: true)
+#   fail-on-skip:    Fail when verdict is SKIP (default: false)
+#                    Recommended: set to "true" so timeout/API failures don't
+#                    silently appear as green checks.
+#
+# Example with options:
+#   jobs:
+#     review:
+#       uses: misty-step/cerberus/.github/workflows/cerberus.yml@master
+#       with:
+#         context: "Single-user personal finance app. Data bounded to ~500 tx/year."
+#         timeout: 900
+#       secrets:
+#         api-key: ${{ secrets.OPENROUTER_API_KEY }}
+#
+# Power-user option (decomposed pipeline with full control):
+#   See templates/consumer-workflow-minimal.yml
+name: Cerberus
 
 on:
   pull_request:
-    branches: ["master"]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
 
 concurrency:
   group: cerberus-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  validate:
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: misty-step/cerberus/validate@v2
-
-  matrix:
-    needs: validate
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.generate.outputs.matrix }}
-      count: ${{ steps.generate.outputs.count }}
-    steps:
-      - uses: misty-step/cerberus/matrix@v2
-        id: generate
-
   review:
-    needs: matrix
-    if: github.event.pull_request.head.repo.full_name == github.repository
-    name: "${{ matrix.reviewer_label || matrix.reviewer }}"
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
+    uses: misty-step/cerberus/.github/workflows/cerberus.yml@master
     permissions:
       contents: read
       pull-requests: write
-    strategy:
-      matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v6
-      - uses: misty-step/cerberus@v2
-        with:
-          perspective: ${{ matrix.perspective }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          api-key: ${{ secrets.OPENROUTER_API_KEY }}
-          post-comment: never
-          timeout: "600"
-          context: |
-            bibliomnomnom is a private-first book tracking + note-taking app.
-            Stack: Next.js App Router, React, TypeScript, Tailwind, Convex (data), Clerk (auth), Stripe (billing), Vercel (deploy).
-            Design policy: deep modules, minimal interfaces, avoid leaking lower-level details.
-
-  verdict:
-    name: Council Verdict
-    needs: review
-    if: always() && needs.review.result != 'skipped'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - uses: misty-step/cerberus/verdict@v2
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # Start advisory: always post the council verdict, but don't block merges on AI output.
-          fail-on-verdict: "false"
+    secrets:
+      api-key: ${{ secrets.OPENROUTER_API_KEY }}
