@@ -2,6 +2,10 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useListeningSessionRecorder } from "./useListeningSessionRecorder";
 
+const { captureErrorMock } = vi.hoisted(() => ({
+  captureErrorMock: vi.fn(),
+}));
+
 const createSessionMock = vi.fn();
 const markTranscribingMock = vi.fn();
 const markSynthesizingMock = vi.fn();
@@ -23,6 +27,10 @@ vi.mock("@/lib/hooks/useAuthedQuery", () => ({
 
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
+}));
+
+vi.mock("@/lib/sentry", () => ({
+  captureError: captureErrorMock,
 }));
 
 vi.mock("posthog-js/react", () => ({
@@ -93,6 +101,7 @@ describe("useListeningSessionRecorder", () => {
     mutationDispatcherMock.mockReset();
     toastMock.mockReset();
     captureMock.mockReset();
+    captureErrorMock.mockReset();
     fetchMock.mockReset();
     getUserMediaMock.mockReset();
 
@@ -611,7 +620,7 @@ describe("useListeningSessionRecorder", () => {
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: "destructive" }));
   });
 
-  it("discards active recording without upload and marks session failed", async () => {
+  it("should fail the session without upload when discarding an active recording", async () => {
     render(<RecorderHarness bookId="book_1" />);
 
     fireEvent.click(screen.getByRole("button", { name: "start" }));
@@ -641,7 +650,43 @@ describe("useListeningSessionRecorder", () => {
     );
   });
 
-  it("ignores discard while processing is already in flight", async () => {
+  it("should report and toast when discard fail-state persistence fails", async () => {
+    failSessionMock.mockRejectedValueOnce(new Error("fail mutation unavailable"));
+
+    render(<RecorderHarness bookId="book_1" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "start" }));
+    await waitFor(() => expect(createSessionMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "discard" }));
+
+    await waitFor(() => expect(captureErrorMock).toHaveBeenCalledTimes(1));
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          component: "useListeningSessionRecorder",
+          action: "discardSession",
+        }),
+        extra: expect.objectContaining({
+          sessionId: "session_1",
+          failedStage: "recording",
+        }),
+      }),
+    );
+
+    expect(toastMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Recording discarded locally",
+        variant: "destructive",
+      }),
+    );
+    expect(toastMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Recording discarded" }),
+    );
+  });
+
+  it("should ignore discard when processing is already in flight", async () => {
     let resolveTranscribe!: (value: Response) => void;
     const pendingTranscription = new Promise<Response>((resolve) => {
       resolveTranscribe = resolve;

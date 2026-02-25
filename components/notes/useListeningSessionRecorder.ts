@@ -7,6 +7,7 @@ import { api } from "@/convex/_generated/api";
 import { usePostHog } from "posthog-js/react";
 import { useAuthedQuery } from "@/lib/hooks/useAuthedQuery";
 import { useToast } from "@/hooks/use-toast";
+import { captureError } from "@/lib/sentry";
 import {
   EMPTY_SYNTHESIS_ARTIFACTS,
   type SynthesisArtifacts,
@@ -541,8 +542,23 @@ export function useListeningSessionRecorder(bookId: Id<"books">) {
             message,
             failedStage: "recording",
           });
-        } catch {
-          // no-op
+        } catch (error) {
+          captureError(error, {
+            tags: {
+              component: "useListeningSessionRecorder",
+              action: "discardSession",
+            },
+            extra: {
+              sessionId,
+              failedStage: "recording",
+            },
+          });
+          toast({
+            title: "Recording discarded locally",
+            description: "Could not persist discard state. Refresh if session status looks stale.",
+            variant: "destructive",
+          });
+          return;
         }
       }
 
