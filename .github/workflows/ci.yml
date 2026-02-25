@@ -1,10 +1,12 @@
 name: CI
 
 on:
-  push:
-    branches: ["master", "feature/*", "feat/*"]
   pull_request:
     branches: ["master"]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    branches: ["master"]
+  workflow_dispatch:
 
 # Cancel in-progress runs when new commits pushed
 concurrency:
@@ -90,7 +92,7 @@ jobs:
       - name: Run tests with coverage
         run: bun run test:coverage
       - name: Report coverage
-        if: always()
+        if: always() && github.event_name == 'pull_request'
         uses: davelosert/vitest-coverage-report-action@v2
 
   trufflehog:
@@ -104,8 +106,8 @@ jobs:
       - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@v3.93.4
         with:
-          base: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
-          head: ${{ github.ref_name }}
+          base: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || '' }}
+          head: ${{ github.event.pull_request.head.sha || github.event.merge_group.head_sha || github.sha }}
           extra_args: --only-verified
 
   build:

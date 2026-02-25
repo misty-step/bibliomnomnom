@@ -1,9 +1,7 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  push:
     branches: ["master"]
   workflow_dispatch:
 
@@ -18,7 +16,6 @@ permissions:
 
 jobs:
   release:
-    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -27,7 +24,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
 
       # Landfall: semantic-release + LLM synthesis + release body update
       # https://github.com/misty-step/landfall
@@ -68,7 +65,7 @@ jobs:
         if: steps.landfall.outputs.released == 'true'
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASE_TOKEN }}
-          TARGET_BRANCH: ${{ github.event.workflow_run.head_branch || github.ref_name }}
+          TARGET_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
 
