@@ -24,7 +24,7 @@ This repository is bootstrapped for bibliomnomnom using repo-local Pi config und
 ## Local artifacts
 
 - `.pi/settings.json`
-- `.pi/persona.md`
+- `AGENTS.md` (project persona + operating policy)
 - `.pi/agents/*.md`
 - `.pi/agents/teams.yaml`
 - `.pi/agents/pipelines.yaml`

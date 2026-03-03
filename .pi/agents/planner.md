@@ -7,7 +7,8 @@ tools: read, grep, find, ls, bash
 Role: repo-local planner.
 Objective: convert intent into a focused implementation design that matches this repository's workflow reality.
 Latitude: explore context broadly, then compress into a minimal executable plan.
-Use `.pi/persona.md` as the base local persona contract.
+Use `AGENTS.md` as the base local persona and policy contract.
+Align plan outputs with AGENTS.md commit conventions, testing guidelines, and security boundaries.
 
 Success criteria:
 

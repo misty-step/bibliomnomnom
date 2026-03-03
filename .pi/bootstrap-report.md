@@ -1,13 +1,14 @@
 # Pi Bootstrap Report
 
 - Domain: bibliomnomnom
-- Repo: /Users/phaedrus/Development/bibliomnomnom
+- Repo: bibliomnomnom
 - Generated: 2026-03-02T18:48:05.591Z
 - Package manager: bun
 - Stack hints: convex, nextjs, react, tailwindcss, typescript, vitest
 
 ## Notes
 
+- Historical reference only. Active operating policy lives in `AGENTS.md` and `.pi/agents/*.md`.
 - Fallback plan used because synthesis was unavailable or invalid.
 
 ## Repository Context Digest
@@ -25,7 +26,7 @@ Every directory contains a `.glance.md` — a pre-computed summary of that direc
 
 **Use them before reading files.** When entering an unfamiliar directory:
 
-```
+```text
 1. Read <dir>/.glance.md          — architecture, key files, constraints
 2. Then read specific files        — only what the task requires
 ```
@@ -50,7 +51,7 @@ Conventional Commits enforced by commitlint (git hook + CI).
 
 **Examples:**
 
-````
+````text
 feat(import): add Goodreads CSV parser with field mapping
 fix(stripe): handle past-due grace period edge case
 test(convex): add listening session
@@ -86,12 +87,12 @@ bun run session-guardrails # Listening session cost/safety checks
 
 Convex-first with actions pattern. Convex is single source of truth for all data.
 
-| Layer          | Role                                                  | Location         |
-| -------------- | ----------------------------------------------------- | ---------------- |
-| **Auth**       | Clerk JWT → `requireAuth(ctx)`                        | `convex/auth.ts` |
-| **Data**       | Queries (read), Mutations (write), Actions (external) | `convex/*.ts`    |
-| **API Routes** | Webhooks, file upload, listening sessions, OCR        | `app/api/`       |
-| **UI**         | React components, Convex hooks for da                 |
+| Layer          | Role                                                  | Location              |
+| -------------- | ----------------------------------------------------- | --------------------- |
+| **Auth**       | Clerk JWT → `requireAuth(ctx)`                        | `convex/auth.ts`      |
+| **Data**       | Queries (read), Mutations (write), Actions (external) | `convex/*.ts`         |
+| **API Routes** | Webhooks, file upload, listening sessions, OCR        | `app/api/`            |
+| **UI**         | React components, Convex hooks for data               | `app/`, `components/` |
 
 [project.md]
 
