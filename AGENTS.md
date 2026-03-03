@@ -30,24 +30,39 @@ You are **Klaus**, the notorious bookworm, meticulous archivist, and resident li
 - Group commits by behavior/theme, not file type.
 
 ## Testing guidelines
+- Frameworks: Vitest (unit/integration), Playwright (E2E).
 - Add or update tests for behavior changes and incident fixes.
 - Location conventions:
   - Convex/backend tests: `__tests__/convex/`
   - API route tests: `__tests__/api/` or colocated route tests
   - UI/component tests: colocated `*.test.tsx`
   - E2E tests: `e2e/`
-- Run targeted checks first, then relevant full checks before merge.
-- Prefer meaningful coverage for critical paths over line-count gaming.
+- Test style: Arrange/Act/Assert, one behavior per test, descriptive names (`should <behavior> when <condition>`).
+- Coverage expectation: keep critical paths (auth, privacy, payments, data integrity) at/above repo threshold; prioritize meaningful assertions over line-count gaming.
+- Run targeted checks first, then relevant full checks before merge (`bun run validate:fast` minimum for non-trivial changes).
 
 ## PR guidelines
-- Include: problem, solution, file-level summary, verification, risk/rollback.
+- PR descriptions must include:
+  1. Summary (problem and why)
+  2. Changes (file-level behavior deltas)
+  3. Acceptance criteria (met/not met)
+  4. Verification (commands run + concise outcomes)
+  5. Risk/rollback plan
 - Keep PR bodies skimmable and evidence-based.
 - Resolve all critical/high review findings before merge.
+- CI must pass before merge (`lint`, `typecheck`, `test`, build checks).
 
 ## Coding style
+- TypeScript strict mode by default; avoid `any` unless explicitly justified.
 - Keep modules focused and names explicit.
+- Naming conventions:
+  - Components/hooks/providers: PascalCase
+  - Utility modules: kebab-case
+  - Tests: `*.test.ts` / `*.test.tsx`
+- Prefer early returns over nested conditionals.
 - Avoid speculative refactors in task-scoped PRs.
 - Favor convention over configuration.
+- Avoid vague names (`Helper`, `Util`, `Misc`, `Common`) in new code.
 
 ## Security boundaries (non-negotiable)
 Agents must **not** change these without explicit human approval:
@@ -56,6 +71,11 @@ Agents must **not** change these without explicit human approval:
 - Payment/subscription logic (`convex/subscriptions.ts`, Stripe webhook/checkout flows)
 - Secret handling, webhook verification, or token validation logic
 - Rate-limit/abuse guardrails
+
+## Issue workflow
+- Labels: `bug`, `feature`, `chore`, `docs`, `security`, `performance`.
+- Priority order: P0 (production down) → P1 (user-facing bug) → P2 (enhancement) → P3 (nice-to-have).
+- Start with P0/P1 and dependency blockers before lower-priority work.
 
 ## Definition of done
 - Acceptance criteria implemented and edge/error paths handled
