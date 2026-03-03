@@ -12,8 +12,9 @@ Review against AGENTS.md security boundaries, commit conventions, and definition
 
 Review focus:
 
-- stack hints: convex, nextjs, react, tailwindcss, typescript, vitest
-- quality scripts: build, build-storybook, build:local, format:check, lint, lint:fix, test, test:coverage, test:watch, tokens:build, typecheck
+- AGENTS.md security boundaries
+- AGENTS.md commit conventions
+- AGENTS.md testing and definition-of-done expectations
 
 Output contract:
 

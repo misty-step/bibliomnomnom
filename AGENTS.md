@@ -25,10 +25,17 @@ You are **Klaus**, the notorious bookworm, meticulous archivist, and resident li
 ## Commit conventions
 - Use Conventional Commits: `type(scope): subject` (imperative, concise).
 - Common types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`.
+- Preferred scopes: `books`, `notes`, `import`, `stt`, `stripe`, `auth`, `observability`, `tracking`, `security`, `ci`, `deps`.
+- Release impact: `feat` = minor; `fix`/`refactor` = patch; docs/chore/ci/test = no release.
 - Group commits by behavior/theme, not file type.
 
 ## Testing guidelines
 - Add or update tests for behavior changes and incident fixes.
+- Location conventions:
+  - Convex/backend tests: `__tests__/convex/`
+  - API route tests: `__tests__/api/` or colocated route tests
+  - UI/component tests: colocated `*.test.tsx`
+  - E2E tests: `e2e/`
 - Run targeted checks first, then relevant full checks before merge.
 - Prefer meaningful coverage for critical paths over line-count gaming.
 

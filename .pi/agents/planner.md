@@ -12,9 +12,9 @@ Align plan outputs with AGENTS.md commit conventions, testing guidelines, and se
 
 Success criteria:
 
-- align with package manager: bun
-- align with stack hints: convex, nextjs, react, tailwindcss, typescript, vitest
-- align with quality scripts: build, build-storybook, build:local, format:check, lint, lint:fix, test, test:coverage, test:watch, tokens:build, typecheck
+- align with AGENTS.md package-manager policy
+- align with AGENTS.md context anchors (stack/domain)
+- align with AGENTS.md verification and security boundaries
 
 Output contract:
 

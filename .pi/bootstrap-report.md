@@ -51,12 +51,14 @@ Conventional Commits enforced by commitlint (git hook + CI).
 
 **Examples:**
 
-````text
+```text
 feat(import): add Goodreads CSV parser with field mapping
 fix(stripe): handle past-due grace period edge case
 test(convex): add listening session
+```
 
 [CLAUDE.md]
+
 # CLAUDE.md
 
 ## What This Is
@@ -79,7 +81,7 @@ bun run validate:fast    # lint + typecheck + test (no build)
 bun run convex:push      # Sync schema to dev deployment
 bun run e2e              # Playwright E2E tests
 bun run session-guardrails # Listening session cost/safety checks
-````
+```
 
 **bun only** — npm/yarn/pnpm blocked via preinstall hook.
 
@@ -117,12 +119,12 @@ Private-first book tracking for voracious readers — capture thoughts on what y
 
 ## Domain Glossary
 
-| Term                  | Definition                                                                              |
-| --------------------- | --------------------------------------------------------------------------------------- |
-| **Listening Session** | A recording event tied to a book: audio → transcription → synthesis → notes             |
-| **Synthesis**         | LLM-generated structured output (quotes, insights, questions) from a session transcript |
-| **Artifact**          | A synthesis output stored in the `synthesisArtifacts` table                             |
-| **STT**               | Speech-to-text. ElevenLabs (primary), Deepgram (fallback), AssemblyAI (candid           |
+| Term                  | Definition                                                                                 |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| **Listening Session** | A recording event tied to a book: audio → transcription → synthesis → notes                |
+| **Synthesis**         | LLM-generated structured output (quotes, insights, questions) from a session transcript    |
+| **Artifact**          | A synthesis output stored in the `synthesisArtifacts` table                                |
+| **STT**               | Speech-to-text. ElevenLabs (primary), Deepgram (fallback), AssemblyAI (candidate provider) |
 
 [ARCHITECTURE.md]
 

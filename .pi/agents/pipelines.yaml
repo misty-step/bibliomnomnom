@@ -12,6 +12,6 @@ repo-delivery-v1:
     - agent: planner
       prompt: "Plan the implementation for: $INPUT"
     - agent: worker
-      prompt: "Implement with focused scope and run relevant checks (build, build-storybook, build:local, format:check):\n\n$INPUT"
+      prompt: "Implement with focused scope and run relevant checks (build, build-storybook, build:local, format:check, test, typecheck):\n\n$INPUT"
     - agent: reviewer
       prompt: "Review for correctness, quality gates, and maintainability:\n\n$INPUT"
