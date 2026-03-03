@@ -1,6 +1,6 @@
 # Pi Local Workflow
 
-This repository is bootstrapped for bibliomnomnom using repo-local Pi config under .pi/.
+This repository is bootstrapped for bibliomnomnom using repo-local Pi config under `.pi/`.
 
 ## Recommended run pattern
 
@@ -13,13 +13,9 @@ This repository is bootstrapped for bibliomnomnom using repo-local Pi config und
    - `/design`
    - `/deliver`
    - `/review`
-4. Prime and use local-first memory:
-   - `/memory-ingest --scope both --force` (first run, then periodic refresh)
-   - `/memory-search --scope local <topic>`
-   - `/memory-context --scope both <goal>`
-5. If orchestration is enabled, run local pipelines:
-   - `/pipeline repo-foundation-v1 <goal>`
-   - `/pipeline repo-delivery-v1 <goal>`
+4. Optional capabilities (if extensions are installed in your environment):
+   - memory workflows: `/memory-ingest`, `/memory-search`, `/memory-context`
+   - orchestration workflows: `/pipeline repo-foundation-v1 <goal>`, `/pipeline repo-delivery-v1 <goal>`
 
 ## Local artifacts
 
@@ -29,4 +25,3 @@ This repository is bootstrapped for bibliomnomnom using repo-local Pi config und
 - `.pi/agents/teams.yaml`
 - `.pi/agents/pipelines.yaml`
 - `.pi/prompts/*.md`
-- `.pi/bootstrap-report.md`

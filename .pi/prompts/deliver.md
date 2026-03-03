@@ -4,10 +4,10 @@ description: Execute a scoped change using planner -> worker -> reviewer flow
 
 Task: $@
 
-Preferred path:
+Execution path:
 
-- If `/pipeline` is available, run `/pipeline repo-delivery-v1 $@`.
-- Otherwise execute the same flow manually using `.pi/agents/planner.md`, `.pi/agents/worker.md`, and `.pi/agents/reviewer.md`.
+- If `pipeline_run` is available, run `repo-delivery-v1` with this task.
+- Otherwise run the same flow manually using `.pi/agents/planner.md`, `.pi/agents/worker.md`, and `.pi/agents/reviewer.md`.
 
 PR feedback hygiene (required when touching an active PR):
 

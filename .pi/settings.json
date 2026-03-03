@@ -1,12 +1,6 @@
 {
   "packages": [],
-  "extensions": [
-    "+~/.pi/agent/extensions/organic-workflows",
-    "+~/.pi/agent/extensions/profiles",
-    "+~/.pi/agent/extensions/subagent",
-    "+~/.pi/agent/extensions/orchestration",
-    "+~/.pi/agent/extensions/web-search"
-  ],
+  "extensions": [],
   "skills": [],
   "prompts": [
     "+prompts/discover.md",
