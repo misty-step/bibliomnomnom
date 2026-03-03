@@ -58,4 +58,8 @@ thinktank.log
 thinktank_*
 .sentryclirc
 
+.pi/state/
+.pi/state/*.json
+.pi/state/*.ndjson
+
 .flywheel/
