@@ -1,0 +1,13 @@
+{
+  "packages": [],
+  "extensions": [],
+  "skills": [],
+  "prompts": [
+    "+prompts/discover.md",
+    "+prompts/design.md",
+    "+prompts/deliver.md",
+    "+prompts/review.md"
+  ],
+  "themes": [],
+  "enableSkillCommands": false
+}
