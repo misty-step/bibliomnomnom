@@ -62,6 +62,7 @@ PR descriptions must include:
 Additional merge expectations:
 - Keep PR bodies skimmable and evidence-based.
 - Resolve all critical/high review findings before merge.
+- Unresolved actionable review conversations are merge blockers (enforced in CI guardrails).
 - When feedback is fixed, resolve the corresponding GitHub conversation (or explicitly reply why it stays open).
 - CI must pass before merge (`lint`, `typecheck`, `test`, build checks).
 
