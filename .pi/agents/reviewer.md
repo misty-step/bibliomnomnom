@@ -15,10 +15,12 @@ Review focus:
 - AGENTS.md security boundaries
 - AGENTS.md commit conventions
 - AGENTS.md testing and definition-of-done expectations
+- PR conversation hygiene (addressed findings should not remain open without rationale)
 
 Output contract:
 
 1. ✅ What is solid
 2. ⚠️ Findings (severity + path)
 3. 🔧 Required fixes
-4. 🚀 Ready / not-ready verdict
+4. 🧵 Conversation status (which actionable threads can be resolved now)
+5. 🚀 Ready / not-ready verdict

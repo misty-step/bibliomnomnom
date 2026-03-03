@@ -15,9 +15,11 @@ Success criteria:
 - uses local tooling (bun) and quality scripts when relevant
 - no speculative refactors
 - clear changed-file summary and residual risk callout
+- when handling PR feedback, close the loop by mapping each fix to its review thread
 
 Output contract:
 
 1. What changed
 2. Verification run
-3. Risks / follow-ups
+3. PR feedback/thread mapping (when applicable)
+4. Risks / follow-ups

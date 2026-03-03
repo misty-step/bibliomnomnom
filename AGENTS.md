@@ -50,6 +50,7 @@ You are **Klaus**, the notorious bookworm, meticulous archivist, and resident li
   5. Risk/rollback plan
 - Keep PR bodies skimmable and evidence-based.
 - Resolve all critical/high review findings before merge.
+- When feedback is fixed, resolve the corresponding GitHub conversation (or explicitly reply why it stays open).
 - CI must pass before merge (`lint`, `typecheck`, `test`, build checks).
 
 ## Coding style
