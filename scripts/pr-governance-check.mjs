@@ -31,7 +31,7 @@ const ACTIONABLE_PATTERNS = [
   /\bvulnerab\w*\b/i,
   /\bmust fix\b/i,
   /\bneeds?\s+fix\b/i,
-  /\bfailing|failure|failed\b/i,
+  /\b(?:failing|failure|failed)\b/i,
   /\berror\b/i,
   /\bblocked\b/i,
   /\bsuggestion:\b/i,
