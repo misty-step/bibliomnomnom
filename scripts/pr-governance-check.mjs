@@ -36,15 +36,15 @@ const ACTIONABLE_PATTERNS = [
   /\bblocked\b/i,
   /\bsuggestion:\b/i,
   /\bnot ready\b/i,
-  /\bquestion\b/i,
-  /\bshould\b/i,
-  /\bplease\b/i,
+  /\baction required\b/i,
+  /\brequested changes?\b/i,
+  /\baddress (?:this|these)\b/i,
 ];
 
 const MACHINE_PATH_PATTERNS = [
-  /\/Users\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/-]+/g,
-  /[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+\\\\[A-Za-z0-9._\\-]+/g,
-  /\/home\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/-]+/g,
+  /\/Users\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/\s-]+/g,
+  /[A-Za-z]:\\+Users\\+[A-Za-z0-9._ -]+(?:\\+[A-Za-z0-9._ -]+)+/g,
+  /\/home\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/\s-]+/g,
 ];
 
 const PORTABILITY_PATH_PREFIXES = [".pi/", "docs/pi-"];
@@ -332,8 +332,8 @@ function fetchUnresolvedThreads(owner, repo, prNumber) {
       `name=${repo}`,
       "-F",
       `number=${prNumber}`,
-      "-f",
-      `after=${after ?? ""}`,
+      "-F",
+      `after=${after ?? "null"}`,
     ];
 
     const payload = runGhJson(args);
