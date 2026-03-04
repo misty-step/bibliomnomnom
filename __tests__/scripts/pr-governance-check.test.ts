@@ -4,6 +4,8 @@ import {
   classifySeverity,
   collectUnresolvedActionableThreadBlockers,
   detectMachinePathViolations,
+  isActionable,
+  runGovernanceChecks,
   shouldScanForPortability,
 } from "../../scripts/pr-governance-check.mjs";
 
@@ -78,6 +80,34 @@ describe("pr-governance-check actionable classification", () => {
   });
 });
 
+describe("pr-governance-check isActionable", () => {
+  it("returns false for empty or whitespace-only text", () => {
+    expect(isActionable("")).toBe(false);
+    expect(isActionable("   ")).toBe(false);
+  });
+
+  it("returns true for explicit actionable phrases", () => {
+    expect(isActionable("breaking change in merge guard")).toBe(true);
+    expect(isActionable("must fix before merge")).toBe(true);
+    expect(isActionable("error in governance check path")).toBe(true);
+  });
+});
+
+describe("pr-governance-check runGovernanceChecks", () => {
+  it("returns failure for invalid repository format when PR number is provided", () => {
+    const failures = runGovernanceChecks({ repository: "invalid-format", prNumber: "247" });
+
+    expect(Array.isArray(failures)).toBe(true);
+    expect(failures.some((entry) => entry.includes("Invalid GITHUB_REPOSITORY format"))).toBe(true);
+  });
+
+  it("returns an array result when PR context is absent", () => {
+    const failures = runGovernanceChecks({ repository: "", prNumber: "" });
+
+    expect(Array.isArray(failures)).toBe(true);
+  });
+});
+
 describe("pr-governance-check unresolved actionable threads", () => {
   it("blocks unresolved actionable external threads", () => {
     const blockers = collectUnresolvedActionableThreadBlockers(
@@ -125,6 +155,32 @@ describe("pr-governance-check unresolved actionable threads", () => {
             nodes: [
               {
                 body: "todo for myself",
+                author: { login: "phrazzld" },
+              },
+            ],
+          },
+        },
+      ],
+      "phrazzld",
+    );
+
+    expect(blockers).toHaveLength(0);
+  });
+
+  it("ignores PR author actionable text when external comments are non-actionable", () => {
+    const blockers = collectUnresolvedActionableThreadBlockers(
+      [
+        {
+          isResolved: false,
+          path: "scripts/pr-governance-check.mjs",
+          comments: {
+            nodes: [
+              {
+                body: "Looks good overall.",
+                author: { login: "reviewer" },
+              },
+              {
+                body: "must fix this",
                 author: { login: "phrazzld" },
               },
             ],

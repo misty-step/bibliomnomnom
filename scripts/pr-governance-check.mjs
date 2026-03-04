@@ -131,6 +131,9 @@ export function detectMachinePathViolations(files) {
 
 export function collectUnresolvedActionableThreadBlockers(threads, prAuthorLogin) {
   const blockers = [];
+  const normalizedPrAuthor = String(prAuthorLogin || "")
+    .trim()
+    .toLowerCase();
 
   for (const thread of threads) {
     if (thread.isResolved) {
@@ -142,24 +145,18 @@ export function collectUnresolvedActionableThreadBlockers(threads, prAuthorLogin
       continue;
     }
 
-    const hasExternalComment = comments.some((comment) => {
+    const externalComments = comments.filter((comment) => {
       const author = String(comment.author?.login || "")
         .trim()
         .toLowerCase();
-      if (!author) return false;
-      return (
-        author !==
-        String(prAuthorLogin || "")
-          .trim()
-          .toLowerCase()
-      );
+      return Boolean(author) && author !== normalizedPrAuthor;
     });
 
-    if (!hasExternalComment) {
+    if (externalComments.length === 0) {
       continue;
     }
 
-    const body = comments
+    const body = externalComments
       .map((comment) => String(comment.body || "").trim())
       .filter(Boolean)
       .join("\n");
