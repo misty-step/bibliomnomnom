@@ -171,7 +171,7 @@ jobs:
           # These colons cause issues with upload-artifact and NTFS compatibility
           find .next -name '*node:*' -delete 2>/dev/null || true
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-build
           path: .next
@@ -241,7 +241,7 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       - name: Upload test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
