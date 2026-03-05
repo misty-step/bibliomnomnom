@@ -5,6 +5,7 @@ import {
   collectUnresolvedActionableThreadBlockers,
   detectMachinePathViolations,
   isActionable,
+  runGhJson,
   runGovernanceChecks,
   shouldScanForPortability,
 } from "../../scripts/pr-governance-check.mjs";
@@ -90,6 +91,76 @@ describe("pr-governance-check isActionable", () => {
     expect(isActionable("breaking change in merge guard")).toBe(true);
     expect(isActionable("must fix before merge")).toBe(true);
     expect(isActionable("error in governance check path")).toBe(true);
+  });
+});
+
+describe("pr-governance-check runGhJson", () => {
+  it("returns parsed json when gh succeeds on first attempt", () => {
+    const runCommandFn = () => ({ ok: true, stdout: '{"ok":true}' });
+
+    const result = runGhJson(["api", "graphql"], { runCommandFn, sleepFn: () => undefined });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("retries with linear backoff and succeeds on a later attempt", () => {
+    const calls: number[] = [];
+    const delays: number[] = [];
+    const runCommandFn = () => {
+      calls.push(Date.now());
+      if (calls.length === 1) {
+        return { ok: false, stdout: "", stderr: "temporary failure" };
+      }
+      return { ok: true, stdout: '{"done":true}' };
+    };
+
+    const result = runGhJson(["api", "graphql"], {
+      retries: 3,
+      backoffMs: 50,
+      runCommandFn,
+      sleepFn: (ms: number) => delays.push(ms),
+    });
+
+    expect(result).toEqual({ done: true });
+    expect(calls).toHaveLength(2);
+    expect(delays).toEqual([50]);
+  });
+
+  it("throws the last command error after exhausting retries", () => {
+    const delays: number[] = [];
+    const runCommandFn = () => ({ ok: false, stdout: "", stderr: "still failing" });
+
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        retries: 3,
+        backoffMs: 25,
+        runCommandFn,
+        sleepFn: (ms: number) => delays.push(ms),
+      }),
+    ).toThrow("still failing");
+
+    expect(delays).toEqual([25, 50]);
+  });
+
+  it("throws on invalid json without retrying", () => {
+    let attempts = 0;
+    const delays: number[] = [];
+    const runCommandFn = () => {
+      attempts += 1;
+      return { ok: true, stdout: "{not json}" };
+    };
+
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        retries: 3,
+        backoffMs: 25,
+        runCommandFn,
+        sleepFn: (ms: number) => delays.push(ms),
+      }),
+    ).toThrow("Failed to parse JSON");
+
+    expect(attempts).toBe(1);
+    expect(delays).toHaveLength(0);
   });
 });
 

@@ -240,10 +240,28 @@ function runCommand(command, args, options = {}) {
   }
 }
 
-function runGhJson(args, { retries = 3, backoffMs = 2000 } = {}) {
+export function sleepSync(ms) {
+  const durationMs = Math.max(0, Number(ms) || 0);
+  if (durationMs === 0) return;
+
+  if (typeof Atomics !== "undefined" && typeof SharedArrayBuffer !== "undefined") {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, durationMs);
+    return;
+  }
+
+  const end = Date.now() + durationMs;
+  while (Date.now() < end) {
+    // Busy wait fallback for runtimes without Atomics.wait support.
+  }
+}
+
+export function runGhJson(
+  args,
+  { retries = 3, backoffMs = 2000, runCommandFn = runCommand, sleepFn = sleepSync } = {},
+) {
   let lastError;
   for (let attempt = 1; attempt <= retries; attempt++) {
-    const result = runCommand("gh", args);
+    const result = runCommandFn("gh", args);
     if (result.ok) {
       try {
         return JSON.parse(result.stdout);
@@ -254,7 +272,7 @@ function runGhJson(args, { retries = 3, backoffMs = 2000 } = {}) {
     lastError = result.stderr || result.stdout || `gh ${args.join(" ")} failed`;
     if (attempt < retries) {
       const delay = backoffMs * attempt;
-      execFileSync("sleep", [String(delay / 1000)]);
+      sleepFn(delay);
     }
   }
   throw new Error(lastError);
