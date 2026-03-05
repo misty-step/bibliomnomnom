@@ -16,6 +16,9 @@ This repository is bootstrapped for bibliomnomnom using repo-local Pi config und
 4. Optional capabilities (if extensions are installed in your environment):
    - memory workflows: `/memory-ingest`, `/memory-search`, `/memory-context`
    - orchestration workflows: `/pipeline repo-foundation-v1 <goal>`, `/pipeline repo-delivery-v1 <goal>`
+   - PR feedback orchestration: `/pr-feedback-loop` (global extension command)
+5. Governance guardrails:
+   - run `bun run pr:governance` to enforce portability + PR conversation readiness checks
 
 ## Local artifacts
 
