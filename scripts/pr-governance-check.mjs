@@ -42,9 +42,9 @@ const ACTIONABLE_PATTERNS = [
 ];
 
 const MACHINE_PATH_PATTERNS = [
-  /\/Users\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/\s-]+/g,
+  /\/Users\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/ -]+/g,
   /[A-Za-z]:\\+Users\\+[A-Za-z0-9._ -]+(?:\\+[A-Za-z0-9._ -]+)+/g,
-  /\/home\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/\s-]+/g,
+  /\/home\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/ -]+/g,
 ];
 
 const PORTABILITY_PATH_PREFIXES = [".pi/", "docs/pi-"];
@@ -226,6 +226,8 @@ function runCommand(command, args, options = {}) {
     const stdout = execFileSync(command, args, {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30_000,
+      maxBuffer: 10 * 1024 * 1024,
       ...options,
     });
     return { ok: true, stdout };
@@ -238,17 +240,24 @@ function runCommand(command, args, options = {}) {
   }
 }
 
-function runGhJson(args) {
-  const result = runCommand("gh", args);
-  if (!result.ok) {
-    throw new Error(result.stderr || result.stdout || `gh ${args.join(" ")} failed`);
+function runGhJson(args, { retries = 3, backoffMs = 2000 } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    const result = runCommand("gh", args);
+    if (result.ok) {
+      try {
+        return JSON.parse(result.stdout);
+      } catch (error) {
+        throw new Error(`Failed to parse JSON from gh ${args.join(" ")}: ${String(error)}`);
+      }
+    }
+    lastError = result.stderr || result.stdout || `gh ${args.join(" ")} failed`;
+    if (attempt < retries) {
+      const delay = backoffMs * attempt;
+      execFileSync("sleep", [String(delay / 1000)]);
+    }
   }
-
-  try {
-    return JSON.parse(result.stdout);
-  } catch (error) {
-    throw new Error(`Failed to parse JSON from gh ${args.join(" ")}: ${String(error)}`);
-  }
+  throw new Error(lastError);
 }
 
 function listTrackedFiles() {
