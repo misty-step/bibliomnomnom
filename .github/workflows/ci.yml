@@ -1,4 +1,4 @@
-name: CI
+name: Quality Checks
 
 on:
   pull_request:
@@ -249,7 +249,7 @@ jobs:
           retention-days: 7
 
   ci-status:
-    name: CI
+    name: merge-gate
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test, trufflehog, pr-governance, build, e2e]
     if: always()
