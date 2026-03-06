@@ -255,6 +255,7 @@ jobs:
     if: always()
     steps:
       - name: Post CI commit status
+        # actions/github-script@v8 requires Actions Runner v2.327.1+.
         uses: actions/github-script@v8
         with:
           script: |
