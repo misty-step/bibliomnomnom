@@ -92,6 +92,10 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
 }
 `;
 
+/**
+ * @typedef {{ ok: true, stdout: string, stderr?: undefined } | { ok: false, stdout: string, stderr: string }} CommandResult
+ */
+
 export function classifySeverity(text) {
   if (matchesAny(CRITICAL_PATTERNS, text)) return "critical";
   if (matchesAny(HIGH_PATTERNS, text)) return "high";
@@ -221,15 +225,24 @@ function matchesAny(patterns, text) {
   return patterns.some((pattern) => pattern.test(text));
 }
 
-function runCommand(command, args, options = {}) {
+export function createExecOptions(options = {}) {
+  const { maxBuffer: _ignoredMaxBuffer, timeout: _ignoredTimeout, ...restOptions } = options;
+
+  return {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    ...restOptions,
+    timeout: 30_000,
+    maxBuffer: 10 * 1024 * 1024,
+  };
+}
+
+/**
+ * @returns {CommandResult}
+ */
+export function runCommand(command, args, options = {}) {
   try {
-    const stdout = execFileSync(command, args, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: 30_000,
-      maxBuffer: 10 * 1024 * 1024,
-      ...options,
-    });
+    const stdout = execFileSync(command, args, createExecOptions(options));
     return { ok: true, stdout };
   } catch (error) {
     return {

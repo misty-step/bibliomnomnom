@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifySeverity,
   collectUnresolvedActionableThreadBlockers,
+  createExecOptions,
   detectMachinePathViolations,
   isActionable,
   runGhJson,
@@ -109,7 +110,7 @@ describe("pr-governance-check isActionable", () => {
 
 describe("pr-governance-check runGhJson", () => {
   it("returns parsed json when gh succeeds on first attempt", () => {
-    const runCommandFn = () => ({ ok: true, stdout: '{"ok":true}' });
+    const runCommandFn = () => ({ ok: true as const, stdout: '{"ok":true}' });
 
     const result = runGhJson(["api", "graphql"], { runCommandFn, sleepFn: () => undefined });
 
@@ -122,9 +123,9 @@ describe("pr-governance-check runGhJson", () => {
     const runCommandFn = () => {
       calls.push(Date.now());
       if (calls.length === 1) {
-        return { ok: false, stdout: "", stderr: "temporary failure" };
+        return { ok: false as const, stdout: "", stderr: "temporary failure" };
       }
-      return { ok: true, stdout: '{"done":true}' };
+      return { ok: true as const, stdout: '{"done":true}' };
     };
 
     const result = runGhJson(["api", "graphql"], {
@@ -141,7 +142,7 @@ describe("pr-governance-check runGhJson", () => {
 
   it("throws the last command error after exhausting retries", () => {
     const delays: number[] = [];
-    const runCommandFn = () => ({ ok: false, stdout: "", stderr: "still failing" });
+    const runCommandFn = () => ({ ok: false as const, stdout: "", stderr: "still failing" });
 
     expect(() =>
       runGhJson(["api", "graphql"], {
@@ -160,7 +161,7 @@ describe("pr-governance-check runGhJson", () => {
     const delays: number[] = [];
     const runCommandFn = () => {
       attempts += 1;
-      return { ok: true, stdout: "{not json}" };
+      return { ok: true as const, stdout: "{not json}" };
     };
 
     expect(() =>
@@ -180,7 +181,7 @@ describe("pr-governance-check runGhJson", () => {
     expect(() =>
       runGhJson(["api", "graphql"], {
         retries: 0,
-        runCommandFn: () => ({ ok: true, stdout: "{}" }),
+        runCommandFn: () => ({ ok: true as const, stdout: "{}" }),
         sleepFn: () => undefined,
       }),
     ).toThrow("Invalid retries value");
@@ -190,10 +191,28 @@ describe("pr-governance-check runGhJson", () => {
     expect(() =>
       runGhJson(["api", "graphql"], {
         backoffMs: -1,
-        runCommandFn: () => ({ ok: true, stdout: "{}" }),
+        runCommandFn: () => ({ ok: true as const, stdout: "{}" }),
         sleepFn: () => undefined,
       }),
     ).toThrow("Invalid backoffMs value");
+  });
+});
+
+describe("pr-governance-check createExecOptions", () => {
+  it("enforces hard timeout and maxBuffer limits even when callers provide overrides", () => {
+    expect(
+      createExecOptions({
+        cwd: "/tmp",
+        timeout: 0,
+        maxBuffer: Number.POSITIVE_INFINITY,
+      }),
+    ).toEqual({
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd: "/tmp",
+      timeout: 30_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
   });
 });
 
