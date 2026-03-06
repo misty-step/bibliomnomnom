@@ -162,7 +162,8 @@ jobs:
         run: bun run build:local
         env:
           # Fallback to placeholders for Dependabot PRs (which lack secret access)
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+          # Clerk validates publishable key format at build time; fallback must be syntactically valid.
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_Y2xlcmsuZXhhbXBsZS5jb20k' }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL || 'https://placeholder.convex.cloud' }}
       - name: Clean problematic filenames
         run: |
@@ -170,7 +171,7 @@ jobs:
           # These colons cause issues with upload-artifact and NTFS compatibility
           find .next -name '*node:*' -delete 2>/dev/null || true
       - name: Upload build artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: nextjs-build
           path: .next
@@ -240,7 +241,7 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
       - name: Upload test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
