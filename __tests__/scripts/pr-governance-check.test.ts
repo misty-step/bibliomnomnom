@@ -59,6 +59,19 @@ describe("pr-governance-check portability", () => {
     expect(violations[0]?.snippet).toContain("Application Support");
   });
 
+  it("does not overmatch across newlines when scanning unix paths", () => {
+    const violations = detectMachinePathViolations([
+      {
+        path: "docs/pi-local-workflow.md",
+        content: "Broken path /Users/phaedrus/Library/Application\nSupport/pi-agent/logs",
+      },
+    ]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.snippet).toBe("/Users/phaedrus/Library/Application");
+    expect(violations[0]?.snippet).not.toContain("Support/pi-agent/logs");
+  });
+
   it("scans only portability-sensitive file surfaces", () => {
     expect(shouldScanForPortability(".pi/prompts/deliver.md")).toBe(true);
     expect(shouldScanForPortability("AGENTS.md")).toBe(true);
@@ -161,6 +174,26 @@ describe("pr-governance-check runGhJson", () => {
 
     expect(attempts).toBe(1);
     expect(delays).toHaveLength(0);
+  });
+
+  it("throws a deterministic error for invalid retries values", () => {
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        retries: 0,
+        runCommandFn: () => ({ ok: true, stdout: "{}" }),
+        sleepFn: () => undefined,
+      }),
+    ).toThrow("Invalid retries value");
+  });
+
+  it("throws a deterministic error for invalid backoff values", () => {
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        backoffMs: -1,
+        runCommandFn: () => ({ ok: true, stdout: "{}" }),
+        sleepFn: () => undefined,
+      }),
+    ).toThrow("Invalid backoffMs value");
   });
 });
 

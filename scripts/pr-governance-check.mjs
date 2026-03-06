@@ -259,8 +259,18 @@ export function runGhJson(
   args,
   { retries = 3, backoffMs = 2000, runCommandFn = runCommand, sleepFn = sleepSync } = {},
 ) {
+  const normalizedRetries = Number(retries);
+  if (!Number.isInteger(normalizedRetries) || normalizedRetries < 1) {
+    throw new Error(`Invalid retries value: ${String(retries)}. Expected an integer >= 1.`);
+  }
+
+  const normalizedBackoffMs = Number(backoffMs);
+  if (!Number.isFinite(normalizedBackoffMs) || normalizedBackoffMs < 0) {
+    throw new Error(`Invalid backoffMs value: ${String(backoffMs)}. Expected a number >= 0.`);
+  }
+
   let lastError;
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  for (let attempt = 1; attempt <= normalizedRetries; attempt++) {
     const result = runCommandFn("gh", args);
     if (result.ok) {
       try {
@@ -270,8 +280,8 @@ export function runGhJson(
       }
     }
     lastError = result.stderr || result.stdout || `gh ${args.join(" ")} failed`;
-    if (attempt < retries) {
-      const delay = backoffMs * attempt;
+    if (attempt < normalizedRetries) {
+      const delay = normalizedBackoffMs * attempt;
       sleepFn(delay);
     }
   }
