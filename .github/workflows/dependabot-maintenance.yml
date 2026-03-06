@@ -1,0 +1,83 @@
+name: Dependabot Maintenance
+
+on:
+  pull_request_target:
+    branches: ["master"]
+    types: [opened, reopened, synchronize, ready_for_review]
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-maintenance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  keep-dependabot-prs-moving:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Refresh Dependabot PRs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          prs_file="$(mktemp)"
+
+          if [ "$EVENT_NAME" = "pull_request_target" ]; then
+            printf '%s\n' "$PR_NUMBER" > "$prs_file"
+          else
+            gh pr list \
+              --state open \
+              --base master \
+              --limit 50 \
+              --json number,headRefName,isDraft \
+              --jq '.[] | select((.headRefName | startswith("dependabot/")) and (.isDraft | not)) | .number' \
+              > "$prs_file"
+          fi
+
+          if [ ! -s "$prs_file" ]; then
+            echo "No open Dependabot PRs to refresh."
+            exit 0
+          fi
+
+          while IFS= read -r pr_number; do
+            [ -n "$pr_number" ] || continue
+
+            pr_json="$(gh pr view "$pr_number" --json autoMergeRequest,isDraft,mergeStateStatus,mergeable)"
+            is_draft="$(printf '%s' "$pr_json" | jq -r '.isDraft')"
+            merge_state="$(printf '%s' "$pr_json" | jq -r '.mergeStateStatus')"
+            mergeable="$(printf '%s' "$pr_json" | jq -r '.mergeable')"
+            auto_merge_enabled="$(printf '%s' "$pr_json" | jq -r '.autoMergeRequest != null')"
+
+            if [ "$is_draft" = "true" ]; then
+              echo "Skipping draft PR #$pr_number."
+              continue
+            fi
+
+            if [ "$merge_state" = "DIRTY" ] || [ "$mergeable" = "CONFLICTING" ]; then
+              echo "Skipping conflicted PR #$pr_number."
+              continue
+            fi
+
+            if [ "$merge_state" = "BEHIND" ]; then
+              echo "Updating PR #$pr_number with latest master."
+              gh pr update-branch "$pr_number" --repo "$GITHUB_REPOSITORY"
+              auto_merge_enabled="false"
+            fi
+
+            if [ "$auto_merge_enabled" = "false" ]; then
+              echo "Enabling auto-merge for PR #$pr_number."
+              gh pr merge "$pr_number" --auto --squash --repo "$GITHUB_REPOSITORY"
+            else
+              echo "Auto-merge already enabled for PR #$pr_number."
+            fi
+          done < "$prs_file"
