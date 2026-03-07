@@ -30,17 +30,41 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
+
+          retry() {
+            local attempt=1
+            local max_attempts=3
+            local delay=5
+
+            while true; do
+              if "$@"; then
+                return 0
+              fi
+
+              local exit_code=$?
+              if [ "$attempt" -ge "$max_attempts" ]; then
+                return "$exit_code"
+              fi
+
+              local backoff=$((delay * (1 << (attempt - 1)) + RANDOM % 3))
+              echo "Command failed (attempt $attempt/$max_attempts): $*"
+              echo "Retrying in ${backoff}s..."
+              sleep "$backoff"
+              attempt=$((attempt + 1))
+            done
+          }
 
           prs_file="$(mktemp)"
 
           if [ "$EVENT_NAME" = "pull_request_target" ]; then
             printf '%s\n' "$PR_NUMBER" > "$prs_file"
           else
-            gh pr list \
+            retry gh pr list \
               --state open \
-              --base master \
+              --base "$DEFAULT_BRANCH" \
               --limit 50 \
               --json number,headRefName,isDraft,author \
               --jq '.[] | select((.headRefName | startswith("dependabot/")) and (.isDraft | not) and (.author.login == "dependabot[bot]" or .author.login == "app/dependabot")) | .number' \
@@ -55,7 +79,7 @@ jobs:
           while IFS= read -r pr_number; do
             [ -n "$pr_number" ] || continue
 
-            pr_json="$(gh pr view "$pr_number" --json autoMergeRequest,isDraft,mergeStateStatus,mergeable)"
+            pr_json="$(retry gh pr view "$pr_number" --json autoMergeRequest,isDraft,mergeStateStatus,mergeable)"
             is_draft="$(printf '%s' "$pr_json" | jq -r '.isDraft')"
             merge_state="$(printf '%s' "$pr_json" | jq -r '.mergeStateStatus')"
             mergeable="$(printf '%s' "$pr_json" | jq -r '.mergeable')"
@@ -72,14 +96,14 @@ jobs:
             fi
 
             if [ "$merge_state" = "BEHIND" ]; then
-              echo "Updating PR #$pr_number with latest master."
-              gh pr update-branch "$pr_number" --repo "$GITHUB_REPOSITORY"
+              echo "Updating PR #$pr_number with latest $DEFAULT_BRANCH."
+              retry gh pr update-branch "$pr_number" --repo "$GITHUB_REPOSITORY"
               auto_merge_enabled="false"
             fi
 
             if [ "$auto_merge_enabled" = "false" ]; then
               echo "Enabling auto-merge for PR #$pr_number."
-              gh pr merge "$pr_number" --auto --squash --repo "$GITHUB_REPOSITORY"
+              retry gh pr merge "$pr_number" --auto --squash --repo "$GITHUB_REPOSITORY"
             else
               echo "Auto-merge already enabled for PR #$pr_number."
             fi
