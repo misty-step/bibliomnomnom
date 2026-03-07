@@ -42,9 +42,9 @@ const ACTIONABLE_PATTERNS = [
 ];
 
 const MACHINE_PATH_PATTERNS = [
-  /\/Users\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/\s-]+/g,
+  /\/Users\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/ -]+/g,
   /[A-Za-z]:\\+Users\\+[A-Za-z0-9._ -]+(?:\\+[A-Za-z0-9._ -]+)+/g,
-  /\/home\/[A-Za-z0-9._-]+\/[A-Za-z0-9._\/\s-]+/g,
+  /\/home\/[A-Za-z0-9._-]+\/[A-Za-z0-9._/ -]+/g,
 ];
 
 const PORTABILITY_PATH_PREFIXES = [".pi/", "docs/pi-"];
@@ -91,6 +91,10 @@ query($owner: String!, $name: String!, $number: Int!, $after: String) {
   }
 }
 `;
+
+/**
+ * @typedef {{ ok: true, stdout: string, stderr?: undefined } | { ok: false, stdout: string, stderr: string }} CommandResult
+ */
 
 export function classifySeverity(text) {
   if (matchesAny(CRITICAL_PATTERNS, text)) return "critical";
@@ -221,13 +225,24 @@ function matchesAny(patterns, text) {
   return patterns.some((pattern) => pattern.test(text));
 }
 
-function runCommand(command, args, options = {}) {
+export function createExecOptions(options = {}) {
+  const { maxBuffer: _ignoredMaxBuffer, timeout: _ignoredTimeout, ...restOptions } = options;
+
+  return {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+    ...restOptions,
+    timeout: 30_000,
+    maxBuffer: 10 * 1024 * 1024,
+  };
+}
+
+/**
+ * @returns {CommandResult}
+ */
+export function runCommand(command, args, options = {}) {
   try {
-    const stdout = execFileSync(command, args, {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-      ...options,
-    });
+    const stdout = execFileSync(command, args, createExecOptions(options));
     return { ok: true, stdout };
   } catch (error) {
     return {
@@ -238,17 +253,52 @@ function runCommand(command, args, options = {}) {
   }
 }
 
-function runGhJson(args) {
-  const result = runCommand("gh", args);
-  if (!result.ok) {
-    throw new Error(result.stderr || result.stdout || `gh ${args.join(" ")} failed`);
+export function sleepSync(ms) {
+  const durationMs = Math.max(0, Number(ms) || 0);
+  if (durationMs === 0) return;
+
+  if (typeof Atomics !== "undefined" && typeof SharedArrayBuffer !== "undefined") {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, durationMs);
+    return;
   }
 
-  try {
-    return JSON.parse(result.stdout);
-  } catch (error) {
-    throw new Error(`Failed to parse JSON from gh ${args.join(" ")}: ${String(error)}`);
+  const end = Date.now() + durationMs;
+  while (Date.now() < end) {
+    // Busy wait fallback for runtimes without Atomics.wait support.
   }
+}
+
+export function runGhJson(
+  args,
+  { retries = 3, backoffMs = 2000, runCommandFn = runCommand, sleepFn = sleepSync } = {},
+) {
+  const normalizedRetries = Number(retries);
+  if (!Number.isInteger(normalizedRetries) || normalizedRetries < 1) {
+    throw new Error(`Invalid retries value: ${String(retries)}. Expected an integer >= 1.`);
+  }
+
+  const normalizedBackoffMs = Number(backoffMs);
+  if (!Number.isFinite(normalizedBackoffMs) || normalizedBackoffMs < 0) {
+    throw new Error(`Invalid backoffMs value: ${String(backoffMs)}. Expected a number >= 0.`);
+  }
+
+  let lastError;
+  for (let attempt = 1; attempt <= normalizedRetries; attempt++) {
+    const result = runCommandFn("gh", args);
+    if (result.ok) {
+      try {
+        return JSON.parse(result.stdout);
+      } catch (error) {
+        throw new Error(`Failed to parse JSON from gh ${args.join(" ")}: ${String(error)}`);
+      }
+    }
+    lastError = result.stderr || result.stdout || `gh ${args.join(" ")} failed`;
+    if (attempt < normalizedRetries) {
+      const delay = normalizedBackoffMs * attempt;
+      sleepFn(delay);
+    }
+  }
+  throw new Error(lastError);
 }
 
 function listTrackedFiles() {

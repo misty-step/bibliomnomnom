@@ -3,8 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   classifySeverity,
   collectUnresolvedActionableThreadBlockers,
+  createExecOptions,
   detectMachinePathViolations,
   isActionable,
+  runGhJson,
   runGovernanceChecks,
   shouldScanForPortability,
 } from "../../scripts/pr-governance-check.mjs";
@@ -58,6 +60,19 @@ describe("pr-governance-check portability", () => {
     expect(violations[0]?.snippet).toContain("Application Support");
   });
 
+  it("does not overmatch across newlines when scanning unix paths", () => {
+    const violations = detectMachinePathViolations([
+      {
+        path: "docs/pi-local-workflow.md",
+        content: "Broken path /Users/phaedrus/Library/Application\nSupport/pi-agent/logs",
+      },
+    ]);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.snippet).toBe("/Users/phaedrus/Library/Application");
+    expect(violations[0]?.snippet).not.toContain("Support/pi-agent/logs");
+  });
+
   it("scans only portability-sensitive file surfaces", () => {
     expect(shouldScanForPortability(".pi/prompts/deliver.md")).toBe(true);
     expect(shouldScanForPortability("AGENTS.md")).toBe(true);
@@ -90,6 +105,114 @@ describe("pr-governance-check isActionable", () => {
     expect(isActionable("breaking change in merge guard")).toBe(true);
     expect(isActionable("must fix before merge")).toBe(true);
     expect(isActionable("error in governance check path")).toBe(true);
+  });
+});
+
+describe("pr-governance-check runGhJson", () => {
+  it("returns parsed json when gh succeeds on first attempt", () => {
+    const runCommandFn = () => ({ ok: true as const, stdout: '{"ok":true}' });
+
+    const result = runGhJson(["api", "graphql"], { runCommandFn, sleepFn: () => undefined });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("retries with linear backoff and succeeds on a later attempt", () => {
+    const calls: number[] = [];
+    const delays: number[] = [];
+    const runCommandFn = () => {
+      calls.push(Date.now());
+      if (calls.length === 1) {
+        return { ok: false as const, stdout: "", stderr: "temporary failure" };
+      }
+      return { ok: true as const, stdout: '{"done":true}' };
+    };
+
+    const result = runGhJson(["api", "graphql"], {
+      retries: 3,
+      backoffMs: 50,
+      runCommandFn,
+      sleepFn: (ms: number) => delays.push(ms),
+    });
+
+    expect(result).toEqual({ done: true });
+    expect(calls).toHaveLength(2);
+    expect(delays).toEqual([50]);
+  });
+
+  it("throws the last command error after exhausting retries", () => {
+    const delays: number[] = [];
+    const runCommandFn = () => ({ ok: false as const, stdout: "", stderr: "still failing" });
+
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        retries: 3,
+        backoffMs: 25,
+        runCommandFn,
+        sleepFn: (ms: number) => delays.push(ms),
+      }),
+    ).toThrow("still failing");
+
+    expect(delays).toEqual([25, 50]);
+  });
+
+  it("throws on invalid json without retrying", () => {
+    let attempts = 0;
+    const delays: number[] = [];
+    const runCommandFn = () => {
+      attempts += 1;
+      return { ok: true as const, stdout: "{not json}" };
+    };
+
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        retries: 3,
+        backoffMs: 25,
+        runCommandFn,
+        sleepFn: (ms: number) => delays.push(ms),
+      }),
+    ).toThrow("Failed to parse JSON");
+
+    expect(attempts).toBe(1);
+    expect(delays).toHaveLength(0);
+  });
+
+  it("throws a deterministic error for invalid retries values", () => {
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        retries: 0,
+        runCommandFn: () => ({ ok: true as const, stdout: "{}" }),
+        sleepFn: () => undefined,
+      }),
+    ).toThrow("Invalid retries value");
+  });
+
+  it("throws a deterministic error for invalid backoff values", () => {
+    expect(() =>
+      runGhJson(["api", "graphql"], {
+        backoffMs: -1,
+        runCommandFn: () => ({ ok: true as const, stdout: "{}" }),
+        sleepFn: () => undefined,
+      }),
+    ).toThrow("Invalid backoffMs value");
+  });
+});
+
+describe("pr-governance-check createExecOptions", () => {
+  it("enforces hard timeout and maxBuffer limits even when callers provide overrides", () => {
+    expect(
+      createExecOptions({
+        cwd: "/tmp",
+        timeout: 0,
+        maxBuffer: Number.POSITIVE_INFINITY,
+      }),
+    ).toEqual({
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      cwd: "/tmp",
+      timeout: 30_000,
+      maxBuffer: 10 * 1024 * 1024,
+    });
   });
 });
 
