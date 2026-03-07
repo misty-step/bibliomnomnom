@@ -18,7 +18,10 @@ concurrency:
 
 jobs:
   keep-dependabot-prs-moving:
-    if: github.event_name != 'pull_request_target' || github.event.pull_request.user.login == 'dependabot[bot]'
+    if: >
+      github.event_name != 'pull_request_target' ||
+      github.event.pull_request.user.login == 'dependabot[bot]' ||
+      github.event.pull_request.user.login == 'app/dependabot'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -39,8 +42,8 @@ jobs:
               --state open \
               --base master \
               --limit 50 \
-              --json number,headRefName,isDraft \
-              --jq '.[] | select((.headRefName | startswith("dependabot/")) and (.isDraft | not)) | .number' \
+              --json number,headRefName,isDraft,author \
+              --jq '.[] | select((.headRefName | startswith("dependabot/")) and (.isDraft | not) and (.author.login == "dependabot[bot]" or .author.login == "app/dependabot")) | .number' \
               > "$prs_file"
           fi
 
