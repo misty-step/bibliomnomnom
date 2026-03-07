@@ -13,7 +13,7 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: dependabot-maintenance-${{ github.event.pull_request.number || github.ref }}
+  group: dependabot-maintenance-${{ github.event.repository.default_branch }}
   cancel-in-progress: true
 
 jobs:
@@ -104,6 +104,13 @@ jobs:
             if [ "$auto_merge_enabled" = "false" ]; then
               echo "Enabling auto-merge for PR #$pr_number."
               retry gh pr merge "$pr_number" --auto --squash --repo "$GITHUB_REPOSITORY"
+
+              pr_json="$(retry gh pr view "$pr_number" --json autoMergeRequest)"
+              auto_merge_enabled="$(printf '%s' "$pr_json" | jq -r '.autoMergeRequest != null')"
+              if [ "$auto_merge_enabled" != "true" ]; then
+                echo "::error::Auto-merge was not enabled for PR #$pr_number."
+                exit 1
+              fi
             else
               echo "Auto-merge already enabled for PR #$pr_number."
             fi
