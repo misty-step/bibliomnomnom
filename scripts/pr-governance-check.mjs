@@ -254,7 +254,10 @@ export function runCommand(command, args, options = {}) {
 }
 
 export function sleepSync(ms) {
-  const durationMs = Math.max(0, Number(ms) || 0);
+  const durationMs = Number(ms);
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error(`Invalid sleep duration: ${String(ms)}. Expected a finite number >= 0.`);
+  }
   if (durationMs === 0) return;
 
   if (typeof Atomics !== "undefined" && typeof SharedArrayBuffer !== "undefined") {

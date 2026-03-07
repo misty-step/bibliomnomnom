@@ -8,6 +8,7 @@ import {
   isActionable,
   runGhJson,
   runGovernanceChecks,
+  sleepSync,
   shouldScanForPortability,
 } from "../../scripts/pr-governance-check.mjs";
 
@@ -213,6 +214,17 @@ describe("pr-governance-check createExecOptions", () => {
       timeout: 30_000,
       maxBuffer: 10 * 1024 * 1024,
     });
+  });
+});
+
+describe("pr-governance-check sleepSync", () => {
+  it("throws for non-finite durations", () => {
+    expect(() => sleepSync(Number.POSITIVE_INFINITY)).toThrow("Invalid sleep duration");
+    expect(() => sleepSync(Number.NaN)).toThrow("Invalid sleep duration");
+  });
+
+  it("throws for negative durations", () => {
+    expect(() => sleepSync(-1)).toThrow("Invalid sleep duration");
   });
 });
 
