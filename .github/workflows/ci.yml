@@ -201,7 +201,7 @@ jobs:
       - name: Run listening session guardrails
         run: bun run session-guardrails
       - name: Download build artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: nextjs-build
           path: .next
